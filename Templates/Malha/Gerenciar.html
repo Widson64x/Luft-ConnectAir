@@ -1,0 +1,221 @@
+{% extends "Base.html" %}
+
+{% block titulo %}Gestão de Malha | FlightOps{% endblock %}
+
+{% block conteudo %}
+
+<style>
+    /* Layout da Página: Grid de 2 Colunas */
+    .page-grid {
+        display: grid;
+        grid-template-columns: 320px 1fr; /* Coluna Fixa + Flexível */
+        gap: 24px;
+        /* Ocupa a altura disponível menos o cabeçalho da página (Título) */
+        height: calc(100vh - 140px); 
+        min-height: 500px;
+    }
+
+    @media (max-width: 1000px) {
+        .page-grid { grid-template-columns: 1fr; height: auto; }
+    }
+
+    /* Cards Estilizados */
+    .painel {
+        background: var(--cor-fundo-painel);
+        border: 1px solid var(--cor-borda);
+        border-radius: 8px;
+        margin-bottom: 30px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden; /* Importante para os filhos não vazarem */
+    }
+
+    .painel-header {
+        padding: 15px 20px;
+        border-bottom: 1px solid var(--cor-borda);
+        background: rgba(0,0,0,0.01);
+        font-weight: 600;
+        color: var(--cor-texto-principal);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .painel-body {
+        padding: 20px;
+        flex: 1; /* Faz o corpo crescer */
+        overflow-y: auto; /* Scroll apenas se necessário dentro do card */
+    }
+
+    /* Painel de Tabela Específico (sem padding para colar a tabela nas bordas) */
+    .painel-tabela .painel-body {
+        padding: 0; 
+    }
+
+    /* Área de Upload */
+    .upload-zone {
+        border: 2px dashed var(--cor-borda);
+        border-radius: 6px;
+        padding: 30px 20px;
+        text-align: center;
+        transition: all 0.2s;
+        cursor: pointer;
+        background: var(--cor-fundo-principal);
+    }
+    .upload-zone:hover {
+        border-color: var(--cor-primaria);
+        background: rgba(0, 86, 179, 0.03);
+    }
+    
+    /* Tabela Profissional */
+    .table-custom { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .table-custom th {
+        background: var(--cor-fundo-principal);
+        color: var(--cor-texto-secundario);
+        font-weight: 600;
+        text-align: left;
+        padding: 12px 20px;
+        position: sticky;
+        top: 0;
+        border-bottom: 1px solid var(--cor-borda);
+        z-index: 5;
+    }
+    .table-custom td { padding: 12px 20px; border-bottom: 1px solid var(--cor-borda); color: var(--cor-texto-principal); }
+    .table-custom tr:hover { background-color: rgba(0,0,0,0.02); }
+
+    /* Badges e Tags */
+    .tag { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
+    .tag-blue { background: #e3f2fd; color: #0d47a1; } /* Importação */
+    .tag-yellow { background: #fff3cd; color: #856404; } /* Substituição */
+    .status-dot { height: 8px; width: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+    .dot-green { background-color: #28a745; }
+    .dot-gray { background-color: #6c757d; }
+
+    /* Modal */
+    .modal-backdrop {
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+        background: rgba(0,0,0,0.5); z-index: 1000;
+        display: flex; align-items: center; justify-content: center;
+        backdrop-filter: blur(2px);
+    }
+    .modal-content {
+        background: var(--cor-fundo-painel); width: 400px; padding: 30px;
+        border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); text-align: center;
+    }
+</style>
+
+{% if ExibirModal %}
+<div class="modal-backdrop">
+    <div class="modal-content">
+        <div style="font-size: 2.5rem; margin-bottom: 15px;">⚠️</div>
+        <h3 style="color: #dc3545; margin-bottom: 10px;">Substituir Malha?</h3>
+        <p style="color: var(--cor-texto-secundario); margin-bottom: 25px; line-height: 1.5;">
+            Já existe uma malha ativa para <strong>{{ DadosModal.mes_ref.strftime('%m/%Y') }}</strong>.<br>
+            Deseja arquivar a atual e ativar esta nova?
+        </p>
+        
+        <form method="POST" style="display: flex; gap: 10px; justify-content: center;">
+            <input type="hidden" name="confirmar_substituicao" value="true">
+            <input type="hidden" name="caminho_temp" value="{{ DadosModal.caminho_temp }}">
+            <input type="hidden" name="nome_arquivo" value="{{ DadosModal.nome_arquivo }}">
+            <input type="hidden" name="mes_ref" value="{{ DadosModal.mes_ref }}">
+            
+            <a href="{{ url_for('Malha.Gerenciar') }}" class="btn-primario" style="background: #6c757d; text-decoration: none;">Cancelar</a>
+            <button type="submit" class="btn-primario" style="background: #dc3545;">Sim, Substituir</button>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: end;">
+    <div>
+        <h2 style="font-weight: 600; color: var(--cor-texto-principal);">Malha Aérea</h2>
+        <p style="color: var(--cor-texto-secundario); font-size: 0.9rem;">Gerencie as importações e versões dos voos.</p>
+    </div>
+</div>
+
+<div class="page-grid">
+    
+    <div class="painel" style="height: fit-content;">
+        <div class="painel-header">Nova Importação</div>
+        <div class="painel-body">
+            <form method="POST" enctype="multipart/form-data">
+                <label style="font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; display: block;">Selecionar Planilha (.xlsx)</label>
+                
+                <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+                    <span style="font-size: 2rem;">📤</span><br>
+                    <span style="font-size: 0.9rem; font-weight: 500;">Clique para Upload</span>
+                    <input type="file" id="fileInput" name="arquivo_xlsx" accept=".xlsx" style="display: none;" onchange="this.form.submit()">
+                </div>
+
+                <div style="margin-top: 15px; font-size: 0.8rem; color: var(--cor-texto-secundario); background: var(--cor-fundo-principal); padding: 10px; border-radius: 4px;">
+                    <strong>Dica:</strong> O sistema detecta o mês automaticamente pela coluna "DIA" ou "DATA".
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="painel painel-tabela">
+        <div class="painel-header">
+            <span>Histórico de Versões</span>
+            <span style="font-size: 0.8rem; font-weight: 400; color: var(--cor-texto-secundario);">Ordenado por data de upload</span>
+        </div>
+        
+        <div class="painel-body">
+            <table class="table-custom">
+                <thead>
+                    <tr>
+                        <th>Referência</th>
+                        <th>Tipo</th>
+                        <th>Arquivo</th>
+                        <th>Resp.</th>
+                        <th>Status</th>
+                        <th style="text-align: center;">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for remessa in ListaRemessas %}
+                    <tr>
+                        <td style="font-weight: 600;">{{ remessa.MesReferencia.strftime('%m/%Y') }}</td>
+                        <td>
+                            {% if remessa.TipoAcao == 'Substituicao' %}
+                                <span class="tag tag-yellow">Substituição</span>
+                            {% else %}
+                                <span class="tag tag-blue">Importação</span>
+                            {% endif %}
+                        </td>
+                        <td style="font-size: 0.85rem; color: var(--cor-texto-secundario);">{{ remessa.NomeArquivoOriginal }}</td>
+                        <td>
+                            <div style="font-weight: 500;">{{ remessa.UsuarioResponsavel }}</div>
+                            <div style="font-size: 0.75rem; color: #999;">{{ remessa.DataUpload.strftime('%d/%m %H:%M') }}</div>
+                        </td>
+                        <td>
+                            {% if remessa.Ativo %}
+                                <span style="color: #155724; font-weight: 600; font-size: 0.85rem;"><span class="status-dot dot-green"></span>Ativo</span>
+                            {% else %}
+                                <span style="color: #6c757d; font-size: 0.85rem;"><span class="status-dot dot-gray"></span>Histórico</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: center;">
+                            <a href="{{ url_for('Malha.Excluir', id_remessa=remessa.Id) }}" 
+                               onclick="return confirm('ATENÇÃO: Isso apagará todos os voos desta versão.\nContinuar?')"
+                               style="text-decoration: none; padding: 5px; border-radius: 4px; transition: 0.2s;"
+                               title="Excluir">
+                               ❌
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 50px; color: var(--cor-texto-secundario);">
+                            Nenhuma importação realizada ainda.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

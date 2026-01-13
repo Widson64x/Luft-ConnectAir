@@ -18,39 +18,57 @@ class ConfiguracaoBase:
     SQL_USER = os.getenv("SQL_USER")
     SQL_PASS = os.getenv("SQL_PASS")
     
+    # --- Configurações do POSTGRESQL (Banco da Aplicação/Malha) ---
+    PG_HOST = os.getenv("PGDB_HOST", "localhost")
+    PG_PORT = os.getenv("PGDB_PORT", "5432")
+    PG_USER = os.getenv("PGDB_USER", "postgres")
+    PG_PASS = os.getenv("PGDB_PASSWORD", "")
+    PG_DRIVER = os.getenv("PGDB_DRIVER", "psycopg") # Ex: psycopg2 ou psycopg (v3)
+
     # Define se mostra logs de conexão (SQLAlchemy Echo)
-    MOSTRAR_LOGS_DB = os.getenv("DB_LOGS", "False").lower() == "true"
+    MOSTRAR_LOGS_DB = os.getenv("DB_CONNECT_LOGS", "False").lower() == "true"
 
     def ObterUrlSqlServer(self):
         """
-        Gera a string de conexão (Connection String) para o SQL Server.
-        Utiliza o driver ODBC Driver 17.
+        Gera a string de conexão para o SQL Server.
         """
         if not self.SQL_PASS:
-            # Caso não tenha senha, assume Autenticação do Windows (Trusted Connection)
             return (
                 f"mssql+pyodbc://{self.SQL_HOST}:{self.SQL_PORT}/{self.SQL_DB}"
                 "?driver=ODBC+Driver+17+for+SQL+Server&Trusted_Connection=yes"
             )
         
-        # Codifica a senha para evitar erros com caracteres especiais (@, #, etc)
         SenhaCodificada = urllib.parse.quote_plus(self.SQL_PASS)
         return (
             f"mssql+pyodbc://{self.SQL_USER}:{SenhaCodificada}@{self.SQL_HOST}:{self.SQL_PORT}/{self.SQL_DB}"
             "?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes"
         )
 
+    def ObterUrlPostgres(self):
+        """
+        Gera a string de conexão para o PostgreSQL.
+        Formato: postgresql+driver://user:pass@host:port/dbname
+        """
+        SenhaCodificada = urllib.parse.quote_plus(self.PG_PASS)
+        # self.PG_DB_NAME será definido nas classes filhas (Ambientes)
+        return f"postgresql+{self.PG_DRIVER}://{self.PG_USER}:{SenhaCodificada}@{self.PG_HOST}:{self.PG_PORT}/{self.PG_DB_NAME}"
+
 # --- Ambientes Específicos ---
 
 class ConfiguracaoDesenvolvimento(ConfiguracaoBase):
     DEBUG = True
-    # Aqui poderíamos ter um banco Postgres de DEV separado, se necessário
+    # Define o nome do banco específico para DEV
+    PG_DB_NAME = os.getenv("PGDB_NAME_DEV", "FlightOps_DEV")
 
 class ConfiguracaoHomologacao(ConfiguracaoBase):
     DEBUG = False
+    # Define o nome do banco específico para HOMOLOG
+    PG_DB_NAME = os.getenv("PGDB_NAME_HOMOLOG", "FlightOps_HOMOLOG")
 
 class ConfiguracaoProducao(ConfiguracaoBase):
     DEBUG = False
+    # Define o nome do banco específico para PROD
+    PG_DB_NAME = os.getenv("PGDB_NAME_PROD", "FlightOps")
 
 # Mapa de seleção do ambiente
 MapaConfiguracao = {
@@ -59,8 +77,10 @@ MapaConfiguracao = {
     "producao": ConfiguracaoProducao
 }
 
-# Inicializa a configuração baseada no .env
+# Inicializa a configuração baseada no .env (AMBIENTE_APP)
+# Se não encontrar, assume 'desenvolvimento'
 NomeAmbiente = os.getenv("AMBIENTE_APP", "desenvolvimento").lower()
 ConfiguracaoAtual = MapaConfiguracao.get(NomeAmbiente, ConfiguracaoDesenvolvimento)()
 
 print(f"🔧 Configurações carregadas em modo: {NomeAmbiente.upper()}")
+print(f"🐘 Banco Postgres Alvo: {ConfiguracaoAtual.PG_DB_NAME}")

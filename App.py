@@ -4,6 +4,7 @@ import os
 
 # Importação das Rotas e Modelos
 from Routes.RotasAutenticacao import AuthBp
+from Routes.RotasMalha import MalhaBp
 from Conexoes import ObterSessaoSqlServer
 from Models.SQL_SERVER.Usuario import Usuario, UsuarioGrupo
 from Models.UsuarioModel import UsuarioSistema
@@ -63,6 +64,7 @@ def CarregarUsuario(UserId):
 
 # Registrar as Rotas (Blueprints)
 app.register_blueprint(AuthBp, url_prefix='/auth')
+app.register_blueprint(MalhaBp)
 
 @app.route('/')
 @login_required

@@ -2,11 +2,28 @@
 
 {% block conteudo %}
     <h1>Painel de Controle</h1>
-    <p>Bem-vindo ao sistema de Planejamento de Voos.</p>
+    <p>Bem-vindo ao sistema de Gestão da Malha de Voos.</p>
     
-    <div style="margin-top: 20px; padding: 20px; background: var(--cor-fundo-painel); border-radius: 8px; box-shadow: var(--sombra-card);">
-        <h3>Status do Sistema</h3>
-        <p>Banco de Dados: <span style="color: green;">Online</span></p>
-        <p>Active Directory: <span style="color: green;">Conectado</span></p>
+    <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 30px;">
+        
+        <div style="flex: 1; min-width: 300px; padding: 25px; background: var(--cor-fundo-painel); border-radius: 8px; box-shadow: var(--sombra-card);">
+            <h3>📊 Status do Sistema</h3>
+            <hr style="margin: 10px 0; border: 0; border-top: 1px solid var(--cor-borda);">
+            <p style="margin-bottom: 8px;">Banco de Dados: <span style="color: green; font-weight: bold;">Online</span></p>
+            <p>Active Directory: <span style="color: green; font-weight: bold;">Conectado</span></p>
+        </div>
+
+        <div style="flex: 1; min-width: 300px; padding: 25px; background: var(--cor-fundo-painel); border-radius: 8px; box-shadow: var(--sombra-card);">
+            <h3>🛫 Gestão de Malha</h3>
+            <hr style="margin: 10px 0; border: 0; border-top: 1px solid var(--cor-borda);">
+            <p style="color: var(--cor-texto-secundario); margin-bottom: 20px;">
+                Importe novas planilhas de voos, visualize o histórico de versões e controle a vigência mensal.
+            </p>
+            
+            <a href="{{ url_for('Malha.Gerenciar') }}" class="btn-primario" style="text-decoration: none; display: inline-block; text-align: center;">
+                Ir para Importação
+            </a>
+        </div>
+
     </div>
 {% endblock %}

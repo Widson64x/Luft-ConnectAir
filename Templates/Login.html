@@ -9,69 +9,122 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='CSS/Global.css') }}">
 
     <style>
-        /* CSS Específico do Login (pode ir para um arquivo separado depois) */
+        /* --- CSS Específico do Login --- */
+        body {
+            overflow: hidden; /* Impede barras de rolagem desnecessárias */
+        }
+
         .login-container {
             display: flex;
             align-items: center;
             justify-content: center;
             height: 100vh;
+            width: 100vw;
+            /* Gradiente suave e profissional */
             background: linear-gradient(135deg, var(--cor-fundo-principal) 0%, var(--cor-borda) 100%);
+            position: relative;
+        }
+
+        /* Efeito de fundo sutil (Opcional) */
+        .login-bg-decoration {
+            position: absolute;
+            width: 100%; height: 100%;
+            background: radial-gradient(circle at 50% 0%, rgba(0, 86, 179, 0.08) 0%, transparent 70%);
+            pointer-events: none;
         }
 
         .login-card {
             background-color: var(--cor-fundo-painel);
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: var(--sombra-card);
-            width: 100%;
+            padding: 45px;
+            border-radius: 16px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1); /* Sombra mais elegante */
+            width: 90%;
             max-width: 400px;
             text-align: center;
+            border: 1px solid var(--cor-borda);
+            position: relative;
+            z-index: 10;
         }
 
         .login-logo {
-            font-size: 2rem;
-            font-weight: bold;
+            font-size: 2.2rem;
+            font-weight: 800;
             color: var(--cor-primaria);
-            margin-bottom: 10px;
+            margin-bottom: 5px;
             display: block;
+            letter-spacing: -0.5px;
         }
 
         .login-subtitle {
             color: var(--cor-texto-secundario);
-            margin-bottom: 30px;
-            font-size: 0.9rem;
+            margin-bottom: 35px;
+            font-size: 0.95rem;
+            font-weight: 500;
         }
 
         .form-group {
             text-align: left;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
         }
 
         label {
             font-size: 0.85rem;
             font-weight: 600;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
             display: block;
+            color: var(--cor-texto-principal);
+        }
+
+        /* Estilização dos Inputs (Necessário pois o Global.css foca em Layout agora) */
+        input[type="text"], 
+        input[type="password"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid var(--cor-borda);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            color: var(--cor-texto-principal);
+            background-color: var(--cor-fundo-principal);
+            transition: all 0.2s ease;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: var(--cor-primaria);
+            background-color: var(--cor-fundo-painel);
+            box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.15); /* Anel de foco */
+        }
+
+        /* Ajuste no botão para ficar mais alto e chamativo */
+        .btn-primario {
+            width: 100%;
+            padding: 14px;
+            font-size: 1rem;
+            margin-top: 10px;
+            font-weight: 600;
         }
         
         .rodape-login {
-            margin-top: 20px;
-            font-size: 0.8rem;
+            margin-top: 30px;
+            font-size: 0.75rem;
             color: var(--cor-texto-secundario);
+            opacity: 0.8;
+            border-top: 1px solid var(--cor-borda);
+            padding-top: 20px;
         }
     </style>
 </head>
 <body>
 
     <div class="login-container">
-        <div class="login-card">
+        <div class="login-bg-decoration"></div> <div class="login-card">
             <span class="login-logo">✈️ FlightOps</span>
-            <p class="login-subtitle">Planejamento e Controle de Voos</p>
+            <p class="login-subtitle">Gestão da Malha e Controle de Voos</p>
 
             {% with messages = get_flashed_messages(with_categories=true) %}
               {% if messages %}
                 {% for category, message in messages %}
-                  <div class="alert alert-{{ category }}">{{ message }}</div>
+                  <div class="alert alert-{{ category }}" style="text-align: left;">{{ message }}</div>
                 {% endfor %}
               {% endif %}
             {% endwith %}
@@ -91,13 +144,14 @@
             </form>
 
             <div class="rodape-login">
-                &copy; 2026 LuftFarma - Depto. Torre de Controle
+                &copy; 2026 LuftFarma - Torre de Controle<br>
+                Acesso Restrito e Monitorado
             </div>
         </div>
     </div>
 
     <script>
-        // Se o usuário usa modo escuro no Windows/Mac, já iniciamos assim
+        // Detecção automática de tema escuro
         if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
             document.documentElement.setAttribute('data-theme', 'dark');
         }
