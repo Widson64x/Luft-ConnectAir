@@ -1,0 +1,28 @@
+/* Definição das Variáveis de Cores (CSS Variables) */
+:root {
+    /* --- TEMA LIGHT (Padrão) --- */
+    --cor-fundo-principal: #f4f6f9;       /* Cinza muito claro (nuvem) */
+    --cor-fundo-painel: #ffffff;          /* Branco */
+    --cor-texto-principal: #333333;       /* Preto suave */
+    --cor-texto-secundario: #666666;      /* Cinza médio */
+    
+    --cor-primaria: #0056b3;              /* Azul Aviação */
+    --cor-primaria-hover: #004494;
+    
+    --cor-borda: #dee2e6;
+    --sombra-card: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* --- TEMA DARK (Modo Noturno / Cockpit) --- */
+[data-theme="dark"] {
+    --cor-fundo-principal: #121212;       /* Preto quase absoluto */
+    --cor-fundo-painel: #1e1e2f;          /* Azul noturno profundo */
+    --cor-texto-principal: #e0e0e0;       /* Branco gelo */
+    --cor-texto-secundario: #a0a0b0;      /* Cinza azulado */
+    
+    --cor-primaria: #3a8dde;              /* Azul mais claro (brilho) */
+    --cor-primaria-hover: #5aa4ea;
+    
+    --cor-borda: #2d2d44;
+    --sombra-card: 0 4px 15px rgba(0, 0, 0, 0.5);
+}

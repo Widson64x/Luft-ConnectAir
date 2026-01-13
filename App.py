@@ -1,0 +1,73 @@
+from flask import Flask, render_template
+from flask_login import LoginManager, login_required, current_user
+import os
+
+# Importação das Rotas e Modelos
+from Routes.RotasAutenticacao import AuthBp
+from Conexoes import ObterSessaoSqlServer
+from Models.SQL_SERVER.Usuario import Usuario, UsuarioGrupo
+from Models.UsuarioModel import UsuarioSistema
+
+app = Flask(__name__)
+app.secret_key = 'CHAVE_SUPER_SECRETA_DO_PROJETO_VOOS' # Trocar por algo seguro depois
+
+# Configuração do Flask-Login
+GerenciadorLogin = LoginManager()
+GerenciadorLogin.init_app(app)
+GerenciadorLogin.login_view = 'Auth.Login' # Nome da rota para redirecionar quem não tá logado
+
+@GerenciadorLogin.user_loader
+def CarregarUsuario(UserId):
+    """
+    Recarrega o usuário a partir do ID armazenado na sessão (neste caso, o Login do AD).
+    Busca dados atualizados no SQL Server a cada requisição.
+    """
+    Sessao = ObterSessaoSqlServer()
+    UsuarioEncontrado = None
+
+    try:
+        # Busca Usuário + Grupo fazendo um JOIN
+        # UserId aqui é o Login (ex: 'joao.silva') que salvamos no cookie
+        Resultado = Sessao.query(Usuario, UsuarioGrupo)\
+            .outerjoin(UsuarioGrupo, Usuario.codigo_usuariogrupo == UsuarioGrupo.codigo_usuariogrupo)\
+            .filter(Usuario.Login_Usuario == UserId)\
+            .first()
+
+        if Resultado:
+            # Desempacota a tupla retornada pela query
+            DadosUsuario, DadosGrupo = Resultado
+            
+            # Trata caso o usuário esteja sem grupo vinculado
+            NomeGrupo = DadosGrupo.Sigla_UsuarioGrupo if DadosGrupo else "SEM_GRUPO"
+
+            # Cria o objeto que ficará disponível em 'current_user'
+            UsuarioEncontrado = UsuarioSistema(
+                Login=DadosUsuario.Login_Usuario,
+                Nome=DadosUsuario.Nome_Usuario,
+                Email=DadosUsuario.Email_Usuario,
+                Grupo=NomeGrupo,
+                IdBanco=DadosUsuario.Codigo_Usuario
+            )
+            
+    except Exception as Erro:
+        print(f"⚠️ Erro ao recarregar usuário do banco: {Erro}")
+        # Em caso de erro de banco, retornamos None para forçar o logout por segurança
+        return None
+    
+    finally:
+        # CRÍTICO: Sempre fechar a sessão para não travar o SQL Server de produção
+        if Sessao:
+            Sessao.close()
+
+    return UsuarioEncontrado
+
+# Registrar as Rotas (Blueprints)
+app.register_blueprint(AuthBp, url_prefix='/auth')
+
+@app.route('/')
+@login_required
+def Dashboard():
+    return render_template('Dashboard.html')
+
+if __name__ == '__main__':
+    app.run(debug=True)

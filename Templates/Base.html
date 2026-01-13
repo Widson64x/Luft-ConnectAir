@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block titulo %}FlightOps{% endblock %}</title>
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='CSS/Temas.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='CSS/Global.css') }}">
+    
+    <style>
+        /* Layout Grid: Menu Lateral + Conteúdo */
+        .layout-wrapper {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Menu Lateral (Sidebar) */
+        .sidebar {
+            width: 260px;
+            background-color: var(--cor-fundo-painel);
+            border-right: 1px solid var(--cor-borda);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        .brand {
+            font-size: 1.5rem;
+            color: var(--cor-primaria);
+            font-weight: bold;
+            margin-bottom: 40px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .menu-link {
+            text-decoration: none;
+            color: var(--cor-texto-secundario);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 5px;
+            display: block;
+            transition: all 0.2s;
+        }
+
+        .menu-link:hover, .menu-link.ativo {
+            background-color: var(--cor-primaria);
+            color: white;
+        }
+
+        /* Área Principal */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--cor-fundo-principal);
+            overflow-y: auto;
+        }
+
+        /* Barra Superior (Header) */
+        .top-bar {
+            height: 60px;
+            background-color: var(--cor-fundo-painel);
+            border-bottom: 1px solid var(--cor-borda);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 30px;
+        }
+
+        .user-info {
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        
+        .conteudo-pagina {
+            padding: 30px;
+        }
+        
+        /* Botão Tema */
+        .btn-tema {
+            background: none;
+            border: 1px solid var(--cor-borda);
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            color: var(--cor-texto-principal);
+        }
+    </style>
+</head>
+<body>
+    <div class="layout-wrapper">
+        <aside class="sidebar">
+            <div class="brand">✈️ FlightOps</div>
+            
+            <nav>
+                <a href="/" class="menu-link ativo">📊 Dashboard</a>
+                <a href="#" class="menu-link">🛫 Planejamento</a>
+                <a href="#" class="menu-link">📅 Escalas</a>
+                <a href="#" class="menu-link">⚙️ Configurações</a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-bar">
+                <button class="btn-tema" onclick="AlternarTema()">🌗 Tema</button>
+                
+                <div class="user-info">
+                    Olá, {{ current_user.Nome }} | 
+                    <a href="{{ url_for('Auth.Logout') }}" style="color: red; text-decoration: none; margin-left: 10px;">Sair</a>
+                </div>
+            </header>
+
+            <div class="conteudo-pagina">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                  {% if messages %}
+                    {% for category, message in messages %}
+                      <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                  {% endif %}
+                {% endwith %}
+
+                {% block conteudo %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Lógica simples para alternar tema e salvar no LocalStorage
+        function AlternarTema() {
+            const html = document.documentElement;
+            const temaAtual = html.getAttribute('data-theme');
+            const novoTema = temaAtual === 'dark' ? 'light' : 'dark';
+            
+            html.setAttribute('data-theme', novoTema);
+            localStorage.setItem('tema', novoTema);
+        }
+
+        // Carrega tema salvo ao iniciar
+        const temaSalvo = localStorage.getItem('tema');
+        if (temaSalvo) {
+            document.documentElement.setAttribute('data-theme', temaSalvo);
+        }
+    </script>
+</body>
+</html>
