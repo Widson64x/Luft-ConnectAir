@@ -1,0 +1,338 @@
+{% extends "Base.html" %}
+
+{% block titulo %}Monitoramento Aéreo | FlightOps{% endblock %}
+
+{% block conteudo %}
+
+<style>
+    /* --- VARIÁVEIS DO TEMA (Só valem aqui dentro) --- */
+    .dash-executivo {
+        --cor-destaque: #0d6efd;       /* Azul Executivo */
+        --cor-sucesso: #198754;        /* Verde Finanças */
+        --cor-alerta: #dc3545;         /* Vermelho Prioridade */
+        --cor-texto: #212529;
+        --cor-texto-suave: #6c757d;
+        --cor-borda: #e0e0e0;
+        --bg-fundo: #f8f9fa;
+        --bg-tabela-head: #ffffff;
+        --bg-novo-item: #e8f5e9;       /* Verde claro para animação */
+        
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        color: var(--cor-texto);
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        padding-bottom: 20px;
+    }
+
+    /* --- LAYOUT DO TOPO --- */
+    .dash-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        border-bottom: 1px solid var(--cor-borda);
+        padding-bottom: 15px;
+    }
+
+    .dash-title h2 {
+        margin: 0;
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1a1a1a;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .dash-subtitle {
+        margin: 5px 0 0 0;
+        font-size: 0.85rem;
+        color: var(--cor-texto-suave);
+    }
+
+    /* Tag "Ao Vivo" Pulsante */
+    .live-badge {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--cor-sucesso);
+        background: rgba(25, 135, 84, 0.1);
+        padding: 4px 10px;
+        border-radius: 4px;
+        border: 1px solid rgba(25, 135, 84, 0.2);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .live-dot {
+        width: 8px; height: 8px;
+        background-color: var(--cor-sucesso);
+        border-radius: 50%;
+        animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
+    /* --- CARDS DE KPI (INDICADORES) --- */
+    .kpi-wrapper {
+        display: flex;
+        gap: 20px;
+    }
+
+    .kpi-box {
+        background: #fff;
+        border: 1px solid var(--cor-borda);
+        border-radius: 8px;
+        padding: 12px 20px;
+        min-width: 140px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .kpi-label { font-size: 0.75rem; color: var(--cor-texto-suave); font-weight: 600; text-transform: uppercase; }
+    .kpi-value { font-size: 1.2rem; font-weight: 700; color: var(--cor-texto); margin-top: 4px; }
+    .kpi-value.money { color: var(--cor-sucesso); font-family: 'Consolas', monospace; }
+
+    /* --- TABELA EXECUTIVA (Estilo Isolado) --- */
+    .table-panel {
+        background: #fff;
+        border: 1px solid var(--cor-borda);
+        border-radius: 8px;
+        flex: 1; /* Ocupa o resto da tela */
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    }
+
+    .table-scroll-area {
+        overflow: auto;
+        flex: 1;
+        position: relative;
+    }
+
+    /* AQUI É O SEGREDO: Usamos .dash-table para não quebrar a Navbar */
+    .dash-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.8rem;
+        white-space: nowrap;
+    }
+
+    .dash-table th {
+        position: sticky; top: 0; z-index: 10;
+        background: var(--bg-tabela-head);
+        color: var(--cor-texto-suave);
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.7rem;
+        padding: 14px 12px;
+        border-bottom: 2px solid var(--cor-borda);
+        text-align: left;
+    }
+
+    .dash-table td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--cor-borda);
+        vertical-align: middle;
+        transition: background 0.3s;
+    }
+
+    .dash-table tr:hover td { background-color: #f8f9fa; }
+
+    /* Estilos Específicos de Coluna */
+    .text-right { text-align: right; }
+    .text-center { text-align: center; }
+    .font-mono { font-family: 'Consolas', monospace; letter-spacing: -0.5px; }
+    .font-bold { font-weight: 700; }
+    .text-dim { color: #adb5bd; }
+    
+    .col-highlight { 
+        background-color: #fcfcfc; 
+        color: var(--cor-sucesso);
+        border-left: 1px solid var(--cor-borda);
+    }
+
+    /* Badges de Prioridade */
+    .badge-prio { padding: 3px 8px; border-radius: 4px; font-size: 0.65rem; font-weight: 700; }
+    .badge-ALTA { background: #fee2e2; color: #dc2626; }
+    .badge-NORMAL { background: #e9ecef; color: #495057; }
+
+    /* --- ANIMAÇÕES DE ENTRADA (Slide & Fade) --- */
+    .animate-entry {
+        animation: slideIn 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        background-color: var(--bg-novo-item) !important;
+    }
+    
+    @keyframes slideIn {
+        from { opacity: 0; transform: translateY(15px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .animate-stabilize {
+        transition: background-color 2.5s ease-out;
+        background-color: transparent !important;
+    }
+</style>
+
+<div class="dash-executivo">
+
+    <div class="dash-header">
+        <div class="dash-title">
+            <h2>
+                Emissões Aéreo
+                <div class="live-badge"><div class="live-dot"></div> On Time</div>
+            </h2>
+            <p class="dash-subtitle">
+                Monitoramento de CTEs em Tempo Real • <span id="data-extenso"></span>
+            </p>
+        </div>
+
+        <div class="kpi-wrapper">
+            <div class="kpi-box">
+                <span class="kpi-label">Volume Doc.</span>
+                <span class="kpi-value" id="kpi-docs">0</span>
+            </div>
+            <div class="kpi-box">
+                <span class="kpi-label">Peso Taxado Total</span>
+                <span class="kpi-value" id="kpi-peso">0,00 kg</span>
+            </div>
+            <div class="kpi-box" style="border-color: #c3e6cb; background: #f8fff9;">
+                <span class="kpi-label" style="color: #155724;">Faturamento Dia</span>
+                <span class="kpi-value money" id="kpi-fat">R$ 0,00</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-panel">
+        <div class="table-scroll-area">
+            <table class="dash-table" id="tabela-ctc">
+                <thead>
+                    <tr>
+                        <th class="text-center" width="60">Filial</th>
+                        <th width="90">Número CTC</th>
+                        <th class="text-center" width="70">Hora</th>
+                        <th class="text-center" width="80">Status</th>
+                        <th>Rota (Origem ➝ Destino)</th>
+                        <th>Remetente</th>
+                        <th>Destinatário</th>
+                        <th>Natureza</th>
+                        <th class="text-right">Vol.</th>
+                        <th class="text-right text-dim">Peso Real</th>
+                        <th class="text-right font-bold" style="color: var(--cor-destaque);">Peso Tax.</th>
+                        <th class="text-right text-dim">Val. Merc.</th>
+                        <th class="text-right">Frete Valor</th>
+                        <th class="text-right">GRIS</th>
+                        <th class="text-right col-highlight font-mono">Frete Total</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    <tr><td colspan="15" class="text-center" style="padding: 40px; color: #999;">Carregando dados...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // --- LÓGICA JAVASCRIPT ---
+    
+    // 1. Data por Extenso
+    const opcoesData = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+    document.getElementById('data-extenso').innerText = new Date().toLocaleDateString('pt-BR', opcoesData);
+
+    // 2. Controle de Estado (Para saber quem é novo)
+    let ctcsJaVistos = new Set();
+
+    async function AtualizarDashboard() {
+        try {
+            const response = await fetch('/planejamento/api/ctcs-hoje');
+            const dados = await response.json();
+
+            const tbody = document.getElementById('table-body');
+            
+            // Variáveis para somatória KPI
+            let totalFaturamento = 0;
+            let totalPesoTaxado = 0;
+
+            if (dados.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="15" class="text-center" style="padding: 40px; color: #999;">Nenhuma emissão aéreo encontrada hoje.</td></tr>';
+                document.getElementById('kpi-docs').innerText = "0";
+                return;
+            }
+
+            // Gera o HTML das linhas
+            const linhasHTML = dados.map(row => {
+                // Atualiza KPIs
+                totalFaturamento += row.raw_frete_total;
+                totalPesoTaxado += row.peso_taxado;
+
+                // Verifica se é novo para animar
+                const ehNovo = !ctcsJaVistos.has(row.id_unico);
+                if (ehNovo) ctcsJaVistos.add(row.id_unico);
+
+                const classeAnimacao = ehNovo ? 'animate-entry' : '';
+                
+                // Formatação da Prioridade
+                const badgePrio = row.prioridade === 'ALTA' ? 'badge-ALTA' : 'badge-NORMAL';
+                const textoPrio = row.prioridade || 'NORMAL';
+
+                return `
+                <tr class="${classeAnimacao}" onanimationend="this.classList.remove('animate-entry'); this.classList.add('animate-stabilize')">
+                    <td class="text-center text-dim">${row.filial}</td>
+                    <td class="font-bold" style="color: var(--cor-texto);">${row.ctc}</td>
+                    <td class="text-center text-dim" style="font-size: 0.75rem;">${row.hora_emissao}</td>
+                    <td class="text-center"><span class="badge-prio ${badgePrio}">${textoPrio}</span></td>
+                    
+                    <td>
+                        <div style="font-weight: 600;">${row.origem}</div>
+                        <div style="font-size: 0.7rem; color: #888;">➝ ${row.destino}</div>
+                    </td>
+                    
+                    <td title="${row.remetente}" style="max-width: 140px; overflow: hidden; text-overflow: ellipsis;">${row.remetente.substring(0, 18)}</td>
+                    <td title="${row.destinatario}" style="max-width: 140px; overflow: hidden; text-overflow: ellipsis;">${row.destinatario.substring(0, 18)}</td>
+                    
+                    <td>
+                        <div>${row.natureza}</div>
+                        <div style="font-size: 0.65rem; color: #999;">${row.especie}</div>
+                    </td>
+                    
+                    <td class="text-right">${row.volumes}</td>
+                    <td class="text-right text-dim">${row.peso_real.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    <td class="text-right font-bold" style="color: var(--cor-destaque);">${row.peso_taxado.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    
+                    <td class="text-right text-dim" style="font-size:0.7rem;">R$ ${row.val_mercadoria}</td>
+                    <td class="text-right text-dim" style="font-size:0.7rem;">R$ ${row.frete_valor}</td>
+                    <td class="text-right text-dim" style="font-size:0.7rem;">R$ ${row.gris}</td>
+                    
+                    <td class="text-right col-highlight font-mono font-bold">
+                        R$ ${row.frete_total}
+                    </td>
+                </tr>
+                `;
+            }).join('');
+
+            // Atualiza Tabela
+            tbody.innerHTML = linhasHTML;
+
+            // Atualiza KPIs com efeito visual simples
+            document.getElementById('kpi-docs').innerText = dados.length;
+            document.getElementById('kpi-peso').innerText = totalPesoTaxado.toLocaleString('pt-BR', {minimumFractionDigits: 2}) + ' kg';
+            document.getElementById('kpi-fat').innerText = totalFaturamento.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+
+        } catch (e) {
+            console.error("Erro no refresh:", e);
+        }
+    }
+
+    // Inicialização
+    AtualizarDashboard();
+    
+    // Atualização Automática (10 segundos)
+    setInterval(AtualizarDashboard, 10000);
+
+</script>
+{% endblock %}

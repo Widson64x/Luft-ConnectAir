@@ -11,6 +11,7 @@ from Routes.RotasAutenticacao import AuthBp
 from Routes.RotasMalha import MalhaBp
 from Routes.RotasAeroportos import AeroportoBp
 from Routes.RotasCidades import CidadeBp
+from Routes.RotasPlanejamento import PlanejamentoBp
 
 app = Flask(__name__)
 app.secret_key = 'CHAVE_SUPER_SECRETA_DO_PROJETO_VOOS' # Trocar por algo seguro depois
@@ -70,6 +71,7 @@ app.register_blueprint(AuthBp, url_prefix='/auth')
 app.register_blueprint(MalhaBp)
 app.register_blueprint(AeroportoBp)
 app.register_blueprint(CidadeBp)
+app.register_blueprint(PlanejamentoBp)
 
 @app.route('/')
 @login_required
