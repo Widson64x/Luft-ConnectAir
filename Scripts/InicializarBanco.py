@@ -1,10 +1,17 @@
 from sqlalchemy import text
+import os
+import sys
+# Ajusta o path para importar módulos corretamente
+CaminhoBase = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(CaminhoBase)
+
 from Conexoes import ObterEnginePostgres
 from Models.POSTGRES.Base import BasePostgres
 
 # Importar os modelos para que o SQLAlchemy saiba o que criar
 from Models.POSTGRES.MalhaAerea import RemessaMalha, VooMalha
-
+from Models.POSTGRES.Aeroporto import RemessaAeroportos, Aeroporto
+from Models.POSTGRES.Cidade import RemessaCidade, Cidade 
 def CriarTabelas():
     print("🚀 Iniciando setup do Banco de Dados...")
     
@@ -26,6 +33,7 @@ def CriarTabelas():
             print("   - Schema: MalhaAerea")
             print("   - Tabela: Tb_RemessaMalha")
             print("   - Tabela: Tb_VooMalha")
+            print("   - Tabela: Tb_Cidade (NOVO)")
             
         except Exception as e:
             print(f"❌ Erro ao inicializar banco: {e}")

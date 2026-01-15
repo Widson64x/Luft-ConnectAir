@@ -31,6 +31,11 @@
                 🌍 Aeroportos
                 </a>
 
+                <a href="{{ url_for('Cidade.Gerenciar') }}" 
+                class="menu-link {{ 'ativo' if request.endpoint and 'Cidade' in request.endpoint else '' }}">
+                🏙️ Cidades
+                </a>
+                
                 <a href="#" class="menu-link">📅 Escalas</a>
                 <a href="#" class="menu-link">⚙️ Configurações</a>
             </nav>
