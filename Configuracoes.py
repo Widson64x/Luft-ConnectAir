@@ -11,6 +11,9 @@ class ConfiguracaoBase:
     """
     DIR_BASE = os.path.dirname(os.path.abspath(__file__))
     
+    # Define o prefixo global das rotas (Ex: /T-FlightOps)
+    ROUTE_PREFIX = os.getenv("ROUTE_PREFIX", "/T-FlightOps")
+    
     # --- Configurações do SQL SERVER (Banco de Negócio/ERP) ---
     SQL_HOST = os.getenv("SQL_HOST")
     SQL_PORT = os.getenv("SQL_PORT", "1433")

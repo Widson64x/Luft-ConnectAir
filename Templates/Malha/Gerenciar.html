@@ -248,6 +248,13 @@
 </div>
 
 <script>
+    // --- ROTAS DA API (INJETADAS PELO FLASK/JINJA2) ---
+    // Isso garante que o JS use o prefixo correto (Ex: /T-FlightOps/malha/api/rotas)
+    const API_URLS = {
+        listarAeroportos: "{{ url_for('Aeroporto.ApiListarSimples') }}",
+        buscarRotas: "{{ url_for('Malha.ApiRotas') }}"
+    };
+
     // --- GLOBAIS ---
     let map, flightLayer, layerAeroportos;
     let rotasAgrupadas = {}; 
@@ -278,7 +285,8 @@
     // --- API DE AEROPORTOS (AUTOCOMPLETE + LOCALIZADOR) ---
     async function CarregarListaAeroportos() {
         try {
-            const resp = await fetch('/aeroportos/api/listar_simples');
+            // Alterado para usar API_URLS
+            const resp = await fetch(API_URLS.listarAeroportos);
             baseAeroportos = await resp.json();
             const datalist = document.getElementById('lista-aeroportos');
             datalist.innerHTML = '';
@@ -328,7 +336,8 @@
         rotasAgrupadas = {}; 
 
         try {
-            let url = `/malha/api/rotas?inicio=${inicio}&fim=${fim}`;
+            // Alterado para usar API_URLS e interpolação de string usando a rota injetada
+            let url = `${API_URLS.buscarRotas}?inicio=${inicio}&fim=${fim}`;
             if(origem) url += `&origem=${origem}`;
             if(destino) url += `&destino=${destino}`;
 
@@ -428,7 +437,8 @@
     async function CarregarAeroportosFundo(inicio, fim) {
         layerAeroportos.clearLayers();
         try {
-            const r = await fetch(`/malha/api/rotas?inicio=${inicio}&fim=${fim}`);
+            // Alterado para usar API_URLS
+            const r = await fetch(`${API_URLS.buscarRotas}?inicio=${inicio}&fim=${fim}`);
             const t = await r.json();
             const u = new Set();
             t.forEach(rota => {

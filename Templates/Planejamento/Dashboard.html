@@ -240,6 +240,12 @@
 <script>
     // --- LÓGICA JAVASCRIPT ---
     
+    // Configuração de Rotas Dinâmicas (Injetado pelo Flask)
+    // Ajuste 'Planejamento.ApiCtcsHoje' se o nome da função for diferente no Controller
+    const API_URLS = {
+        ctcsHoje: "{{ url_for('Planejamento.ApiCtcsHoje') }}" 
+    };
+
     // 1. Data por Extenso
     const opcoesData = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
     document.getElementById('data-extenso').innerText = new Date().toLocaleDateString('pt-BR', opcoesData);
@@ -249,7 +255,8 @@
 
     async function AtualizarDashboard() {
         try {
-            const response = await fetch('/planejamento/api/ctcs-hoje');
+            // Alterado para usar a variável dinâmica em vez da string hardcoded
+            const response = await fetch(API_URLS.ctcsHoje);
             const dados = await response.json();
 
             const tbody = document.getElementById('table-body');

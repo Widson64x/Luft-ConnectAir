@@ -1,10 +1,11 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, redirect, url_for
 from flask_login import LoginManager, login_required, current_user
 import os
 
 from Conexoes import ObterSessaoSqlServer
 from Models.SQL_SERVER.Usuario import Usuario, UsuarioGrupo
 from Models.UsuarioModel import UsuarioSistema
+from Configuracoes import ConfiguracaoAtual # Importação da Configuração
 
 # Importação das Rotas e Modelos
 from Routes.RotasAutenticacao import AuthBp
@@ -66,17 +67,29 @@ def CarregarUsuario(UserId):
 
     return UsuarioEncontrado
 
-# Registrar as Rotas (Blueprints)
-app.register_blueprint(AuthBp, url_prefix='/auth')
-app.register_blueprint(MalhaBp)
-app.register_blueprint(AeroportoBp)
-app.register_blueprint(CidadeBp)
-app.register_blueprint(PlanejamentoBp)
+# --- REGISTRO DE ROTAS (BLUEPRINTS) ---
+# Pega o prefixo definido no .env ou padrão (ex: /T-FlightOps)
+Prefix = ConfiguracaoAtual.ROUTE_PREFIX
 
-@app.route('/')
+# O Auth geralmente fica separado, ex: /T-FlightOps/auth
+app.register_blueprint(AuthBp, url_prefix=f'{Prefix}/auth')
+
+# Os demais módulos assumem o prefixo base, pois suas rotas internas já possuem nomes (ex: /malha/...)
+app.register_blueprint(MalhaBp, url_prefix=Prefix)
+app.register_blueprint(AeroportoBp, url_prefix=Prefix)
+app.register_blueprint(CidadeBp, url_prefix=Prefix)
+app.register_blueprint(PlanejamentoBp, url_prefix=Prefix)
+
+# Rota principal do Dashboard com o prefixo
+@app.route(f'{Prefix}/')
 @login_required
 def Dashboard():
     return render_template('Dashboard.html')
+
+# Redirecionamento da raiz absoluta para o Dashboard correto
+@app.route('/')
+def IndexRoot():
+    return redirect(url_for('Dashboard'))
 
 if __name__ == '__main__':
     app.run(debug=True)
