@@ -12,6 +12,7 @@ from Routes.RotasAutenticacao import AuthBp
 from Routes.RotasMalha import MalhaBp
 from Routes.RotasAeroportos import AeroportoBp
 from Routes.RotasCidades import CidadeBp
+from Routes.RotasEscalas import EscalasBp
 from Routes.RotasPlanejamento import PlanejamentoBp
 
 app = Flask(__name__)
@@ -78,7 +79,8 @@ app.register_blueprint(AuthBp, url_prefix=f'{Prefix}/auth')
 app.register_blueprint(MalhaBp, url_prefix=Prefix)
 app.register_blueprint(AeroportoBp, url_prefix=Prefix)
 app.register_blueprint(CidadeBp, url_prefix=Prefix)
-app.register_blueprint(PlanejamentoBp, url_prefix=f'{Prefix}/planejamento')
+app.register_blueprint(PlanejamentoBp, url_prefix=f'{Prefix}/Planejamento')
+app.register_blueprint(EscalasBp, url_prefix=f'{Prefix}/Escalas')
 
 # Rota principal do Dashboard com o prefixo
 @app.route(f'{Prefix}/')

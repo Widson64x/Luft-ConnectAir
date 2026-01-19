@@ -10,7 +10,7 @@ from Models.SQL_SERVER.Usuario import Usuario, UsuarioGrupo
 # Definição do Blueprint
 AuthBp = Blueprint('Auth', __name__)
 
-@AuthBp.route('/login', methods=['GET', 'POST'])
+@AuthBp.route('/Logar', methods=['GET', 'POST'])
 def Login():
     """
     Rota responsável por exibir o formulário e processar o login.
@@ -71,7 +71,7 @@ def Login():
 
     return render_template('Login.html')
 
-@AuthBp.route('/logout')
+@AuthBp.route('/Deslogar')
 @login_required
 def Logout():
     logout_user()

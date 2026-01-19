@@ -9,12 +9,12 @@ from Services.MalhaService import BuscarRotasInteligentes
 
 PlanejamentoBp = Blueprint('Planejamento', __name__)
 
-@PlanejamentoBp.route('/planejamento/dashboard')
+@PlanejamentoBp.route('/Dashboard')
 @login_required
 def Dashboard():
     return render_template('Planejamento/Dashboard.html')
 
-@PlanejamentoBp.route('/planejamento/api/ctcs-hoje')
+@PlanejamentoBp.route('/API/CTCs-Hoje')
 @login_required
 def ApiCtcsHoje():
     Dados = BuscarCtcsAereoHoje()
@@ -60,7 +60,7 @@ def MontarPlanejamento(filial, serie, ctc):
                            AeroOrigem=AeroOrigem, AeroDestino=AeroDestino,
                            Rotas=RotasSugeridas)
     
-@PlanejamentoBp.route('/planejamento/mapa-global')
+@PlanejamentoBp.route('/mapa-global')
 @login_required
 def MapaGlobal():
     # 1. Pega todos os CTCs aéreos de hoje

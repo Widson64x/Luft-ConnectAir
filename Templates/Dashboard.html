@@ -1,29 +1,314 @@
 {% extends "Base.html" %}
 
+{% block titulo %}Command Center | FlightOps{% endblock %}
+
 {% block conteudo %}
-    <h1>Painel de Controle</h1>
-    <p>Bem-vindo ao sistema de Gestão da Malha de Voos.</p>
+
+<style>
+    /* --- CONFIGURAÇÕES GERAIS --- */
+    .dashboard-wrapper {
+        display: flex; flex-direction: column; gap: 30px;
+        padding-bottom: 40px;
+        animation: fadeIn 0.8s ease-out;
+    }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* --- 1. HERO SECTION (COMMAND CENTER) --- */
+    .hero-section {
+        position: relative;
+        background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #172554 100%);
+        border-radius: 24px;
+        padding: 40px;
+        color: white;
+        overflow: hidden;
+        box-shadow: 0 20px 50px rgba(30, 58, 138, 0.3);
+        display: flex; justify-content: space-between; align-items: center;
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    /* Background Map Effect */
+    .hero-bg {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23ffffff' fill-opacity='0.05' fill-rule='evenodd'/%3E%3C/svg%3E");
+        opacity: 0.6; z-index: 0;
+    }
+
+    .hero-content { position: relative; z-index: 2; }
+    .hero-badge {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+        padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 700;
+        text-transform: uppercase; margin-bottom: 15px; letter-spacing: 1px;
+        backdrop-filter: blur(4px);
+    }
+    .hero-title { font-size: 2.2rem; font-weight: 800; margin-bottom: 8px; letter-spacing: -1px; }
+    .hero-sub { font-size: 1rem; color: rgba(255,255,255,0.7); max-width: 500px; line-height: 1.5; }
+
+    /* Relógio Digital Foda */
+    .clock-widget {
+        position: relative; z-index: 2;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        padding: 20px 30px; border-radius: 16px;
+        text-align: right;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    }
+    .clock-time { font-family: 'Monaco', monospace; font-size: 2.5rem; font-weight: 700; color: #fff; letter-spacing: 2px; }
+    .clock-label { font-size: 0.8rem; color: var(--cor-primaria); text-transform: uppercase; font-weight: 700; margin-top: 5px; display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+    .status-dot { width: 8px; height: 8px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 10px #22c55e; animation: pulse 2s infinite; }
+
+    /* --- 2. STATS ROW (Resumo Rápido) --- */
+    .stats-row {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+    }
+    .stat-card {
+        background: var(--cor-fundo-painel); border: 1px solid var(--cor-borda);
+        padding: 20px; border-radius: 16px; display: flex; align-items: center; gap: 15px;
+        transition: 0.3s;
+    }
+    .stat-card:hover { transform: translateY(-3px); border-color: var(--cor-primaria); }
     
-    <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 30px;">
+    .stat-icon-box {
+        width: 48px; height: 48px; border-radius: 12px;
+        display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
+    }
+    .icon-blue { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+    .icon-purple { background: rgba(168, 85, 247, 0.1); color: #a855f7; }
+    .icon-green { background: rgba(34, 197, 94, 0.1); color: #22c55e; }
+    
+    .stat-info h4 { font-size: 0.8rem; color: var(--cor-texto-secundario); text-transform: uppercase; margin-bottom: 4px; }
+    .stat-info span { font-size: 1.2rem; font-weight: 800; color: var(--cor-texto-principal); }
+
+    /* --- 3. MODULES GRID (Navigation) --- */
+    .modules-title { font-size: 1.1rem; font-weight: 700; margin-top: 10px; display: flex; align-items: center; gap: 10px; }
+    
+    .modules-grid {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 25px;
+    }
+
+    .module-card {
+        background: var(--cor-fundo-painel);
+        border: 1px solid var(--cor-borda);
+        border-radius: 20px;
+        padding: 30px;
+        position: relative; overflow: hidden;
+        text-decoration: none;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        display: flex; flex-direction: column; justify-content: space-between;
+        height: 240px;
+        group: module; /* Group for hover effects */
+    }
+
+    /* Hover Effects Complexos */
+    .module-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+        border-color: rgba(var(--cor-primaria-rgb), 0.3);
+    }
+
+    /* Fundo Gradiente Sutil no Hover */
+    .module-card::before {
+        content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        background: radial-gradient(circle at top right, rgba(var(--cor-primaria-rgb), 0.08), transparent 70%);
+        opacity: 0; transition: 0.4s;
+    }
+    .module-card:hover::before { opacity: 1; }
+
+    /* Ícone Flutuante */
+    .card-icon {
+        width: 64px; height: 64px;
+        background: var(--cor-fundo-principal);
+        border: 1px solid var(--cor-borda);
+        border-radius: 16px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 2.2rem; color: var(--cor-texto-secundario);
+        transition: all 0.4s ease;
+        margin-bottom: 20px; z-index: 2;
+    }
+    
+    /* Hover no Card afeta o Ícone */
+    .module-card:hover .card-icon {
+        background: var(--cor-primaria);
+        color: white;
+        border-color: var(--cor-primaria);
+        transform: scale(1.1) rotate(-5deg);
+        box-shadow: 0 10px 20px rgba(var(--cor-primaria-rgb), 0.3);
+    }
+
+    .card-content { position: relative; z-index: 2; }
+    .card-title { font-size: 1.4rem; font-weight: 800; color: var(--cor-texto-principal); margin-bottom: 8px; }
+    .card-desc { font-size: 0.9rem; color: var(--cor-texto-secundario); line-height: 1.5; }
+
+    /* Seta de Ação */
+    .card-action {
+        position: absolute; bottom: 25px; right: 25px;
+        width: 40px; height: 40px;
+        border-radius: 50%;
+        background: rgba(0,0,0,0.03);
+        display: flex; align-items: center; justify-content: center;
+        color: var(--cor-primaria);
+        opacity: 0; transform: translateX(-10px);
+        transition: all 0.3s ease 0.1s;
+    }
+    .module-card:hover .card-action { opacity: 1; transform: translateX(0); background: rgba(var(--cor-primaria-rgb), 0.1); }
+
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
+</style>
+
+<div class="dashboard-wrapper">
+    
+    <div class="hero-section">
+        <div class="hero-bg"></div>
         
-        <div style="flex: 1; min-width: 300px; padding: 25px; background: var(--cor-fundo-painel); border-radius: 8px; box-shadow: var(--sombra-card);">
-            <h3>📊 Status do Sistema</h3>
-            <hr style="margin: 10px 0; border: 0; border-top: 1px solid var(--cor-borda);">
-            <p style="margin-bottom: 8px;">Banco de Dados: <span style="color: green; font-weight: bold;">Online</span></p>
-            <p>Active Directory: <span style="color: green; font-weight: bold;">Conectado</span></p>
+        <div class="hero-content">
+            <div class="hero-badge">
+                <i class="ph-fill ph-shield-check"></i> Sistema Operacional
+            </div>
+            <h1 class="hero-title">
+                Bem-vindo ao FlightOps
+            </h1>
+            <p class="hero-sub">
+                Painel de controle unificado para gestão de malha aérea, rastreamento de cargas e análise de viabilidade logística em tempo real.
+            </p>
         </div>
 
-        <div style="flex: 1; min-width: 300px; padding: 25px; background: var(--cor-fundo-painel); border-radius: 8px; box-shadow: var(--sombra-card);">
-            <h3>🛫 Gestão de Malha</h3>
-            <hr style="margin: 10px 0; border: 0; border-top: 1px solid var(--cor-borda);">
-            <p style="color: var(--cor-texto-secundario); margin-bottom: 20px;">
-                Importe novas planilhas de voos, visualize o histórico de versões e controle a vigência mensal.
-            </p>
-            
-            <a href="{{ url_for('Malha.Gerenciar') }}" class="btn-primario" style="text-decoration: none; display: inline-block; text-align: center;">
-                Ir para Importação
-            </a>
+        <div class="clock-widget">
+            <div class="clock-time" id="local-clock">00:00:00</div>
+            <div class="clock-label">
+                <div class="status-dot"></div> BRASÍLIA (BRT)
+            </div>
         </div>
+    </div>
+
+    <div class="stats-row">
+        <div class="stat-card">
+            <div class="stat-icon-box icon-blue"><i class="ph-duotone ph-airplane-tilt"></i></div>
+            <div class="stat-info">
+                <h4>Voos Ativos (Hoje)</h4>
+                <span id="voos-ativos">Detectando...</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon-box icon-green"><i class="ph-duotone ph-database"></i></div>
+            <div class="stat-info">
+                <h4>Status API</h4>
+                <span id="status-api" style="color:#22c55e">Online</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon-box icon-purple"><i class="ph-duotone ph-users"></i></div>
+            <div class="stat-info">
+                <h4>Usuário</h4>
+                <span>{{ current_user.Nome.split()[0] if current_user.is_authenticated else 'Visitante' }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="modules-title">
+        <i class="ph-bold ph-squares-four" style="color: var(--cor-primaria);"></i> Módulos do Sistema
+    </div>
+
+    <div class="modules-grid">
+        
+        <a href="{{ url_for('Malha.Gerenciar') }}" class="module-card">
+            <div class="card-icon"><i class="ph-duotone ph-file-xls"></i></div>
+            <div class="card-content">
+                <div class="card-title">Malha Aérea</div>
+                <div class="card-desc">Importação de planilhas, versionamento de malhas e controle de vigência.</div>
+            </div>
+            <div class="card-action"><i class="ph-bold ph-arrow-right"></i></div>
+        </a>
+
+        <a href="{{ url_for('Planejamento.Dashboard') }}" class="module-card">
+            <div class="card-icon"><i class="ph-duotone ph-globe-hemisphere-west"></i></div>
+            <div class="card-content">
+                <div class="card-title">Planejamento</div>
+                <div class="card-desc">Cockpit de monitoramento de cargas, roteirização visual e tracking.</div>
+            </div>
+            <div class="card-action"><i class="ph-bold ph-arrow-right"></i></div>
+        </a>
+
+        <a href="{{ url_for('Escalas.Mapa') }}" class="module-card">
+            <div class="card-icon"><i class="ph-duotone ph-broadcast"></i></div>
+            <div class="card-content">
+                <div class="card-title">Escalas e Rotas</div>
+                <div class="card-desc">Mapa interativo global com visualização de tráfego aéreo e conexões.</div>
+            </div>
+            <div class="card-action"><i class="ph-bold ph-arrow-right"></i></div>
+        </a>
+
+        <a href="{{ url_for('Aeroporto.Gerenciar') }}" class="module-card">
+            <div class="card-icon"><i class="ph-duotone ph-airplane-landing"></i></div>
+            <div class="card-content">
+                <div class="card-title">Aeroportos</div>
+                <div class="card-desc">Base de dados mundial IATA/ICAO com geolocalização precisa.</div>
+            </div>
+            <div class="card-action"><i class="ph-bold ph-arrow-right"></i></div>
+        </a>
+
+        <a href="{{ url_for('Cidade.Gerenciar') }}" class="module-card">
+            <div class="card-icon"><i class="ph-duotone ph-buildings"></i></div>
+            <div class="card-content">
+                <div class="card-title">Cidades</div>
+                <div class="card-desc">Cadastro de municípios para suporte logístico terrestre (Last Mile).</div>
+            </div>
+            <div class="card-action"><i class="ph-bold ph-arrow-right"></i></div>
+        </a>
 
     </div>
+</div>
+
+<script>
+    // --- RELÓGIO HORÁRIO DE BRASÍLIA ---
+    function updateClock() {
+        const now = new Date();
+        const options = { timeZone: 'America/Sao_Paulo', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' };
+        const timeString = now.toLocaleTimeString('pt-BR', options);
+        document.getElementById('local-clock').innerText = timeString;
+    }
+    setInterval(updateClock, 1000); // Atualiza a cada segundo o relógio
+    updateClock();
+ 
+    // --- CARREGAR ESTATÍSTICAS REAIS ---
+    const API_STATS = "{{ url_for('Escalas.ApiVoosHoje') }}";
+
+    async function carregarStats() {
+        try {
+            const response = await fetch(API_STATS);
+            if (!response.ok) throw new Error('Erro na API');
+            
+            const total = await response.json();
+            
+            const elVoos = document.getElementById('voos-ativos');
+            const elApi = document.getElementById('status-api');
+            
+            if(elVoos) {
+                elVoos.innerText = total;
+            }
+            if(elApi) {
+                elApi.innerText = "Online";
+                elApi.style.color = "#22c55e";
+            }
+
+        } catch (e) {
+            console.warn("Falha ao carregar stats:", e);
+            const elApi = document.getElementById('status-api');
+            if(elApi) {
+                elApi.innerText = "Off-line";
+                elApi.style.color = "#ef4444";
+            }
+        }
+    }
+
+    // Chama imediatamente e repete a cada 60s
+    carregarStats();
+    setInterval(carregarStats, 60000);
+
+</script>
+
 {% endblock %}

@@ -5,185 +5,299 @@
 {% block conteudo %}
 
 <style>
-    /* --- TEMA EXECUTIVO --- */
-    .dash-executivo {
-        --cor-destaque: #0d6efd;       /* Azul Principal */
-        --cor-sucesso: #198754;        /* Verde Status */
-        --cor-texto: #212529;
-        --cor-texto-suave: #6c757d;
-        --cor-borda: #e0e0e0;
-        --bg-fundo: #f8f9fa;
-        
-        font-family: 'Inter', -apple-system, sans-serif;
-        color: var(--cor-texto);
-        height: calc(100vh - 80px); /* Ocupa altura total menos topo */
+    /* --- VARIÁVEIS DO TEMA --- */
+    :root {
+        --kpi-bg: var(--cor-fundo-painel);
+        --table-header-bg: #f8fafc;
+        --table-row-hover: rgba(var(--cor-primaria-rgb), 0.03);
+        --success-color: #10b981;
+        --warning-color: #f59e0b;
+        --danger-color: #ef4444;
+        --text-muted: #64748b;
+    }
+    
+    /* Layout Principal */
+    .monitoring-dashboard {
         display: flex;
         flex-direction: column;
-        gap: 20px;
-        padding: 10px 20px 20px 20px;
-        box-sizing: border-box;
+        gap: 24px;
+        height: calc(100vh - 100px); /* Ajuste para caber na tela sem scroll externo */
     }
 
     /* --- CABEÇALHO --- */
     .dash-header {
         display: flex;
         justify-content: space-between;
-        align-items: center;
-        padding-bottom: 15px;
+        align-items: flex-end;
+        padding-bottom: 20px;
         border-bottom: 1px solid var(--cor-borda);
     }
 
-    .header-left h2 {
-        margin: 0; font-size: 1.6rem; font-weight: 700; color: #1a1a1a;
+    .header-title h2 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--cor-texto-principal);
         display: flex; align-items: center; gap: 12px;
+        margin-bottom: 6px;
     }
-    .header-sub { font-size: 0.85rem; color: var(--cor-texto-suave); margin-top: 4px; }
-
-    /* Botão Torre de Controle */
-    .btn-torre {
-        text-decoration: none;
-        background: #212529; color: #fff;
-        padding: 10px 18px; border-radius: 6px;
-        font-weight: 600; font-size: 0.9rem;
+    .header-subtitle {
+        font-size: 0.9rem;
+        color: var(--text-muted);
+        font-weight: 500;
         display: flex; align-items: center; gap: 8px;
-        transition: transform 0.2s, background 0.2s;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
-    .btn-torre:hover { background: #000; transform: translateY(-2px); }
 
-    /* Tag Ao Vivo */
-    .live-badge {
-        font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px;
-        color: var(--cor-sucesso); background: rgba(25, 135, 84, 0.1);
-        padding: 4px 10px; border-radius: 4px; border: 1px solid rgba(25, 135, 84, 0.2);
-        display: flex; align-items: center; gap: 6px;
+    /* Badge Ao Vivo */
+    .live-indicator {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: rgba(16, 185, 129, 0.1);
+        color: var(--success-color);
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        border: 1px solid rgba(16, 185, 129, 0.2);
     }
     .live-dot {
-        width: 8px; height: 8px; background-color: var(--cor-sucesso);
-        border-radius: 50%; animation: pulse 1.5s infinite;
+        width: 8px; height: 8px;
+        background: var(--success-color);
+        border-radius: 50%;
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+        animation: pulse-green 2s infinite;
     }
-    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
 
-    /* --- KPIS (INDICADORES) --- */
-    .kpi-container {
-        display: flex; gap: 20px;
+    @keyframes pulse-green {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+        70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
     }
+
+    /* --- BOTÃO DE AÇÃO PRINCIPAL --- */
+    .btn-action-primary {
+        background: var(--cor-texto-principal); /* Preto/Cinza Escuro */
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        text-decoration: none;
+        display: flex; align-items: center; gap: 10px;
+        transition: all 0.2s;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .btn-action-primary:hover {
+        transform: translateY(-2px);
+        background: #000;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    }
+
+    /* --- CARDS DE KPI --- */
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+    }
+
     .kpi-card {
-        background: #fff; border: 1px solid var(--cor-borda);
-        border-radius: 8px; padding: 10px 20px;
-        min-width: 150px; display: flex; flex-direction: column;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        background: var(--kpi-bg);
+        border: 1px solid var(--cor-borda);
+        border-radius: 12px;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+        transition: 0.2s;
     }
-    .kpi-titulo { font-size: 0.75rem; color: var(--cor-texto-suave); font-weight: 600; text-transform: uppercase; }
-    .kpi-valor { font-size: 1.3rem; font-weight: 700; color: var(--cor-texto); margin-top: 2px; }
-    .kpi-destaque { color: var(--cor-sucesso); }
+    .kpi-card:hover { border-color: var(--cor-primaria); transform: translateY(-2px); }
 
-    /* --- TABELA --- */
-    .table-wrapper {
-        background: #fff; border: 1px solid var(--cor-borda);
-        border-radius: 8px; flex: 1; overflow: hidden;
-        display: flex; flex-direction: column;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.03);
-    }
-    
-    .table-scroll { flex: 1; overflow: auto; }
-
-    .dash-table {
-        width: 100%; border-collapse: collapse; font-size: 0.85rem; white-space: nowrap;
-    }
-    .dash-table th {
-        position: sticky; top: 0; z-index: 10;
-        background: #f8f9fa; color: #555; font-weight: 600; text-transform: uppercase; font-size: 0.7rem;
-        padding: 14px 12px; border-bottom: 2px solid #eee; text-align: left;
-    }
-    .dash-table td {
-        padding: 12px; border-bottom: 1px solid #eee; vertical-align: middle; color: #444;
-    }
-    .dash-table tr:hover td { background-color: #f8f9fa; }
-
-    /* Colunas Especiais */
-    .col-filial { font-weight: bold; color: #333; text-align: center; }
-    .col-ctc { font-weight: 700; color: var(--cor-destaque); font-family: monospace; font-size: 0.9rem; }
-    .col-rota { font-weight: 600; }
-    .col-money { font-family: 'Consolas', monospace; text-align: right; font-weight: 600; }
-    .col-prio span { padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; }
-    
-    /* Status Badges */
-    .bg-alta { background: #fee2e2; color: #dc2626; }
-    .bg-normal { background: #e9ecef; color: #495057; }
-
-    /* Botão de Ação da Tabela */
-    .btn-table-action {
-        background: #fff; border: 1px solid #ddd;
-        width: 32px; height: 32px; border-radius: 6px;
+    .kpi-icon {
+        width: 48px; height: 48px;
+        border-radius: 10px;
         display: flex; align-items: center; justify-content: center;
-        text-decoration: none; transition: 0.2s; cursor: pointer;
+        font-size: 1.8rem;
     }
-    .btn-table-action:hover { background: #0d6efd; color: #fff; border-color: #0d6efd; transform: scale(1.1); }
+    
+    .icon-blue { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+    .icon-orange { background: rgba(249, 115, 22, 0.1); color: #f97316; }
+    .icon-green { background: rgba(16, 185, 129, 0.1); color: #10b981; }
 
-    /* Animação */
-    .novo-item { animation: highlight 1s ease-out; }
-    @keyframes highlight { from { background-color: #e8f5e9; } to { background-color: transparent; } }
+    .kpi-info { display: flex; flex-direction: column; }
+    .kpi-label { font-size: 0.75rem; text-transform: uppercase; font-weight: 600; color: var(--text-muted); letter-spacing: 0.5px; }
+    .kpi-value { font-size: 1.4rem; font-weight: 700; color: var(--cor-texto-principal); margin-top: 2px; }
+
+    /* --- TABELA DE MONITORAMENTO --- */
+    .table-container {
+        flex: 1;
+        background: var(--cor-fundo-painel);
+        border: 1px solid var(--cor-borda);
+        border-radius: 12px;
+        overflow: hidden;
+        display: flex; flex-direction: column;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+    }
+
+    .table-scroll-area { flex: 1; overflow: auto; }
+
+    .flight-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+        white-space: nowrap;
+    }
+
+    .flight-table th {
+        background: var(--table-header-bg);
+        color: var(--text-muted);
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        padding: 16px;
+        text-align: left;
+        position: sticky; top: 0; z-index: 10;
+        border-bottom: 1px solid var(--cor-borda);
+    }
+
+    .flight-table td {
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--cor-borda);
+        color: var(--cor-texto-principal);
+        vertical-align: middle;
+    }
+
+    .flight-table tr:hover td { background: var(--table-row-hover); }
+
+    /* Colunas Estilizadas */
+    .col-ctc { font-family: 'Monaco', monospace; font-weight: 700; color: var(--cor-primaria); }
+    .col-route { font-weight: 600; display: flex; align-items: center; gap: 6px; }
+    .col-route i { color: var(--text-muted); font-size: 0.8rem; }
+    
+    .col-money { font-family: 'Monaco', monospace; font-weight: 600; text-align: right; }
+    
+    /* Badges de Prioridade */
+    .badge-prio {
+        padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    }
+    .prio-urgent { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); }
+    .prio-normal { background: rgba(100, 116, 139, 0.1); color: #64748b; border: 1px solid rgba(100, 116, 139, 0.2); }
+
+    /* Botão Planejar (Ação na Tabela) */
+    .btn-plan {
+        width: 34px; height: 34px;
+        border-radius: 8px;
+        background: transparent;
+        border: 1px solid var(--cor-borda);
+        color: var(--text-muted);
+        display: flex; align-items: center; justify-content: center;
+        transition: 0.2s;
+        text-decoration: none;
+    }
+    .btn-plan:hover {
+        background: var(--cor-primaria);
+        color: white;
+        border-color: var(--cor-primaria);
+        transform: scale(1.05);
+    }
+
+    /* Animação de Entrada */
+    .new-row { animation: flash-row 1.5s ease-out; }
+    @keyframes flash-row { 
+        0% { background-color: rgba(16, 185, 129, 0.2); } 
+        100% { background-color: transparent; } 
+    }
+    
+    /* Estado Vazio */
+    .empty-state {
+        text-align: center; padding: 60px; color: var(--text-muted);
+        display: flex; flex-direction: column; align-items: center; gap: 10px;
+    }
+    .empty-state i { font-size: 3rem; color: var(--cor-borda); margin-bottom: 10px; }
 
 </style>
 
-<div class="dash-executivo">
+<div class="monitoring-dashboard">
 
     <div class="dash-header">
-        <div class="header-left">
+        <div class="header-title">
             <h2>
-                Emissões Aéreo
-                <div class="live-badge"><div class="live-dot"></div> On Time</div>
+                Monitoramento de Cargas
+                <div class="live-indicator">
+                    <div class="live-dot"></div>
+                    AO VIVO
+                </div>
             </h2>
-            <div class="header-sub">
-                Monitoramento em tempo real • <span id="data-extenso"></span>
+            <div class="header-subtitle">
+                <i class="ph-bold ph-calendar-blank"></i> <span id="data-extenso"></span>
+                <span style="margin: 0 8px; color: var(--cor-borda);">|</span>
+                <i class="ph-bold ph-clock"></i> Atualização automática a cada 10s
             </div>
         </div>
 
-        <div class="kpi-container">
-            <div class="kpi-card">
-                <span class="kpi-titulo">Volume Doc.</span>
-                <span class="kpi-valor" id="kpi-docs">0</span>
+        <a href="{{ url_for('Planejamento.MapaGlobal') }}" class="btn-action-primary">
+            <i class="ph-bold ph-globe-hemisphere-west"></i>
+            Diário de Voos
+        </a>
+    </div>
+
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-icon icon-blue">
+                <i class="ph-duotone ph-files"></i>
             </div>
-            <div class="kpi-card">
-                <span class="kpi-titulo">Peso Taxado</span>
-                <span class="kpi-valor" id="kpi-peso">0 kg</span>
+            <div class="kpi-info">
+                <span class="kpi-label">Documentos Hoje</span>
+                <span class="kpi-value" id="kpi-docs">0</span>
             </div>
-            <div class="kpi-card" style="border-bottom: 3px solid var(--cor-sucesso);">
-                <span class="kpi-titulo" style="color: var(--cor-sucesso);">Faturamento</span>
-                <span class="kpi-valor kpi-destaque" id="kpi-fat">R$ 0,00</span>
+        </div>
+        
+        <div class="kpi-card">
+            <div class="kpi-icon icon-orange">
+                <i class="ph-duotone ph-scales"></i>
             </div>
-            
-            <a href="{{ url_for('Planejamento.MapaGlobal') }}" class="btn-torre">
-                🌍 Torre de Controle
-            </a>
+            <div class="kpi-info">
+                <span class="kpi-label">Peso Taxado Total</span>
+                <span class="kpi-value" id="kpi-peso">0 kg</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-green">
+                <i class="ph-duotone ph-currency-dollar"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-label">Faturamento Estimado</span>
+                <span class="kpi-value" id="kpi-fat">R$ 0,00</span>
+            </div>
         </div>
     </div>
 
-    <div class="table-wrapper">
-        <div class="table-scroll">
-            <table class="dash-table">
+    <div class="table-container">
+        <div class="table-scroll-area">
+            <table class="flight-table">
                 <thead>
                     <tr>
-                        <th width="50" style="text-align:center;">Ação</th>
-                        <th class="col-filial" width="60">Filial</th>
-                        <th width="100">Documento</th>
-                        <th width="80">Hora</th>
-                        <th width="80">Data</th>
-                        <th width="90" style="text-align:center;">Prioridade</th>
-                        <th>Rota (Origem ➝ Destino)</th>
+                        <th style="text-align: center; width: 60px;">Ação</th>
+                        <th style="text-align: center; width: 80px;">Filial</th>
+                        <th style="width: 120px;">CT-e / Doc</th>
+                        <th style="width: 100px;">Emissão</th>
+                        <th style="text-align: center; width: 100px;">Prioridade</th>
+                        <th style="width: 140px;">Rota</th>
                         <th>Remetente</th>
                         <th>Destinatário</th>
-                        <th style="text-align:right;">Vol.</th>
-                        <th style="text-align:right;">Peso Tax.</th>
-                        <th style="text-align:right;">Peso</th>
-                        <th style="text-align:right;">Valor Merc.</th>
-                        <th width="100" style="text-align:center;">NFs</th>
-                        <th style="text-align:right;">Frete Total</th>
+                        <th style="text-align: right;">Vol.</th>
+                        <th style="text-align: right;">Peso Tax.</th>
+                        <th style="text-align: right;">Frete Total</th>
                     </tr>
                 </thead>
                 <tbody id="table-body">
-                    <tr><td colspan="12" style="text-align:center; padding:40px; color:#999;">Carregando dados...</td></tr>
+                    <tr>
+                        <td colspan="11">
+                            <div class="empty-state">
+                                <i class="ph-duotone ph-airplane-tilt"></i>
+                                <span>Aguardando dados do servidor...</span>
+                            </div>
+                        </td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -194,7 +308,7 @@
 <script>
     // --- LÓGICA DO DASHBOARD ---
     
-    // Rotas do Flask injetadas no JS
+    // Configuração de Rotas
     const URLS = {
         api: "{{ url_for('Planejamento.ApiCtcsHoje') }}",
         baseMontar: "{{ url_for('Planejamento.MontarPlanejamento', filial='0', serie='0', ctc='0') }}"
@@ -202,15 +316,15 @@
 
     function gerarLink(filial, serie, ctc) {
         return URLS.baseMontar
-            .replace('/0/0/0', `/${filial}/${serie}/${ctc}`) // com barra
-            .replace('0/0/0', `${filial}/${serie}/${ctc}`);  // sem barra
+            .replace('/0/0/0', `/${filial}/${serie}/${ctc}`) 
+            .replace('0/0/0', `${filial}/${serie}/${ctc}`);
     }
 
-    // Data Atual
+    // Data Atual Formatada
     const opts = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
     document.getElementById('data-extenso').innerText = new Date().toLocaleDateString('pt-BR', opts);
 
-    let vistos = new Set();
+    let vistos = new Set(); // Para controlar animação de novos itens
 
     async function Atualizar() {
         try {
@@ -219,7 +333,14 @@
             const tbody = document.getElementById('table-body');
 
             if (dados.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding:40px; color:#999;">Sem emissões aéreas hoje.</td></tr>';
+                tbody.innerHTML = `
+                    <tr><td colspan="11">
+                        <div class="empty-state">
+                            <i class="ph-duotone ph-check-circle"></i>
+                            <h3>Tudo limpo!</h3>
+                            <span>Nenhuma emissão de carga aérea registrada hoje.</span>
+                        </div>
+                    </td></tr>`;
                 AtualizarKPIs(0, 0, 0);
                 return;
             }
@@ -231,41 +352,41 @@
                 somaFat += r.raw_frete_total;
                 somaPeso += r.peso_taxado;
 
-                // Animação para novos itens
+                // Detecta se é novo para animar
                 const novo = !vistos.has(r.id_unico);
                 if (novo) vistos.add(r.id_unico);
-                const classeAnim = novo ? 'novo-item' : '';
+                const classeAnim = novo ? 'new-row' : '';
 
-                // Badge de Prioridade
-                const pCls = r.prioridade === 'URGENTE' ? 'bg-alta' : 'bg-normal';
+                // Define classe da prioridade
+                const badgeClass = r.prioridade === 'URGENTE' ? 'prio-urgent' : 'prio-normal';
                 
                 return `
                 <tr class="${classeAnim}">
                     <td style="text-align:center;">
-                        <a href="${gerarLink(r.filial, r.serie, r.ctc)}" class="btn-table-action" title="Planejar Rota">
-                            🗺️
+                        <a href="${gerarLink(r.filial, r.serie, r.ctc)}" class="btn-plan" title="Planejar Rota">
+                            <i class="ph-bold ph-airplane-takeoff"></i>
                         </a>
                     </td>
-                    <td class="col-filial">${r.filial}</td>
+                    <td style="text-align:center; font-weight: 600;">${r.filial}</td>
                     <td class="col-ctc">${r.ctc}</td>
-                    <td style="color:#666;">${r.data_emissao}</td>
-                    <td style="color:#666;">${r.hora_emissao}</td>
-                    <td style="text-align:center;" class="col-prio">
-                        <span class="${pCls}">${r.prioridade || 'NORMAL'}</span>
+                    <td>
+                        <div style="font-weight: 600;">${r.hora_emissao}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">${r.data_emissao.substring(0,5)}</div>
                     </td>
-                    <td class="col-rota">
-                        ${r.origem} <span style="color:#ccc;">➝</span> ${r.destino}
+                    <td style="text-align:center;">
+                        <span class="badge-prio ${badgeClass}">${r.prioridade || 'NORMAL'}</span>
                     </td>
-                    <td title="${r.remetente}">${r.remetente.substring(0,15)}...</td>
-                    <td title="${r.destinatario}">${r.destinatario.substring(0,15)}...</td>
+                    <td>
+                        <div class="col-route">
+                            ${r.origem} <i class="ph-bold ph-arrow-right"></i> ${r.destino}
+                        </div>
+                    </td>
+                    <td style="font-size: 0.85rem;" title="${r.remetente}">${r.remetente.substring(0,20)}...</td>
+                    <td style="font-size: 0.85rem;" title="${r.destinatario}">${r.destinatario.substring(0,20)}...</td>
                     
                     <td style="text-align:right;">${r.volumes}</td>
-                    <td style="text-align:right;">${r.peso_taxado.toLocaleString('pt-BR', {minimumFractionDigits:2})}</td>
-                    <td style="text-align:right; color:#666;">${r.peso_real.toLocaleString('pt-BR', {minimumFractionDigits:2})}</td>
-                    <td class="col-money" style="font-size:0.8rem; color:#666;">${r.val_mercadoria}</td>
-                    <td style="text-align:center;">${r.nfs}</td>
-                    <td class="col-money" style="color:var(--cor-sucesso); background:#fcfcfc;">${r.frete_total}</td>
-
+                    <td style="text-align:right; font-weight:600;">${r.peso_taxado.toLocaleString('pt-BR')} kg</td>
+                    <td class="col-money" style="color: var(--success-color);">${r.frete_total}</td>
                 </tr>
                 `;
             }).join('');
@@ -279,14 +400,15 @@
     }
 
     function AtualizarKPIs(docs, peso, valor) {
+        // Efeito de contagem animada poderia ser adicionado aqui
         document.getElementById('kpi-docs').innerText = docs;
         document.getElementById('kpi-peso').innerText = peso.toLocaleString('pt-BR', {maximumFractionDigits:0}) + ' kg';
         document.getElementById('kpi-fat').innerText = valor.toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
     }
 
-    // Loop
+    // Inicializa e configura loop
     Atualizar();
-    setInterval(Atualizar, 10000);
+    setInterval(Atualizar, 10000); // 10 segundos
 
 </script>
 {% endblock %}

@@ -2,7 +2,8 @@ from sqlalchemy import distinct
 from Conexoes import ObterSessaoPostgres
 from Models.POSTGRES.Cidade import Cidade
 from Models.POSTGRES.Aeroporto import Aeroporto
-from Models.POSTGRES.MalhaAerea import VooMalha
+# IMPORTANTE: Importar RemessaMalha para fazer o Join
+from Models.POSTGRES.MalhaAerea import VooMalha, RemessaMalha 
 from Utils.Geometria import Haversine
 from Utils.Texto import NormalizarTexto
 
@@ -32,22 +33,24 @@ def BuscarCoordenadasCidade(NomeCidade, Uf):
 
 def BuscarAeroportoMaisProximo(Lat, Lon):
     """
-    Busca o aeroporto mais próximo que TENHA VOOS na malha.
-    Ignora aeroportos fantasmas (ex: GYA) que travam a busca.
+    Busca o aeroporto mais próximo que TENHA VOOS NA MALHA ATIVA.
     """
     Sessao = ObterSessaoPostgres()
     try:
-        # 1. Lista de aeroportos que realmente operam (têm voos saindo)
-        # Isso evita pegar aeroportos da Bolívia ou pistas de pouso sem rota
-        AeroportosAtivos = Sessao.query(distinct(VooMalha.AeroportoOrigem)).all()
+        # 1. Lista de aeroportos que realmente operam (têm voos saindo) NA MALHA ATIVA
+        AeroportosAtivos = Sessao.query(distinct(VooMalha.AeroportoOrigem))\
+            .join(RemessaMalha)\
+            .filter(RemessaMalha.Ativo == True)\
+            .all()
+            
         ListaIatasAtivos = [a[0] for a in AeroportosAtivos]
 
         if not ListaIatasAtivos:
-            # Fallback se a tabela de voos estiver vazia
-            print("⚠️ Tabela de VooMalha vazia. Usando todos os aeroportos.")
-            TodosAeroportos = Sessao.query(Aeroporto).all()
+            # Se não tem malha ativa, não retorna nenhum aeroporto como "ativo"
+            print("⚠️ Nenhuma malha ativa encontrada.")
+            return None
         else:
-            # Busca apenas aeroportos que existem na malha ativa
+            # Busca dados geográficos apenas dos aeroportos ativos
             TodosAeroportos = Sessao.query(
                 Aeroporto.CodigoIata, 
                 Aeroporto.Latitude, 
@@ -55,7 +58,7 @@ def BuscarAeroportoMaisProximo(Lat, Lon):
                 Aeroporto.NomeAeroporto
             ).filter(
                 Aeroporto.Latitude != None,
-                Aeroporto.CodigoIata.in_(ListaIatasAtivos) # O Pulo do Gato
+                Aeroporto.CodigoIata.in_(ListaIatasAtivos)
             ).all()
         
         MenorDistancia = float('inf')
@@ -64,8 +67,6 @@ def BuscarAeroportoMaisProximo(Lat, Lon):
         for Aero in TodosAeroportos:
             Dist = Haversine(Lat, Lon, Aero.Latitude, Aero.Longitude)
             
-            # Prioriza aeroportos num raio aceitável (ex: até 600km)
-            # Se for muito longe, continua buscando o menor
             if Dist < MenorDistancia:
                 MenorDistancia = Dist
                 AeroportoEscolhido = {

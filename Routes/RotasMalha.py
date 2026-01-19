@@ -5,7 +5,7 @@ from Services.MalhaService import AnalisarArquivo, ProcessarMalhaFinal, ListarRe
 
 MalhaBp = Blueprint('Malha', __name__)
 
-@MalhaBp.route('/malha/api/rotas')
+@MalhaBp.route('/Malha/API/Rotas')
 @login_required
 def ApiRotas():
     Inicio = request.args.get('inicio')
@@ -26,8 +26,8 @@ def ApiRotas():
         return jsonify(Dados)
     except Exception as e:
         return jsonify({'erro': str(e)}), 500
-    
-@MalhaBp.route('/malha/gerenciar', methods=['GET', 'POST'])
+
+@MalhaBp.route('/Malha/Gerenciar', methods=['GET', 'POST'])
 @login_required
 def Gerenciar():
     # Variáveis para controlar o Modal de Confirmação
@@ -101,7 +101,7 @@ def Gerenciar():
                            ExibirModal=ModalConfirmacao, 
                            DadosModal=DadosConfirmacao)
 
-@MalhaBp.route('/malha/excluir/<int:id_remessa>')
+@MalhaBp.route('/Malha/Excluir/<int:id_remessa>')
 @login_required
 def Excluir(id_remessa):
     Sucesso, Mensagem = ExcluirRemessa(id_remessa)

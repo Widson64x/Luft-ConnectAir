@@ -5,7 +5,7 @@ from Services.CidadeService import ListarRemessasCidades, ExcluirRemessaCidade, 
 
 CidadeBp = Blueprint('Cidade', __name__)
 
-@CidadeBp.route('/cidades/gerenciar', methods=['GET', 'POST'])
+@CidadeBp.route('/Cidades/Gerenciar', methods=['GET', 'POST'])
 @login_required
 def Gerenciar():
     ModalConfirmacao = False
@@ -45,7 +45,7 @@ def Gerenciar():
     Historico = ListarRemessasCidades()
     return render_template('Cidades/Gerenciar.html', ListaRemessas=Historico, ExibirModal=ModalConfirmacao, DadosModal=DadosConfirmacao)
 
-@CidadeBp.route('/cidades/excluir/<int:id_remessa>')
+@CidadeBp.route('/Cidades/Excluir/<int:id_remessa>')
 @login_required
 def Excluir(id_remessa):
     Ok, Msg = ExcluirRemessaCidade(id_remessa)

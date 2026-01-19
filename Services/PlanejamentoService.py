@@ -6,8 +6,8 @@ from Models.SQL_SERVER.Ctc import Ctc
 def BuscarCtcsAereoHoje():
     Sessao = ObterSessaoSqlServer()
     try:
-        # Hoje = date.today() - timedelta(days=1) # <--- Subtrai 1 dia
-        Hoje = date.today()
+        Hoje = date.today() - timedelta(days=0  ) # <--- Subtrai 1 dia
+        #Hoje = date.today()
         Inicio = datetime.combine(Hoje, time.min)
         Fim = datetime.combine(Hoje, time.max)
         

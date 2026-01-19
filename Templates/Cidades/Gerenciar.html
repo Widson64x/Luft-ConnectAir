@@ -4,87 +4,236 @@
 
 {% block conteudo %}
 
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+
 <style>
-    /* Estilos Globais */
-    .page-grid { display: grid; grid-template-columns: 350px 1fr; gap: 25px; height: calc(100vh - 145px); }
+    /* --- LAYOUT MODERNO --- */
+    .page-grid {
+        display: grid;
+        grid-template-columns: 350px 1fr;
+        gap: 24px;
+        align-items: start;
+        height: calc(100vh - 140px);
+        min-height: 500px;
+    }
     @media (max-width: 1100px) { .page-grid { grid-template-columns: 1fr; height: auto; } }
+
+    .painel {
+        background: var(--cor-fundo-painel);
+        border: 1px solid var(--cor-borda);
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+        display: flex; flex-direction: column;
+        overflow: hidden;
+    }
     
-    .painel { background: var(--cor-fundo-painel); border: 1px solid var(--cor-borda); border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
-    .painel-header { padding: 18px 25px; border-bottom: 1px solid var(--cor-borda); background: var(--cor-fundo-principal); font-weight: 600; }
-    .painel-body { padding: 25px; flex: 1; overflow-y: auto; }
+    .painel-header {
+        padding: 18px 24px;
+        border-bottom: 1px solid var(--cor-borda);
+        background: rgba(0,0,0,0.01);
+        display: flex; justify-content: space-between; align-items: center;
+    }
+    .painel-title {
+        font-size: 1rem; font-weight: 700; color: var(--cor-texto-principal);
+        display: flex; align-items: center; gap: 8px;
+    }
+    
+    .painel-body { padding: 24px; flex: 1; overflow-y: auto; }
     .painel-tabela .painel-body { padding: 0; }
-    
-    .upload-zone { border: 2px dashed var(--cor-borda); border-radius: 8px; padding: 40px 20px; text-align: center; cursor: pointer; transition: 0.2s; background: rgba(0,0,0,0.01); }
-    .upload-zone:hover { border-color: var(--cor-primaria); background: rgba(0, 86, 179, 0.04); }
-    
+
+    .upload-container {
+        border: 2px dashed var(--cor-borda);
+        border-radius: 8px;
+        background: rgba(0,0,0,0.01);
+        text-align: center;
+        padding: 40px 20px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .upload-container:hover {
+        border-color: var(--cor-primaria);
+        background: rgba(var(--cor-primaria-rgb), 0.03);
+        transform: translateY(-2px);
+    }
+    .upload-icon { font-size: 2.5rem; color: var(--cor-primaria); margin-bottom: 15px; }
+    .upload-text { font-size: 0.95rem; font-weight: 600; color: var(--cor-texto-principal); }
+    .upload-sub { font-size: 0.8rem; color: var(--cor-texto-secundario); margin-top: 5px; }
+
     .table-custom { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-    .table-custom th { background: #f8f9fa; padding: 14px 20px; text-align: left; position: sticky; top: 0; border-bottom: 1px solid var(--cor-borda); }
-    .table-custom td { padding: 14px 20px; border-bottom: 1px solid var(--cor-borda); }
     
-    .status-active { color: #155724; background: #d4edda; padding: 4px 8px; border-radius: 20px; font-weight: 600; font-size: 0.75rem; width: fit-content; }
+    .table-custom th {
+        background: #f8f9fa; 
+        color: var(--cor-texto-secundario);
+        font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.75rem;
+        padding: 16px 24px; text-align: left;
+        position: sticky; top: 0; z-index: 10;
+        border-bottom: 1px solid var(--cor-borda);
+    }
     
-    /* Modal */
-    .modal-backdrop { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); z-index: 2000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
-    .modal-content { background: var(--cor-fundo-painel); width: 420px; padding: 35px; border-radius: 12px; text-align: center; border: 1px solid var(--cor-borda); }
+    .table-custom td {
+        padding: 16px 24px;
+        border-bottom: 1px solid var(--cor-borda);
+        color: var(--cor-texto-principal);
+        vertical-align: middle;
+    }
+    .table-custom tr:hover td { background-color: rgba(0,0,0,0.02); }
+
+    .badge {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 4px 10px; border-radius: 6px;
+        font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+    }
+    .badge-success { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+    .badge-history { background: rgba(107, 114, 128, 0.1); color: #6b7280; }
+    
+    .type-imp { color: var(--cor-primaria); font-weight: 600; }
+    .type-sub { color: #f59e0b; font-weight: 600; }
+
+    .btn-delete {
+        width: 32px; height: 32px;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 6px; border: 1px solid transparent;
+        color: #ef4444; background: rgba(239, 68, 68, 0.05);
+        transition: 0.2s; cursor: pointer; text-decoration: none;
+    }
+    .btn-delete:hover { background: #ef4444; color: white; }
+
+    .modal-backdrop {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+        z-index: 2000; display: flex; align-items: center; justify-content: center;
+    }
+    .modal-content {
+        background: var(--cor-fundo-painel);
+        width: 420px; padding: 30px; border-radius: 16px;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+        text-align: center; border: 1px solid var(--cor-borda);
+    }
 </style>
 
 {% if ExibirModal %}
 <div class="modal-backdrop">
     <div class="modal-content">
-        <h3 style="color: #dc3545;">⚠️ Base Existente</h3>
-        <p style="margin: 20px 0;">Já existe uma base de cidades ativa.<br>Deseja substituir pela nova?</p>
+        <i class="ph-duotone ph-warning-circle" style="font-size: 3rem; color: #f59e0b; margin-bottom: 15px;"></i>
+        <h3 style="font-size: 1.2rem; margin-bottom: 10px; color: var(--cor-texto-principal);">Atualização de Base</h3>
+        <p style="color: var(--cor-texto-secundario); margin-bottom: 25px; line-height: 1.5;">
+            Já existe uma base de cidades ativa para <strong>{{ DadosModal.mes_ref.strftime('%m/%Y') }}</strong>.<br>
+            Deseja substituir pela nova versão?
+        </p>
+        
         <form method="POST" style="display: flex; gap: 10px; justify-content: center;">
             <input type="hidden" name="confirmar_substituicao" value="true">
             <input type="hidden" name="caminho_temp" value="{{ DadosModal.caminho_temp }}">
             <input type="hidden" name="nome_arquivo" value="{{ DadosModal.nome_arquivo }}">
             <input type="hidden" name="mes_ref" value="{{ DadosModal.mes_ref }}">
-            <a href="{{ url_for('Cidade.Gerenciar') }}" class="btn-primario" style="background: #ccc; color: #333; text-decoration: none;">Cancelar</a>
-            <button type="submit" class="btn-primario" style="background: #dc3545;">Substituir</button>
+            
+            <a href="{{ url_for('Cidade.Gerenciar') }}" class="btn-primario" style="background: transparent; color: var(--cor-texto-secundario); border: 1px solid var(--cor-borda);">Cancelar</a>
+            <button type="submit" class="btn-primario">Sim, Atualizar</button>
         </form>
     </div>
 </div>
 {% endif %}
 
-<div style="margin-bottom: 20px;">
-    <h2 style="font-size: 1.2rem; font-weight: 700;">🏙️ Base de Cidades</h2>
-    <p style="color: #666; font-size: 0.9rem;">Cadastro de Municípios e Coordenadas (XLSX).</p>
+<div style="margin-bottom: 25px;">
+    <h2 style="font-weight: 700; color: var(--cor-texto-principal); font-size: 1.5rem; display: flex; align-items: center; gap: 10px;">
+        <i class="ph-duotone ph-buildings" style="color: var(--cor-primaria);"></i> Base de Cidades
+    </h2>
+    <p style="color: var(--cor-texto-secundario); margin-top: 5px;">Cadastro nacional de municípios para roteirização terrestre.</p>
 </div>
 
 <div class="page-grid">
+    
     <div class="painel" style="height: fit-content;">
-        <div class="painel-header">Nova Importação</div>
+        <div class="painel-header">
+            <span class="painel-title"><i class="ph-bold ph-upload"></i> Nova Carga</span>
+        </div>
         <div class="painel-body">
             <form method="POST" enctype="multipart/form-data">
-                <label style="font-size: 0.85rem; font-weight: 600; margin-bottom: 10px; display: block;">Arquivo Cidades (.xlsx)</label>
-                <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
-                    <div style="font-size: 2rem;">📤</div>
-                    <div style="font-size: 0.9rem; font-weight: 600;">Clique para Upload</div>
+                <label style="font-size: 0.8rem; font-weight: 600; color: var(--cor-texto-secundario); display: block; margin-bottom: 8px;">ARQUIVO EXCEL (.XLSX)</label>
+                
+                <div class="upload-container" onclick="document.getElementById('fileInput').click()">
+                    <i class="ph-duotone ph-file-xls upload-icon"></i>
+                    <div class="upload-text">Clique ou arraste aqui</div>
+                    <div class="upload-sub">Suporta apenas arquivos .xlsx</div>
                     <input type="file" id="fileInput" name="arquivo_xlsx" accept=".xlsx" style="display: none;" onchange="this.form.submit()">
+                </div>
+
+                <div style="margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.02); border-radius: 8px; border: 1px solid var(--cor-borda);">
+                    <div style="display: flex; gap: 8px; margin-bottom: 5px;">
+                        <i class="ph-fill ph-info" style="color: var(--cor-primaria);"></i>
+                        <span style="font-weight: 600; font-size: 0.85rem;">Nota</span>
+                    </div>
+                    <p style="font-size: 0.8rem; color: var(--cor-texto-secundario); line-height: 1.4;">
+                        A data de referência será definida automaticamente como o mês atual.
+                    </p>
                 </div>
             </form>
         </div>
     </div>
 
     <div class="painel painel-tabela">
-        <div class="painel-header">Histórico de Versões</div>
+        <div class="painel-header">
+            <span class="painel-title"><i class="ph-bold ph-list-dashes"></i> Histórico de Versões</span>
+            <div class="badge badge-history">{{ ListaRemessas|length }} Registros</div>
+        </div>
+        
         <div class="painel-body">
             <table class="table-custom">
                 <thead>
-                    <tr><th>Data Upload</th><th>Arquivo</th><th>Responsável</th><th>Status</th><th>Ações</th></tr>
+                    <tr>
+                        <th>Referência</th>
+                        <th>Tipo</th>
+                        <th>Arquivo</th>
+                        <th>Responsável</th>
+                        <th>Status</th>
+                        <th style="text-align: center;">Ações</th>
+                    </tr>
                 </thead>
                 <tbody>
-                    {% for item in ListaRemessas %}
+                    {% for remessa in ListaRemessas %}
                     <tr>
-                        <td>{{ item.DataUpload.strftime('%d/%m/%Y %H:%M') }}</td>
-                        <td>{{ item.NomeArquivoOriginal }}</td>
-                        <td>{{ item.UsuarioResponsavel }}</td>
-                        <td>{% if item.Ativo %}<div class="status-active">Ativo</div>{% else %}Histórico{% endif %}</td>
+                        <td style="font-weight: 700; font-family: 'Monaco', monospace;">{{ remessa.MesReferencia.strftime('%m/%Y') }}</td>
                         <td>
-                            <a href="{{ url_for('Cidade.Excluir', id_remessa=item.Id) }}" onclick="return confirm('Excluir?')" style="text-decoration:none;">❌</a>
+                            {% if remessa.TipoAcao == 'Substituicao' %}
+                                <span class="type-sub">Substituição</span>
+                            {% else %}
+                                <span class="type-imp">Importação</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <i class="ph-file-xls" style="color: #10b981;"></i>
+                                {{ remessa.NomeArquivoOriginal[:30] }}
+                            </div>
+                        </td>
+                        <td>
+                            <div style="font-weight: 600;">{{ remessa.UsuarioResponsavel }}</div>
+                            <div style="font-size: 0.75rem; color: var(--cor-texto-secundario);">{{ remessa.DataUpload.strftime('%d/%m %H:%M') }}</div>
+                        </td>
+                        <td>
+                            {% if remessa.Ativo %}
+                                <span class="badge badge-success"><i class="ph-fill ph-check-circle"></i> Ativo</span>
+                            {% else %}
+                                <span class="badge badge-history">Arquivado</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: center;">
+                            <div style="display: flex; justify-content: center;">
+                                <a href="{{ url_for('Cidade.Excluir', id_remessa=remessa.Id) }}" 
+                                   onclick="return confirm('ATENÇÃO: Isso apagará toda a base.\nContinuar?')"
+                                   class="btn-delete" title="Excluir">
+                                   <i class="ph-bold ph-trash"></i>
+                                </a>
+                            </div>
                         </td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="5" style="text-align: center; padding: 20px;">Nenhuma base carregada.</td></tr>
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 60px; color: var(--cor-texto-secundario);">
+                            <i class="ph-duotone ph-buildings" style="font-size: 3rem; margin-bottom: 10px; opacity: 0.5;"></i><br>
+                            Nenhuma base de cidades carregada.
+                        </td>
+                    </tr>
                     {% endfor %}
                 </tbody>
             </table>

@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 from datetime import datetime, timedelta, date, time
-from sqlalchemy import desc
+from sqlalchemy import desc, func
 from Conexoes import ObterSessaoPostgres
 from Models.POSTGRES.Aeroporto import Aeroporto
 from Models.POSTGRES.MalhaAerea import RemessaMalha, VooMalha
@@ -143,23 +143,25 @@ def ProcessarMalhaFinal(CaminhoArquivo, DataRef, NomeOriginal, Usuario, TipoAcao
 def BuscarRotasInteligentes(DataInicio, DataFim, OrigemIata=None, DestinoIata=None):
     Sessao = ObterSessaoPostgres()
     try:
-        # 1. Filtros para o Banco (Converter tudo para DATE puro)
-        # O banco compara apenas data, a hora será validada no python depois
+        # 1. Filtros para o Banco
         FiltroDataInicio = DataInicio.date() if isinstance(DataInicio, datetime) else DataInicio
         FiltroDataFim = DataFim.date() if isinstance(DataFim, datetime) else DataFim
 
         OrigemIata = OrigemIata.upper().strip() if OrigemIata else None
         DestinoIata = DestinoIata.upper().strip() if DestinoIata else None
         
-        # 2. Busca todos os voos na janela estendida (+1 dia para conexões que viram a noite)
-        VoosDB = Sessao.query(VooMalha).filter(
-            VooMalha.DataPartida >= FiltroDataInicio, 
-            VooMalha.DataPartida <= FiltroDataFim + timedelta(days=1)
-        ).all()
+        # CORREÇÃO PRINCIPAL: JOIN COM REMESSA E FILTRO ATIVO=TRUE
+        VoosDB = Sessao.query(VooMalha)\
+            .join(RemessaMalha)\
+            .filter(
+                RemessaMalha.Ativo == True,  # <--- SÓ O QUE É ATIVO
+                VooMalha.DataPartida >= FiltroDataInicio, 
+                VooMalha.DataPartida <= FiltroDataFim + timedelta(days=1)
+            ).all()
         
         DadosAeroportos = {}
         G = nx.DiGraph()
-        ListaGeral = [] # Usado apenas se não for roteamento
+        ListaGeral = [] 
 
         # 3. Monta o Grafo
         for Voo in VoosDB:
@@ -192,7 +194,6 @@ def BuscarRotasInteligentes(DataInicio, DataFim, OrigemIata=None, DestinoIata=No
             
             RotasValidas = []
             for CaminhoNos in Caminhos:
-                # CORREÇÃO: Passamos DataInicio original (que pode ter Hora)
                 Rota = ValidarCaminhoCronologico(G, CaminhoNos, DataInicio)
                 if Rota:
                     RotasValidas.append(Rota)
@@ -210,8 +211,6 @@ def BuscarRotasInteligentes(DataInicio, DataFim, OrigemIata=None, DestinoIata=No
                     
         except Exception as e:
             print(f"Erro grafo: {e}")
-            import traceback
-            traceback.print_exc() # Ajuda a ver onde estourou
             return []
 
     finally:
@@ -224,8 +223,6 @@ def ValidarCaminhoCronologico(Grafo, Nos, DataMinimaAbsoluta):
     """
     VoosEscolhidos = []
     
-    # GARANTIA: Converter DataMinimaAbsoluta para datetime se for date
-    # Isso evita o erro: '>' not supported between instances of 'datetime' and 'date'
     if isinstance(DataMinimaAbsoluta, date) and not isinstance(DataMinimaAbsoluta, datetime):
         DataReferencia = datetime.combine(DataMinimaAbsoluta, time.min)
     else:
@@ -244,20 +241,17 @@ def ValidarCaminhoCronologico(Grafo, Nos, DataMinimaAbsoluta):
         
         VooEleito = None
         for Voo in Candidatos:
-            # Monta datetime de saída deste voo candidato
             SaidaVoo = datetime.combine(Voo.DataPartida, Voo.HorarioSaida)
             
             if i == 0:
-                # PRIMEIRO TRECHO:
-                # O voo deve sair DEPOIS da data/hora de liberação da carga
+                # PRIMEIRO TRECHO
                 if SaidaVoo > DataReferencia: 
                     VooEleito = Voo
                     break
             else:
-                # CONEXÃO:
-                # Pega chegada do voo anterior
-                VooAnt = VoosEscolhidos[-1]
-                ChegadaAnt = datetime.combine(VooAnt.DataPartida, VooAnt.HorarioChegada)
+                # CONEXÃO
+                VooAnt = VoosEscolhidos[-1] # Último voo escolhido até agora
+                ChegadaAnt = datetime.combine(VooAnt.DataPartida, VooAnt.HorarioChegada) # Chegada do voo anterior
                 if VooAnt.HorarioChegada < VooAnt.HorarioSaida: # Virou a noite
                     ChegadaAnt += timedelta(days=1)
                 
@@ -269,10 +263,9 @@ def ValidarCaminhoCronologico(Grafo, Nos, DataMinimaAbsoluta):
         
         if VooEleito:
             VoosEscolhidos.append(VooEleito)
-            # Atualiza referência (embora não seja usada no próximo loop de conexão, mantém consistência)
             DataReferencia = datetime.combine(VooEleito.DataPartida, VooEleito.HorarioChegada)
         else:
-            return None # Não achou voo viável neste trecho, descarta rota
+            return None 
             
     return VoosEscolhidos
 
@@ -321,3 +314,26 @@ def FormatarListaRotas(ListaVoos, Cache, Tipo):
             'destino': {'iata': Voo.AeroportoDestino, 'nome': Dest.get('nome'), 'lat': Dest.get('lat'), 'lon': Dest.get('lon')}
         })
     return Resultado
+
+def ObterTotalVoosData(DataRef):
+    """
+    Conta o total de voos ativos para uma data específica.
+    """
+    Sessao = ObterSessaoPostgres()
+    try:
+        # Garante que é apenas a data (sem hora)
+        DataFiltro = DataRef.date() if isinstance(DataRef, datetime) else DataRef
+        
+        Total = Sessao.query(func.count(VooMalha.Id))\
+            .join(RemessaMalha)\
+            .filter(
+                RemessaMalha.Ativo == True,
+                VooMalha.DataPartida == DataFiltro
+            ).scalar()
+            
+        return Total or 0
+    except Exception as e:
+        print(f"Erro ao contar voos: {e}")
+        return 0
+    finally:
+        Sessao.close()

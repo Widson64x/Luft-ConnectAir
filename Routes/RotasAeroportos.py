@@ -5,7 +5,7 @@ from Services.AeroportoService import AnalisarArquivoAeroportos, ProcessarAeropo
 
 AeroportoBp = Blueprint('Aeroporto', __name__)
 
-@AeroportoBp.route('/aeroportos/api/listar_simples')
+@AeroportoBp.route('/Aeroportos/API/Listar-Simples')
 @login_required
 def ApiListarSimples():
     try:
@@ -13,8 +13,8 @@ def ApiListarSimples():
         return jsonify(Dados)
     except Exception as e:
         return jsonify([]), 500
-    
-@AeroportoBp.route('/aeroportos/gerenciar', methods=['GET', 'POST'])
+
+@AeroportoBp.route('/Aeroportos/Gerenciar', methods=['GET', 'POST'])
 @login_required
 def Gerenciar():
     ModalConfirmacao = False
@@ -74,7 +74,7 @@ def Gerenciar():
                            ExibirModal=ModalConfirmacao, 
                            DadosModal=DadosConfirmacao)
 
-@AeroportoBp.route('/aeroportos/excluir/<int:id_remessa>')
+@AeroportoBp.route('/Aeroportos/Excluir/<int:id_remessa>')
 @login_required
 def Excluir(id_remessa):
     Sucesso, Mensagem = ExcluirRemessaAeroporto(id_remessa)

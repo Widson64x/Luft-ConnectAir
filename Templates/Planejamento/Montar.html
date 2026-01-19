@@ -5,190 +5,290 @@
 {% block conteudo %}
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
 
 <style>
-    /* --- TEMA GLASSMORPHISM (CLEAN & MODERNO) --- */
-    :root {
-        --cor-primaria: #0d6efd;
-        --cor-sucesso: #198754;
-        --bg-glass: rgba(255, 255, 255, 0.95);
-        --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
-        --border-glass: 1px solid rgba(255, 255, 255, 0.18);
-        --font-main: 'Inter', system-ui, sans-serif;
-    }
-
-    body { margin: 0; overflow: hidden; }
-
-    .page-container {
+    /* --- CONFIGURAÇÃO GERAL (INTEGRADA AO TEMA) --- */
+    body { overflow: hidden; } 
+    
+    .map-wrapper {
         position: relative;
-        height: calc(100vh - 70px);
         width: 100%;
-        background: #eef2f3;
-        font-family: var(--font-main);
+        height: 98%; /* Altura exata descontando o header */
+        background: var(--cor-fundo-principal);
     }
 
-    #map { width: 100%; height: 95%; z-index: 1; background: #cad2d3; }
+    #map { width: 100%; height: 100%; z-index: 1; }
 
-    /* --- SIDEBAR FLUTUANTE --- */
-    .sidebar-float {
-        position: absolute; top: 20px; left: 20px; bottom: 20px; width: 400px;
-        height: 85%;
-        background: var(--bg-glass); backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border-radius: 16px; border: var(--border-glass);
-        box-shadow: var(--shadow-glass);
-        z-index: 1000; display: flex; flex-direction: column;
-        transition: transform 0.3s ease;
+    /* Ajuste do Mapa para Modo Dark (Opcional: Inverte cores do mapa base para ficar dark) */
+    [data-theme="dark"] .leaflet-layer {
+        filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
     }
 
-    /* Header */
+    /* --- SIDEBAR FLUTUANTE (ADAPTATIVA) --- */
+    .glass-sidebar {
+        position: absolute; top: 20px; left: 20px; bottom: 20px; width: 450px;
+        /* Usa cor do painel com leve transparência para efeito vidro */
+        background: var(--cor-fundo-painel);
+        opacity: 0.96; 
+        backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--cor-borda);
+        box-shadow: var(--sombra-card); 
+        border-radius: 20px;
+        z-index: 1000; display: flex; flex-direction: column; overflow: hidden;
+        transition: all 0.3s ease;
+    }
+
+    /* HEADER */
     .sidebar-header {
         padding: 25px;
-        background: linear-gradient(135deg, rgba(255,255,255,0.8), rgba(240,240,240,0.8));
-        border-radius: 16px 16px 0 0;
-        border-bottom: 1px solid rgba(0,0,0,0.05);
+        background: var(--cor-fundo-painel);
+        border-bottom: 1px solid var(--cor-borda);
+        position: relative; z-index: 2;
     }
-
-    .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
-    .badge-filial { background: #333; color: #fff; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; }
-    .ctc-numero { font-size: 1.8rem; font-weight: 800; color: #1a1a1a; letter-spacing: -1px; margin: 0; }
-    .ctc-data { font-size: 0.85rem; color: #666; display: flex; align-items: center; gap: 5px; margin-top: 5px; }
-
-    /* KPIs */
-    .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
-    .kpi-card {
-        background: #fff; padding: 12px; border-radius: 10px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.02); border: 1px solid rgba(0,0,0,0.05);
-        display: flex; flex-direction: column;
-    }
-    .kpi-lbl { font-size: 0.7rem; color: #999; text-transform: uppercase; font-weight: 600; }
-    .kpi-val { font-size: 1rem; font-weight: 700; color: #333; margin-top: 2px; }
-    .kpi-money { color: var(--cor-sucesso); }
-
-    /* TIMELINE */
-    .timeline-area { flex: 1; overflow-y: auto; padding: 25px; }
     
-    .step { display: flex; gap: 18px; padding-bottom: 35px; position: relative; opacity: 0.5; transition: all 0.5s; }
-    .step.active { opacity: 1; transform: translateX(5px); }
+    .badge-serie {
+        display: inline-flex; align-items: center; gap: 6px; 
+        background: var(--cor-texto-principal); color: var(--cor-fundo-painel); /* Invertido para destaque */
+        padding: 5px 12px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+    }
     
-    .step::before {
-        content: ''; position: absolute; left: 20px; top: 45px; bottom: 0;
-        width: 2px; background: #e0e0e0; z-index: 0;
+    .ctc-title {
+        font-size: 2.2rem; font-weight: 800; 
+        color: var(--cor-texto-principal);
+        margin: 12px 0 6px 0; letter-spacing: -1.5px;
     }
-    .step:last-child::before { display: none; }
+    
+    .ctc-meta { 
+        font-size: 0.9rem; color: var(--cor-texto-secundario); 
+        display: flex; gap: 15px; align-items: center; font-weight: 500; 
+    }
+    
+    /* KPI GRID */
+    .kpi-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 25px; }
+    
+    .kpi-box {
+        background: var(--cor-fundo-principal); /* Leve contraste com o painel */
+        border-radius: 12px; padding: 12px; 
+        border: 1px solid var(--cor-borda);
+        text-align: center; transition: 0.2s;
+    }
+    .kpi-box:hover { transform: translateY(-3px); border-color: var(--cor-primaria); }
+    
+    .kpi-lbl { 
+        font-size: 0.7rem; color: var(--cor-texto-secundario); 
+        text-transform: uppercase; font-weight: 800; display: block; margin-bottom: 4px; letter-spacing: 0.5px;
+    }
+    .kpi-val { font-size: 1.1rem; font-weight: 800; color: var(--cor-texto-principal); }
+    .kpi-val.money { color: #10b981; } /* Verde mantém fixo pois é dinheiro/sucesso */
 
-    .step-icon {
-        width: 42px; height: 42px; background: #fff; border: 2px solid #ddd;
-        border-radius: 50%; display: flex; align-items: center; justify-content: center;
-        font-size: 20px; z-index: 2; box-shadow: 0 4px 10px rgba(0,0,0,0.05); transition: all 0.3s;
+    /* --- TIMELINE --- */
+    .timeline-content { flex: 1; overflow-y: auto; padding: 0 25px 25px 25px; position: relative; }
+    
+    .timeline-line-bg { 
+        position: absolute; left: 47px; top: 0; bottom: 0; width: 2px; 
+        background: var(--cor-borda); z-index: 0; 
     }
-    .step.active .step-icon {
+    .timeline-line-active {
+        position: absolute; left: 47px; top: 0; height: 0%; width: 2px; 
+        background: linear-gradient(180deg, var(--cor-primaria) 0%, var(--cor-primaria-hover) 100%);
+        z-index: -1; box-shadow: 0 0 10px rgba(var(--cor-primaria), 0.4);
+        transition: height 0.5s ease;
+    }
+
+    .step-item { position: relative; z-index: 2; display: flex; gap: 20px; margin-top: 35px; opacity: 0.4; transition: opacity 0.4s ease; }
+    .step-item.active { opacity: 1; }
+
+    .step-marker-wrapper { position: relative; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; }
+    
+    .step-marker {
+        width: 46px; height: 46px; 
+        background: var(--cor-fundo-painel); 
+        border: 2px solid var(--cor-borda); border-radius: 14px;
+        display: flex; align-items: center; justify-content: center; 
+        font-size: 1.5rem; color: var(--cor-texto-secundario);
+        box-shadow: var(--sombra-card); transition: 0.3s; z-index: 2;
+    }
+    
+    .step-item.active .step-marker {
         border-color: var(--cor-primaria); color: var(--cor-primaria);
-        box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.15); transform: scale(1.1);
+        background: var(--cor-fundo-painel); transform: scale(1.1);
+        box-shadow: 0 0 15px rgba(0,0,0,0.1);
     }
 
-    .step-info strong { display: block; font-size: 1rem; color: #333; margin-bottom: 2px; }
-    .step-info span { font-size: 0.85rem; color: #666; }
+    /* Radar Pulse */
+    .radar-wave {
+        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        width: 100%; height: 100%; border-radius: 14px; border: 2px solid var(--cor-primaria); opacity: 0; z-index: 1;
+    }
+    .step-item.active .radar-wave { animation: radar-pulse 2s infinite ease-out; }
+    @keyframes radar-pulse { 0% { width: 100%; height: 100%; opacity: 0.8; border-width: 2px; } 100% { width: 200%; height: 200%; opacity: 0; border-width: 0px; } }
 
-    /* Card de Voo */
-    .flight-card {
-        background: #fff; border-left: 4px solid #ccc; padding: 15px;
-        border-radius: 8px; margin-top: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+    .step-details { flex: 1; padding-top: 2px; }
+    .step-title { font-size: 1rem; font-weight: 700; color: var(--cor-texto-principal); margin-bottom: 4px; }
+    .step-desc { font-size: 0.85rem; color: var(--cor-texto-secundario); line-height: 1.4; }
+
+    /* --- FLIGHT CARD INTERATIVO --- */
+    .flight-segment {
+        background: var(--cor-fundo-principal); /* Contraste dentro da sidebar */
+        border-radius: 12px; padding: 15px; margin-top: 15px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
+        border: 1px solid var(--cor-borda);
+        position: relative; overflow: hidden; opacity: 0.6; transition: 0.3s;
     }
-    .flight-header { display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: 700; font-size: 0.95rem; }
-    .flight-route { display: flex; justify-content: space-between; font-size: 0.9rem; color: #555; }
     
-    /* POPUP CUSTOMIZADO */
-    .leaflet-popup-content-wrapper { border-radius: 12px; padding: 0; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
-    .leaflet-popup-content { margin: 0; width: 300px !important; }
-    
-    .pop-header {
-        background: #1a1a1a; color: white; padding: 15px;
-        font-weight: 700; font-size: 1rem; border-bottom: 3px solid var(--cor-primaria);
+    .flight-segment.active-flight { 
+        opacity: 1; transform: scale(1.02); 
+        box-shadow: var(--sombra-card);
+        background: var(--cor-fundo-painel); /* Destaca ficando igual ao painel */
+        border-color: var(--cor-primaria);
     }
-    .pop-body { padding: 15px; background: #fff; }
-    .pop-row {
+
+    .flight-segment.azul { border-top: 4px solid #0055a4; }
+    .flight-segment.latam { border-top: 4px solid #e60000; }
+    .flight-segment.gol { border-top: 4px solid #ff6600; }
+
+    .fs-header { display: flex; justify-content: space-between; font-weight: 700; margin-bottom: 12px; font-size: 0.9rem; color: var(--cor-texto-principal); }
+    
+    .route-visual {
+        display: flex; align-items: center; justify-content: space-between;
+        /* Fundo sutil para a área da rota */
+        background: rgba(0,0,0,0.03); 
+        border-radius: 8px; padding: 10px 15px; position: relative;
+    }
+    
+    .point-code { font-size: 1.2rem; font-weight: 800; color: var(--cor-texto-principal); z-index: 2; }
+    .point-time { font-size: 0.75rem; color: var(--cor-texto-secundario); font-weight: 600; margin-top: 2px; }
+
+    /* TRACK ANIMADO */
+    .flight-track-container { flex: 1; margin: 0 15px; position: relative; height: 20px; display: flex; align-items: center; }
+    
+    .flight-track-line { 
+        width: 100%; height: 2px; 
+        background: var(--cor-borda); 
+        position: relative; overflow: hidden; border-radius: 2px; 
+    }
+    
+    /* Aviãozinho Controlado via JS */
+    .flight-icon-controlled {
+        position: absolute; top: 50%; left: 0%;
+        transform: translateY(-50%) rotate(90deg);
+        font-size: 1.2rem; color: var(--cor-primaria);
+        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+        transition: left 0.1s linear; 
+    }
+
+    /* --- MAPA MARKERS (Personalização) --- */
+    .custom-div-icon { background: transparent; border: none; }
+    .marker-pin {
+        width: 44px; height: 44px; border-radius: 50%; 
+        background: var(--cor-fundo-painel); 
+        border: 3px solid var(--cor-texto-principal);
+        display: flex; align-items: center; justify-content: center; font-size: 1.3rem;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.4); position: relative; transition: transform 0.2s;
+    }
+    .marker-pin:hover { transform: scale(1.2) translateY(-5px); cursor: pointer; z-index: 999; }
+    
+    .marker-pin::after {
+        content: ''; position: absolute; bottom: -7px; left: 50%; margin-left: -7px;
+        width: 14px; height: 14px; 
+        background: var(--cor-fundo-painel); 
+        transform: rotate(45deg);
+        border-bottom: 3px solid var(--cor-texto-principal); border-right: 3px solid var(--cor-texto-principal);
+    }
+    
+    /* Cores Específicas dos Pinos */
+    .pin-origem { border-color: #0d6efd; color: #0d6efd; } .pin-origem::after { border-color: #0d6efd; }
+    .pin-destino { border-color: #198754; color: #198754; } .pin-destino::after { border-color: #198754; }
+    
+    /* Veículos seguem o tema */
+    .pin-truck { background: var(--cor-texto-principal); color: var(--cor-fundo-painel); border-color: var(--cor-texto-principal); } 
+    .pin-truck::after { background: var(--cor-texto-principal); border-color: var(--cor-texto-principal); }
+    
+    .pin-plane { background: var(--cor-primaria); color: #fff; border-color: var(--cor-primaria-hover); } 
+    .pin-plane::after { background: var(--cor-primaria); border-color: var(--cor-primaria-hover); }
+
+    /* --- POPUPS ADAPTATIVOS --- */
+    .leaflet-popup-content-wrapper { 
+        background: var(--cor-fundo-painel); 
+        color: var(--cor-texto-principal); 
+        border-radius: 12px; 
+        box-shadow: var(--sombra-card);
+        border: 1px solid var(--cor-borda);
+    }
+    .leaflet-popup-tip { background: var(--cor-fundo-painel); border: 1px solid var(--cor-borda); border-top: none; border-left: none; }
+    
+    .pop-header { 
+        padding: 12px; font-weight: 700; 
+        background: var(--cor-fundo-principal);
+        border-bottom: 1px solid var(--cor-borda); 
         display: flex; justify-content: space-between; align-items: center;
-        padding: 8px 0; border-bottom: 1px dashed #eee; font-size: 0.85rem;
     }
-    .pop-row:last-child { border-bottom: none; }
-    .pop-label { color: #888; }
-    .pop-val { font-weight: 600; color: #333; text-align: right; max-width: 160px; }
-
+    .pop-body { padding: 12px; font-size: 0.85rem; }
+    .pop-row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+    .pop-val { font-weight: 700; color: var(--cor-texto-principal); } 
+    .pop-lbl { color: var(--cor-texto-secundario); font-size: 0.8rem; }
 </style>
 
-<div class="page-container">
-    
-    <div class="sidebar-float">
+<div class="map-wrapper">
+    <div class="glass-sidebar">
         <div class="sidebar-header">
-            <div class="header-top">
-                <span class="badge-filial">FILIAL {{ Ctc.filial }}</span>
-                <span style="font-size:0.8rem; color:#888;">SÉRIE {{ Ctc.serie }}</span>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div class="badge-serie"><i class="ph-bold ph-barcode"></i> Filial {{ Ctc.filial }} / Série {{ Ctc.serie }}</div>
             </div>
-            <h1 class="ctc-numero">CTC {{ Ctc.ctc }}</h1>
-            <div class="ctc-data">
-                📅 Emissão: {{ Ctc.data_emissao_real.strftime('%d/%m/%Y às %H:%M') }}
+            <h1 class="ctc-title">CTC {{ Ctc.ctc }}</h1>
+            <div class="ctc-meta">
+                <div><i class="ph-fill ph-calendar-blank"></i> {{ Ctc.data_emissao_real.strftime('%d/%m/%Y') }}</div>
+                <div><i class="ph-fill ph-clock"></i> {{ Ctc.data_emissao_real.strftime('%H:%M') }}</div>
             </div>
-
-            <div class="kpi-grid">
-                <div class="kpi-card">
-                    <span class="kpi-lbl">Volumes</span>
-                    <span class="kpi-val">{{ Ctc.volumes }} cx</span>
-                </div>
-                <div class="kpi-card">
-                    <span class="kpi-lbl">Peso Real</span>
-                    <span class="kpi-val">{{ Ctc.peso }} kg</span>
-                </div>
-                <div class="kpi-card" style="grid-column: span 2; background: #f8fff9; border-color: #c3e6cb;">
-                    <span class="kpi-lbl" style="color:#198754;">Valor da Carga</span>
-                    <span class="kpi-val kpi-money">R$ {{ "{:,.2f}".format(Ctc.valor) }}</span>
-                </div>
+            <div class="kpi-row">
+                <div class="kpi-box"><span class="kpi-lbl">Volumes</span><span class="kpi-val">{{ Ctc.volumes }}</span></div>
+                <div class="kpi-box"><span class="kpi-lbl">Peso</span><span class="kpi-val">{{ Ctc.peso }} kg</span></div>
+                <div class="kpi-box"><span class="kpi-lbl">Valor</span><span class="kpi-val money">R$ {{ "{:,.0f}".format(Ctc.valor) }}</span></div>
             </div>
         </div>
 
-        <div class="timeline-area">
-            <div class="step active" id="step-1">
-                <div class="step-icon">🚛</div>
-                <div class="step-info">
-                    <strong>Coleta na Origem</strong>
-                    <span>{{ Origem.nome }} - {{ Origem.uf }}</span>
-                </div>
+        <div class="timeline-content">
+            <div class="timeline-line-bg"></div>
+            <div class="timeline-line-active" id="progress-line"></div>
+
+            <div class="step-item active" id="step-coleta">
+                <div class="step-marker-wrapper"><div class="radar-wave"></div><div class="step-marker"><i class="ph-fill ph-package"></i></div></div>
+                <div class="step-details"><div class="step-title">Origem / Coleta</div><div class="step-desc">{{ Origem.nome }}<br><small style="color: var(--cor-texto-secundario);">{{ Ctc.remetente.split(' ')[0] }}...</small></div></div>
             </div>
 
-            <div class="step" id="step-2">
-                <div class="step-icon">✈️</div>
-                <div class="step-info" style="width: 100%;">
-                    <strong>Malha Aérea</strong>
+            <div class="step-item" id="step-aereo">
+                <div class="step-marker-wrapper"><div class="radar-wave"></div><div class="step-marker"><i class="ph-fill ph-airplane-tilt"></i></div></div>
+                <div class="step-details">
+                    <div class="step-title">Transferência Aérea</div>
                     {% if Rotas %}
                         {% for voo in Rotas %}
-                        <div class="flight-card" id="card-{{ loop.index0 }}">
-                            <div class="flight-header">
-                                <span id="cia-{{ loop.index0 }}">{{ voo.cia }} {{ voo.voo }}</span>
-                                <span style="font-weight:400; font-size:0.8rem; background:#eee; padding:2px 6px; border-radius:4px;">{{ voo.data }}</span>
-                            </div>
-                            <div class="flight-route">
-                                <span>🛫 {{ voo.origem.iata }} <b>{{ voo.horario_saida }}</b></span>
-                                <span>🛬 {{ voo.destino.iata }} <b>{{ voo.horario_chegada }}</b></span>
+                        {% set cia_cls = 'latam' if 'LA' in voo.cia or 'LATAM' in voo.cia else ('azul' if 'AD' in voo.cia or 'AZUL' in voo.cia else 'gol') %}
+                        
+                        <div class="flight-segment {{ cia_cls }}" id="card-flight-{{ loop.index0 }}">
+                            <div class="fs-header"><span>{{ voo.cia }} {{ voo.voo }}</span><span style="font-weight: 400; color: var(--cor-texto-secundario);">{{ voo.data }}</span></div>
+                            <div class="route-visual">
+                                <div><div class="point-code">{{ voo.origem.iata }}</div><div class="point-time">{{ voo.horario_saida }}</div></div>
+                                
+                                <div class="flight-track-container">
+                                    <div class="flight-track-line"></div>
+                                    <i id="plane-icon-{{ loop.index0 }}" class="ph-fill ph-airplane-tilt flight-icon-controlled"></i>
+                                </div>
+
+                                <div style="text-align: right;"><div class="point-code">{{ voo.destino.iata }}</div><div class="point-time">{{ voo.horario_chegada }}</div></div>
                             </div>
                         </div>
                         {% endfor %}
                     {% else %}
-                        <div class="flight-card" style="border-left-color: #dc3545; background: #fff5f5; color:#dc3545;">
-                            <strong>Não planejado</strong><br>
-                            <small>Nenhum voo compatível encontrado.</small>
-                        </div>
+                        <div class="flight-segment" style="border-left: 4px solid var(--cor-texto-secundario); color: var(--cor-texto-secundario);"><em>Nenhum voo alocado.</em></div>
                     {% endif %}
                 </div>
             </div>
 
-            <div class="step" id="step-3">
-                <div class="step-icon">🏁</div>
-                <div class="step-info">
-                    <strong>Entrega Final</strong>
-                    <span>{{ Destino.nome }} - {{ Destino.uf }}</span>
-                </div>
+            <div class="step-item" id="step-entrega">
+                <div class="step-marker-wrapper"><div class="radar-wave"></div><div class="step-marker"><i class="ph-fill ph-flag-checkered"></i></div></div>
+                <div class="step-details"><div class="step-title">Destino Final</div><div class="step-desc">{{ Destino.nome }}<br><small style="color: var(--cor-texto-secundario);">{{ Ctc.destinatario.split(' ')[0] }}...</small></div></div>
             </div>
         </div>
     </div>
@@ -197,187 +297,149 @@
 </div>
 
 <script>
-    /**
-     * ====================================================================
-     * PLUGIN MOVING MARKER EMBUTIDO (Para corrigir erro 404/MIME)
-     * ====================================================================
-     */
+    // Plugin Marker
     L.interpolatePosition=function(t,i,n,o){var e=o/n;e=e>0?e:0,e=e>1?1:e;return L.latLng(t.lat+e*(i.lat-t.lat),t.lng+e*(i.lng-t.lng))};L.Marker.MovingMarker=L.Marker.extend({initialize:function(t,i,n){L.Marker.prototype.initialize.call(this,t[0],n),this._latlngs=t.map(t=>L.latLng(t)),this._durations=i,this._currentDuration=0,this._currentIndex=0,this._state=null,this._startTime=0,this._startTimeStamp=0,this._pauseStartTime=0,this._animId=0,this._animRequested=!1,this._currentLine=[]},isRunning:function(){return"run"===this._state},isPaused:function(){return"paused"===this._state},isEnded:function(){return"ended"===this._state},start:function(){this.isRunning()||(this.isPaused()?this.resume():(this._loadLine(0),this._startAnimation(),this.fire("start")))},resume:function(){this.isPaused()&&(this._currentLine[0]=this.getLatLng(),this._currentDuration-=this._pauseStartTime-this._startTime,this._startAnimation())},pause:function(){this.isRunning()&&(this._pauseStartTime=Date.now(),this._state="paused",this._stopAnimation(),this._updatePosition())},stop:function(t){this.isEnded()||(this._stopAnimation(),void 0===t&&(t=0,this._updatePosition()),this._state="ended",this.fire("end",{elapsedTime:t}))},_startAnimation:function(){this._state="run",this._animId=L.Util.requestAnimFrame(function(t){this._startTime=Date.now(),this._startTimeStamp=t,this._animate(t)},this),this._animRequested=!0},_stopAnimation:function(){this._animRequested&&(L.Util.cancelAnimFrame(this._animId),this._animRequested=!1)},_loadLine:function(t){this._currentIndex=t,this._currentDuration=this._durations[t],this._currentLine=[this._latlngs[t],this._latlngs[t+1]]},_updatePosition:function(){var t=Date.now()-this._startTime;this._animate(this._startTimeStamp+t,!0)},_animate:function(t,i){this._animRequested=!1;var n=Date.now()-this._startTime,o=this._currentDuration;if(n<o){var e=L.interpolatePosition(this._currentLine[0],this._currentLine[1],o,n);this.setLatLng(e),i||(this._animId=L.Util.requestAnimFrame(this._animate,this),this._animRequested=!0)}else this.setLatLng(this._currentLine[1]),this._currentIndex<this._latlngs.length-2?(this._loadLine(this._currentIndex+1),this._startAnimation()):(this._state="ended",this.fire("end",{elapsedTime:n}))},addLatLng:function(t,i){this._latlngs.push(L.latLng(t)),this._durations.push(i)},moveTo:function(t,i){this._stopAnimation(),this._latlngs=[this.getLatLng(),L.latLng(t)],this._durations=[i],this.start()}});L.Marker.movingMarker=function(t,i,n){return new L.Marker.MovingMarker(t,i,n)};
-    /* FIM DO PLUGIN EMBUTIDO */
 
-
-    // --- LÓGICA DO SISTEMA ---
     const ctc = {{ Ctc | tojson | safe }};
     const rotas = {{ Rotas | tojson | safe }};
     const origem = { lat: {{ Origem.lat | default(0) }}, lon: {{ Origem.lon | default(0) }} };
     const destino = { lat: {{ Destino.lat | default(0) }}, lon: {{ Destino.lon | default(0) }} };
 
-    const CORES = { 
-        'LATAM': '#e60000', 'LA': '#e60000', 
-        'AZUL': '#0055a4', 'AD': '#0055a4', 
-        'GOL': '#ff6600', 'G3': '#ff6600', 
-        'PADRAO': '#333' 
-    };
+    // --- POPUPS & ÍCONES ---
+    function GetPopupCtc() { return `<div class="pop-header"><span>CTC ${ctc.ctc}</span><i class="ph-fill ph-truck"></i></div><div class="pop-body"><div class="pop-row"><span class="pop-lbl">Remetente</span><span class="pop-val">${ctc.remetente.substring(0,12)}..</span></div><div class="pop-row"><span class="pop-lbl">Vol/Peso</span><span class="pop-val">${ctc.volumes} / ${ctc.peso}kg</span></div></div>`; }
+    function GetPopupLocal(t,n,u) { return `<div class="pop-header"><span>${t}</span><i class="ph-fill ph-map-pin"></i></div><div class="pop-body"><div style="font-weight:700;">${n}</div><div style="color:var(--cor-texto-secundario);">${u}</div></div>`; }
+    function GetPopupAero(i,n) { return `<div class="pop-header"><span>${i}</span><i class="ph-fill ph-airplane"></i></div><div class="pop-body">${n}</div>`; }
 
-    let map;
-    let markerAnim = null;
+    function criarIcone(tipo) {
+        let cls='pin-truck', ico='ph-truck';
+        if(tipo==='origem'){cls='pin-origem';ico='ph-package';}
+        if(tipo==='destino'){cls='pin-destino';ico='ph-flag-checkered';}
+        if(tipo==='plane'){cls='pin-plane';ico='ph-airplane-tilt';}
+        return L.divIcon({className:'custom-div-icon',html:`<div class="marker-pin ${cls}"><i class="ph-fill ${ico}"></i></div>`,iconSize:[44,46],iconAnchor:[22,46],popupAnchor:[0,-45]});
+    }
+
+    let map, markerAnim;
 
     document.addEventListener("DOMContentLoaded", function() {
-        
-        // 1. Mapa Clean
         map = L.map('map', {zoomControl: false}).setView([-14.2, -51.9], 4);
-        L.control.zoom({position: 'topright'}).addTo(map);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-            attribution: 'FlightOps', maxZoom: 18
-        }).addTo(map);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {maxZoom: 18}).addTo(map);
 
-        // 2. Ícones Fixos
-        const iconOrigem = L.divIcon({html: '<div style="font-size:28px;">📦</div>', className: 'dummy', iconSize:[30,30], iconAnchor:[15,15]});
-        const iconDestino = L.divIcon({html: '<div style="font-size:28px;">🏁</div>', className: 'dummy', iconSize:[30,30], iconAnchor:[15,15]});
+        if(origem.lat) L.marker([origem.lat, origem.lon], {icon: criarIcone('origem')}).addTo(map).bindPopup(GetPopupLocal('Origem','{{ Origem.nome }}','{{ Origem.uf }}'));
+        if(destino.lat) L.marker([destino.lat, destino.lon], {icon: criarIcone('destino')}).addTo(map).bindPopup(GetPopupLocal('Destino','{{ Destino.nome }}','{{ Destino.uf }}'));
 
-        // 3. Popup Rico (Com todos os dados)
-        const htmlPopup = `
-            <div class="pop-header">CTC ${ctc.ctc}</div>
-            <div class="pop-body">
-                <div class="pop-row"><span class="pop-label">Remetente</span> <span class="pop-val">${ctc.remetente.substring(0,20)}</span></div>
-                <div class="pop-row"><span class="pop-label">Destinatário</span> <span class="pop-val">${ctc.destinatario.substring(0,20)}</span></div>
-                <div class="pop-row"><span class="pop-label">Nota Fiscal</span> <span class="pop-val">${ctc.nfs || '-'}</span></div>
-                <div class="pop-row"><span class="pop-label">Espécie</span> <span class="pop-val">${ctc.especie || 'VOL'}</span></div>
-                <div class="pop-row"><span class="pop-label">Volumes</span> <span class="pop-val">${ctc.volumes}</span></div>
-                <div class="pop-row"><span class="pop-label">Peso Taxado</span> <span class="pop-val">${ctc.peso} kg</span></div>
-            </div>
-        `;
-
-        if(origem.lat) L.marker([origem.lat, origem.lon], {icon: iconOrigem}).addTo(map).bindPopup(htmlPopup);
-        if(destino.lat) L.marker([destino.lat, destino.lon], {icon: iconDestino}).addTo(map).bindPopup("<b>Destino Final</b><br>{{ Destino.nome }}");
-
-        // 4. Desenha Rotas e Configura Animação
         if(rotas && rotas.length > 0) {
             const layers = L.featureGroup();
             let pontosAnimacao = []; 
-            
             let pontoAtual = [origem.lat, origem.lon];
+            
             pontosAnimacao.push({loc: pontoAtual, duracao: 0, tipo: 'inicio'});
 
             rotas.forEach((voo, i) => {
-                const pAeroO = [voo.origem.lat, voo.origem.lon];
-                const pAeroD = [voo.destino.lat, voo.destino.lon];
-                
-                let cor = CORES['PADRAO'];
-                if(voo.cia.includes('AZUL') || voo.cia.includes('AD')) cor = CORES['AZUL'];
-                else if(voo.cia.includes('LATAM') || voo.cia.includes('LA')) cor = CORES['LATAM'];
-                else if(voo.cia.includes('GOL') || voo.cia.includes('G3')) cor = CORES['GOL'];
+                const pO = [voo.origem.lat, voo.origem.lon], pD = [voo.destino.lat, voo.destino.lon];
+                let cor = '#333';
+                if(voo.cia.includes('AZUL')||voo.cia.includes('AD')) cor='#0055a4';
+                else if(voo.cia.includes('LATAM')||voo.cia.includes('LA')) cor='#e60000';
+                else if(voo.cia.includes('GOL')||voo.cia.includes('G3')) cor='#ff6600';
 
-                // Atualiza Sidebar
-                const card = document.getElementById('card-'+i);
-                if(card) {
-                    card.style.borderLeftColor = cor;
-                    document.getElementById('cia-'+i).style.color = cor;
-                }
-
-                // 1. Road (Tracejado) - BEM LENTO (8s)
                 if(i===0) {
-                    L.polyline([pontoAtual, pAeroO], {color:'#888', dashArray:'8,8', weight:3}).addTo(layers);
-                    pontosAnimacao.push({loc: pAeroO, duracao: 8000, tipo: 'road'}); 
+                    L.polyline([pontoAtual, pO], {color:'#999', dashArray:'8,12', weight:3}).addTo(layers);
+                    pontosAnimacao.push({loc: pO, duracao: 3000, tipo: 'road'}); 
                 }
 
-                // 2. Air (Sólido) - ULTRA LENTO E SUAVE (15s)
-                L.polyline([pAeroO, pAeroD], {color: cor, weight: 4}).addTo(layers);
-                L.circleMarker(pAeroO, {radius:4, color:cor, fillColor:'white', fillOpacity:1}).addTo(layers).bindTooltip(voo.origem.iata);
-                L.circleMarker(pAeroD, {radius:4, color:cor, fillColor:'white', fillOpacity:1}).addTo(layers).bindTooltip(voo.destino.iata);
-                
-                pontosAnimacao.push({loc: pAeroD, duracao: 15000, tipo: 'air', cor: cor}); 
+                L.polyline([pO, pD], {color:cor, weight:4}).addTo(layers);
+                L.circleMarker(pO, {radius:5, color:cor, fillColor:'#fff', fillOpacity:1}).addTo(layers).bindPopup(GetPopupAero(voo.origem.iata, voo.origem.nome));
+                L.circleMarker(pD, {radius:5, color:cor, fillColor:'#fff', fillOpacity:1}).addTo(layers).bindPopup(GetPopupAero(voo.destino.iata, voo.destino.nome));
 
-                pontoAtual = pAeroD;
+                pontosAnimacao.push({loc: pD, duracao: 8000, tipo: 'air', cor: cor, flightIndex: i}); 
+                pontoAtual = pD;
             });
 
-            // 3. Road Final - BEM LENTO (8s)
             const pFinal = [destino.lat, destino.lon];
-            L.polyline([pontoAtual, pFinal], {color:'#888', dashArray:'8,8', weight:3}).addTo(layers);
-            pontosAnimacao.push({loc: pFinal, duracao: 8000, tipo: 'road'});
+            L.polyline([pontoAtual, pFinal], {color:'#999', dashArray:'8,12', weight:3}).addTo(layers);
+            pontosAnimacao.push({loc: pFinal, duracao: 3000, tipo: 'road'});
 
             layers.addTo(map);
-            
-            // Zoom inicial com margem
-            setTimeout(() => map.fitBounds(layers.getBounds(), {padding: [100, 100]}), 500);
+            setTimeout(() => map.fitBounds(layers.getBounds(), {padding: [150, 150]}), 500);
 
-            // GATILHO AUTOMÁTICO DO LOOP
             window.dadosAnimacao = pontosAnimacao;
-            // Delay inicial
-            setTimeout(IniciarLoop, 2000);
+            window.iconTruck = criarIcone('truck'); window.iconPlane = criarIcone('plane');
+            setTimeout(IniciarLoop, 1500);
         }
     });
 
-    // --- FUNÇÃO DE LOOP INFINITO (SUAVE) ---
     function IniciarLoop() {
         if(!window.dadosAnimacao) return;
-
         const pontos = window.dadosAnimacao;
         let index = 0;
+        
+        ResetarIcones();
 
-        // Ícones Móveis
-        const iconTruck = L.divIcon({html: '<div style="font-size:32px;">🚚</div>', className: 'dummy', iconSize:[30,30], iconAnchor:[15,15]});
-        const iconPlane = L.divIcon({html: '<div style="font-size:32px; transform: rotate(-45deg);">✈️</div>', className: 'dummy', iconSize:[30,30], iconAnchor:[15,15]});
-
-        // Limpa anterior
         if (markerAnim) markerAnim.remove();
 
-        // Cria marcador
-        markerAnim = L.Marker.movingMarker(
-            [pontos[0].loc], 
-            [1000], 
-            {icon: iconTruck, zIndexOffset: 2000}
-        ).addTo(map);
-
-        // Torna o ícone animado clicável também!
-        const popupInfo = `
-            <div class="pop-header" style="background:#212529;">Carga em Trânsito</div>
-            <div class="pop-body">
-                <div class="pop-row"><span class="pop-label">Volume</span> <span class="pop-val">${ctc.volumes} vol</span></div>
-                <div class="pop-row"><span class="pop-label">Peso</span> <span class="pop-val">${ctc.peso} kg</span></div>
-            </div>
-        `;
-        markerAnim.bindPopup(popupInfo, {className: 'custom-popup'});
+        markerAnim = L.Marker.movingMarker([pontos[0].loc], [1000], {icon: window.iconTruck, zIndexOffset: 2000}).addTo(map);
+        markerAnim.bindPopup(GetPopupCtc());
 
         function AnimarProximo() {
-            // Fim -> Reinicia
             if (index >= pontos.length - 1) {
-                setTimeout(() => {
-                    document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
-                    document.getElementById('step-1').classList.add('active'); 
-                    IniciarLoop(); 
-                }, 4000); // 4s de pausa no fim
+                setTimeout(() => { AtualizarUI('coleta', 0); IniciarLoop(); }, 4000);
                 return;
             }
-
             const pProx = pontos[index+1];
             
-            // Controle Sidebar
-            document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
-            
             if (pProx.tipo === 'air') {
-                markerAnim.setIcon(iconPlane);
-                document.getElementById('step-2').classList.add('active');
+                markerAnim.setIcon(window.iconPlane);
+                AtualizarUI('aereo', 50);
+                SincronizarAviaoSidebar(pProx.duracao, pProx.flightIndex);
+                HighlightCardVoo(pProx.flightIndex);
             } else {
-                markerAnim.setIcon(iconTruck);
-                if(index === 0) document.getElementById('step-1').classList.add('active'); 
-                else document.getElementById('step-3').classList.add('active');
+                markerAnim.setIcon(window.iconTruck);
+                RemoverHighlightVoo();
+                if(index === 0) AtualizarUI('coleta', 10);
+                else AtualizarUI('entrega', 100);
             }
 
-            // Move
             markerAnim.moveTo(pProx.loc, pProx.duracao);
-
             markerAnim.once('end', function() {
-                // Pausa nas conexões (2s)
-                setTimeout(() => {
-                    index++;
-                    AnimarProximo();
-                }, 2000);
+                setTimeout(() => { index++; AnimarProximo(); }, 500);
             });
         }
-
         AnimarProximo();
     }
 
+    function SincronizarAviaoSidebar(duracaoTotal, flightIndex) {
+        const icon = document.getElementById('plane-icon-' + flightIndex);
+        if(!icon) return;
+        let startTime = null;
+        function step(timestamp) {
+            if (!startTime) startTime = timestamp;
+            const progress = timestamp - startTime;
+            const percent = Math.min(progress / duracaoTotal, 1);
+            icon.style.left = (percent * 100) + '%';
+            if (progress < duracaoTotal) { window.requestAnimationFrame(step); }
+        }
+        window.requestAnimationFrame(step);
+    }
+
+    function ResetarIcones() {
+        document.querySelectorAll('.flight-icon-controlled').forEach(el => { el.style.left = '0%'; });
+        RemoverHighlightVoo();
+    }
+
+    function HighlightCardVoo(idx) {
+        RemoverHighlightVoo();
+        const card = document.getElementById('card-flight-' + idx);
+        if(card) card.classList.add('active-flight');
+    }
+
+    function RemoverHighlightVoo() {
+        document.querySelectorAll('.flight-segment').forEach(c => c.classList.remove('active-flight'));
+    }
+
+    function AtualizarUI(stepId, progresso) {
+        document.querySelectorAll('.step-item').forEach(s => s.classList.remove('active'));
+        const el = document.getElementById('step-' + stepId);
+        if(el) { el.classList.add('active'); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+        document.getElementById('progress-line').style.height = progresso + '%';
+    }
 </script>
 {% endblock %}

@@ -5,61 +5,112 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block titulo %}FlightOps{% endblock %}</title>
     
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
     <link rel="stylesheet" href="{{ url_for('static', filename='CSS/Temas.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='CSS/Global.css') }}">
 </head>
 <body>
     <div class="layout-wrapper">
         <aside class="sidebar">
-            <div style="font-size: 1.4rem; font-weight: 700; color: var(--cor-primaria); margin-bottom: 40px; display: flex; align-items: center; gap: 8px;">
-                ✈️ FlightOps
+            <div class="sidebar-logo">
+                <i class="ph-fill ph-airplane-tilt"></i>
+                <span>FlightOps</span>
             </div>
             
             <nav>
-                <a href="/" 
-                class="menu-link {{ 'ativo' if request.endpoint == 'Dashboard' else '' }}">
-                📊 Dashboard
+                <a href="{{ url_for('Dashboard') }}" 
+                   class="menu-link {{ 'ativo' if request.endpoint == 'Dashboard' else '' }}">
+                   <div class="link-content">
+                       <i class="ph-bold ph-chart-pie-slice"></i>
+                       <span>Dashboard</span>
+                   </div>
                 </a>
 
-                <a href="{{ url_for('Malha.Gerenciar') }}" 
-                class="menu-link {{ 'ativo' if request.endpoint and 'Malha' in request.endpoint else '' }}">
-                🛫 Malha Aérea
-                </a>
+                <div class="menu-group-wrapper">
+                    <button class="menu-group-btn {{ 'ativo' if 'Malha' in request.endpoint or 'Aeroporto' in request.endpoint or 'Cidade' in request.endpoint else '' }}" 
+                            onclick="ToggleMenu(this)">
+                        <div class="link-content">
+                            <i class="ph-bold ph-folder-notch"></i>
+                            <span>Cadastros</span>
+                        </div>
+                        <i class="ph-bold ph-caret-down seta-menu"></i>
+                    </button>
+                    
+                    <div class="submenu {{ 'aberto' if 'Malha' in request.endpoint or 'Aeroporto' in request.endpoint or 'Cidade' in request.endpoint else '' }}">
+                        <a href="{{ url_for('Malha.Gerenciar') }}" 
+                           class="menu-link {{ 'ativo' if request.endpoint and 'Malha' in request.endpoint else '' }}">
+                           <span>Malha Aérea</span>
+                        </a>
 
-                <a href="{{ url_for('Aeroporto.Gerenciar') }}" 
-                class="menu-link {{ 'ativo' if request.endpoint and 'Aeroporto' in request.endpoint else '' }}">
-                🌍 Aeroportos
-                </a>
+                        <a href="{{ url_for('Aeroporto.Gerenciar') }}" 
+                           class="menu-link {{ 'ativo' if request.endpoint and 'Aeroporto' in request.endpoint else '' }}">
+                           <span>Aeroportos</span>
+                        </a>
 
-                <a href="{{ url_for('Cidade.Gerenciar') }}" 
-                class="menu-link {{ 'ativo' if request.endpoint and 'Cidade' in request.endpoint else '' }}">
-                🏙️ Cidades
-                </a>
+                        <a href="{{ url_for('Cidade.Gerenciar') }}" 
+                           class="menu-link {{ 'ativo' if request.endpoint and 'Cidade' in request.endpoint else '' }}">
+                           <span>Cidades</span>
+                        </a>
+                    </div>
+                </div>
 
                 <a href="{{ url_for('Planejamento.Dashboard') }}" 
-                class="menu-link {{ 'ativo' if request.endpoint and 'Planejamento' in request.endpoint else '' }}">
-                🗺️ Planejamento
+                   class="menu-link {{ 'ativo' if request.endpoint and 'Planejamento' in request.endpoint else '' }}">
+                   <div class="link-content">
+                       <i class="ph-bold ph-globe-hemisphere-west"></i>
+                       <span>Planejamento</span>
+                   </div>
                 </a>
                 
-                <a href="#" class="menu-link">📅 Escalas</a>
-                <a href="#" class="menu-link">⚙️ Configurações</a>
+                <a href="{{ url_for('Escalas.Mapa') }}" 
+                   class="menu-link {{ 'ativo' if request.endpoint and 'Escalas' in request.endpoint else '' }}">
+                   <div class="link-content">
+                       <i class="ph-bold ph-calendar-blank"></i>
+                       <span>Escalas</span>
+                   </div>
+                </a>
+
+                <div class="menu-divider"></div>
+
+                <a href="#" class="menu-link">
+                    <div class="link-content">
+                        <i class="ph-bold ph-gear"></i>
+                        <span>Configurações</span>
+                    </div>
+                </a>
             </nav>
+
+            <div class="sidebar-footer">
+                <span>v1.0.0 (Stable)</span>
+            </div>
         </aside>
 
         <main class="main-content">
             <header class="top-bar">
-                <button onclick="AlternarTema()" style="background:none; border:1px solid var(--cor-borda); padding:6px 12px; border-radius:4px; cursor:pointer; color:var(--cor-texto-secundario);">
-                    🌗 Tema
+                <button onclick="AlternarTema()" class="btn-icon" title="Alternar Tema">
+                    <i class="ph-bold ph-moon"></i>
                 </button>
                 
-                <div style="font-size: 0.9rem; font-weight: 500;">
-                    {% if current_user.is_authenticated %}
-                        {{ current_user.Nome }} 
-                    {% else %}
-                        Usuário
-                    {% endif %}
-                    
-                    <a href="{{ url_for('Auth.Logout') }}" style="color: #dc3545; text-decoration: none; margin-left: 15px; font-size: 0.85rem;">Sair</a>
+                <div class="user-profile">
+                    <div class="user-info">
+                        <span class="user-name">
+                            {% if current_user.is_authenticated %}
+                                {{ current_user.Nome }}
+                            {% else %}
+                                Visitante
+                            {% endif %}
+                        </span>
+                        <span class="user-role">Flight Dispatcher</span>
+                    </div>
+                    <div class="user-avatar">
+                        <i class="ph-fill ph-user"></i>
+                    </div>
+                    <a href="{{ url_for('Auth.Logout') }}" class="btn-logout" title="Sair">
+                        <i class="ph-bold ph-sign-out"></i>
+                    </a>
                 </div>
             </header>
 
@@ -67,7 +118,10 @@
                 {% with messages = get_flashed_messages(with_categories=true) %}
                   {% if messages %}
                     {% for category, message in messages %}
-                      <div class="alert alert-{{ category }}">{{ message }}</div>
+                      <div class="alert alert-{{ category }}">
+                          <i class="ph-fill {% if category == 'success' %}ph-check-circle{% elif category == 'danger' %}ph-warning-circle{% else %}ph-info{% endif %}"></i>
+                          <span>{{ message }}</span>
+                      </div>
                     {% endfor %}
                   {% endif %}
                 {% endwith %}
@@ -78,13 +132,33 @@
     </div>
 
     <script>
+        function ToggleMenu(btn) {
+            btn.classList.toggle('ativo');
+            const submenu = btn.nextElementSibling;
+            submenu.classList.toggle('aberto');
+        }
+
         function AlternarTema() {
             const html = document.documentElement;
             const novoTema = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
             html.setAttribute('data-theme', novoTema);
             localStorage.setItem('tema', novoTema);
+            
+            // Troca ícone do tema dinamicamente
+            const icon = document.querySelector('.btn-icon i');
+            if(novoTema === 'dark') {
+                icon.classList.replace('ph-moon', 'ph-sun');
+            } else {
+                icon.classList.replace('ph-sun', 'ph-moon');
+            }
         }
-        if(localStorage.getItem('tema')) document.documentElement.setAttribute('data-theme', localStorage.getItem('tema'));
+        
+        // Inicialização
+        const temaSalvo = localStorage.getItem('tema');
+        if (temaSalvo) {
+            document.documentElement.setAttribute('data-theme', temaSalvo);
+            if(temaSalvo === 'dark') document.querySelector('.btn-icon i').classList.replace('ph-moon', 'ph-sun');
+        }
     </script>
 </body>
 </html>
