@@ -3,207 +3,315 @@
 {% block titulo %}Torre de Controle Global | FlightOps{% endblock %}
 
 {% block conteudo %}
+{% include "Components/ModalCtc.html" %}
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
 <style>
-    /* Layout Fixo (Sidebar + Mapa) */
+    /* --- ESTRUTURA ORIGINAL --- */
     .page-grid {
-        display: grid;
-        grid-template-columns: 380px 1fr;
-        gap: 20px;
-        height: calc(100vh - 140px);
-        min-height: 550px;
-        font-family: 'Inter', sans-serif;
+        display: grid; grid-template-columns: 380px 1fr; gap: 20px;
+        height: calc(100vh - 140px); min-height: 550px; font-family: 'Inter', sans-serif;
     }
-
-    /* Sidebar */
     .painel {
-        background: #fff; border: 1px solid #dee2e6; border-radius: 8px;
-        display: flex; flex-direction: column; overflow: hidden;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        background: var(--cor-fundo-painel, #fff); border: 1px solid var(--cor-borda, #dee2e6); 
+        border-radius: 8px; display: flex; flex-direction: column; overflow: hidden;
+        box-shadow: var(--sombra-card, 0 4px 12px rgba(0,0,0,0.05));
     }
-    .painel-top { padding: 20px; background: #f8f9fa; border-bottom: 1px solid #eee; }
-    .painel-content { padding: 0; flex: 1; overflow-y: auto; background: #fdfdfd; }
-
-    /* Lista de CTCs */
-    .ctc-item {
-        padding: 15px 20px; border-bottom: 1px solid #eee; cursor: pointer;
-        transition: all 0.2s; border-left: 4px solid transparent;
-    }
-    .ctc-item:hover { background: #f1f8ff; }
-    
-    .ctc-item.ativo {
-        background: #fff; border-left-color: #0d6efd;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 2; position: relative;
-    }
-
-    .ctc-header { display: flex; justify-content: space-between; margin-bottom: 5px; }
-    .badge-ctc { background: #343a40; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; }
-    .valor-ctc { color: #198754; font-weight: bold; font-size: 0.9rem; }
-    
-    .rota-texto { font-size: 0.85rem; color: #555; display: flex; align-items: center; gap: 5px; }
-    .seta-rota { color: #aaa; font-size: 0.8rem; }
-
-    /* Botão de Ação */
-    .area-acao { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #eee; animation: fadeIn 0.3s; }
-    .ctc-item.ativo .area-acao { display: block; }
-
-    .btn-planejar {
-        display: block; width: 100%; text-align: center;
-        background: #0d6efd; color: white; text-decoration: none;
-        padding: 8px; border-radius: 4px; font-weight: 600; font-size: 0.9rem;
-        transition: 0.2s;
-    }
-    .btn-planejar:hover { background: #0b5ed7; }
-
-    /* Mapa */
     #map-wrapper {
-        border-radius: 8px; border: 1px solid #ced4da;
-        position: relative; height: 100%; width: 100%; overflow: hidden;
-        background: #e9ecef;
+        border-radius: 8px; border: 1px solid var(--cor-borda, #dee2e6);
+        position: relative; height: 100%; width: 100%; overflow: hidden; background: #e9ecef;
     }
     #map { width: 100%; height: 100%; z-index: 1; }
 
-    /* Estados Visuais */
-    .rota-fantasma { opacity: 0.1 !important; transition: opacity 0.5s; }
-    .rota-focada { opacity: 1 !important; stroke-width: 4px !important; z-index: 999; }
-    .marker-fantasma { opacity: 0.2 !important; }
-    .marker-focado { opacity: 1 !important; z-index: 1000 !important; }
+    /* --- ESTILOS INTERNOS --- */
+    .painel-top { padding: 20px; background: var(--cor-fundo-principal, #f8f9fa); border-bottom: 1px solid var(--cor-borda, #eee); }
+    .painel-content { padding: 15px; flex: 1; overflow-y: auto; background: var(--cor-fundo-painel, #fdfdfd); }
 
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    /* Card CTC */
+    .ctc-card {
+        background: var(--cor-fundo-painel, #fff); border: 1px solid var(--cor-borda, #eee);
+        border-radius: 10px; padding: 15px; margin-bottom: 12px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02); transition: all 0.2s; position: relative;
+    }
+    .ctc-card:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.08); border-color: var(--cor-primaria, #0056b3); }
+    .ctc-card.urgente { border-left: 4px solid #dc3545; }
+    .ctc-card.normal { border-left: 4px solid var(--cor-primaria, #0056b3); }
+
+    .card-header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .badge-serie { background: #f1f3f5; color: #495057; padding: 3px 8px; border-radius: 6px; font-family: monospace; font-weight: bold; font-size: 0.8rem; }
+    .badge-urg { background: #ffebeb; color: #dc3545; font-size: 0.7rem; padding: 4px 8px; border-radius: 20px; font-weight: 700; text-transform: uppercase;}
+
+    .rota-display { font-weight: 700; color: var(--cor-texto-principal, #333); margin-bottom: 5px; font-size: 0.95rem; display: flex; align-items: center; gap: 6px; }
+    .seta-display { color: #adb5bd; font-size: 0.8rem; }
+
+    .cliente-display { font-size: 0.8rem; color: #666; margin-bottom: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .card-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; margin-bottom: 12px; }
+    .stat-box { background: var(--cor-fundo-principal, #f8f9fa); padding: 6px; border-radius: 6px; text-align: center; }
+    .stat-label { font-size: 0.65rem; color: #888; display: block; }
+    .stat-val { font-size: 0.85rem; font-weight: 600; color: #333; }
+    .stat-money { color: #198754; }
+
+    /* Botões de Ação */
+    .card-actions { display: grid; grid-template-columns: 1fr 40px; gap: 8px; }
+    
+    .btn-planejar {
+        display: flex; align-items: center; justify-content: center; gap: 8px;
+        width: 100%; padding: 8px; border-radius: 6px;
+        background: transparent; border: 1px solid var(--cor-primaria, #0056b3);
+        color: var(--cor-primaria, #0056b3); font-weight: 600; text-decoration: none;
+        font-size: 0.9rem; transition: 0.2s;
+    }
+    .btn-planejar:hover { background: var(--cor-primaria, #0056b3); color: white; }
+
+    .btn-detalhes {
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 6px; background: #f8f9fa; border: 1px solid #dee2e6;
+        color: #666; cursor: pointer; transition: 0.2s;
+    }
+    .btn-detalhes:hover { background: #e9ecef; color: #333; border-color: #ced4da; }
+
+    /* --- MODAL DE DETALHES --- */
+    .modal-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.5); z-index: 10000;
+        display: none; align-items: center; justify-content: center;
+        backdrop-filter: blur(4px);
+    }
+    .modal-box {
+        background: white; width: 90%; max-width: 800px; max-height: 90vh;
+        border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        display: flex; flex-direction: column; overflow: hidden;
+    }
+    .modal-header {
+        padding: 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;
+        background: #f8f9fa;
+    }
+    .modal-title { font-size: 1.1rem; font-weight: 700; color: #333; }
+    .btn-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #999; }
+    .btn-close:hover { color: #333; }
+    
+    .modal-body { padding: 0; overflow-y: auto; }
+    
+    /* Tabela do Modal */
+    .details-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    .details-table th, .details-table td { padding: 10px 20px; border-bottom: 1px solid #eee; text-align: left; }
+    .details-table th { background: #fdfdfd; color: #666; width: 30%; font-weight: 600; }
+    .details-table td { color: #333; font-family: monospace; }
+    .details-table tr:nth-child(even) { background: #fafafa; }
+
+    /* Markers */
+    .map-marker { display: flex; flex-direction: column; align-items: center; justify-content: center; transition: transform 0.2s; }
+    .map-marker:hover { transform: scale(1.1); z-index: 9999 !important; }
+    .marker-bubble {
+        width: 100%; height: 100%; background: white; border-radius: 50%;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); border: 2px solid white;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        overflow: hidden; position: relative;
+    }
+    .marker-header { width: 100%; color: white; font-weight: 800; font-size: 13px; padding: 3px 0; text-align: center; position: absolute; top: 0; }
+    .bg-blue { background: var(--cor-primaria, #0056b3); }
+    .bg-red { background: #dc3545; }
+    .marker-body { margin-top: 18px; display: flex; flex-direction: column; align-items: center; line-height: 1.1; color: #333; }
+    .marker-docs { font-weight: 900; font-size: 15px; }
+    .marker-vols { font-size: 10px; color: #666; }
+    .marker-value { font-size: 11px; font-weight: 700; color: #198754; margin-top: 2px; background: #e8f5e9; padding: 1px 5px; border-radius: 8px; }
+    .map-marker.is-urgente .marker-bubble { border-color: #ffc9c9; }
+    .map-marker.is-urgente::before { content: ''; position: absolute; top: -5px; left: -5px; right: -5px; bottom: -5px; border-radius: 50%; border: 2px solid #dc3545; animation: pulse-radar 2s infinite; opacity: 0; z-index: -1; }
+    @keyframes pulse-radar { 0% { transform: scale(0.8); opacity: 0.8; } 100% { transform: scale(1.4); opacity: 0; } }
+    .empty-state { text-align: center; padding: 40px; color: #adb5bd; }
 </style>
 
 <div class="page-grid">
-    
     <div class="painel">
         <div class="painel-top">
-            <h2 style="margin:0 0 5px 0; color:#212529;">Torre de Controle</h2>
-            <div style="font-size:0.85rem; color:#666;">
-                {{ Dados|length }} cargas aéreas em monitoramento
-            </div>
+            <h5 style="margin:0; font-weight:700; color:var(--cor-texto-principal, #333);">
+                <i class="bi bi-radar"></i> Expedição Aérea
+            </h5>
+            <small style="color:var(--cor-texto-secundario, #666);">Selecione um cluster no mapa</small>
         </div>
-
-        <div class="painel-content">
-            {% for d in Dados %}
-            <div class="ctc-item" id="item-{{ d.id }}" onclick="FocarRota('{{ d.id }}')">
-                <div class="ctc-header">
-                    <span class="badge-ctc">{{ d.filial }}-{{ d.serie }}-{{ d.ctc }}</span>
-                    <span class="valor-ctc">R$ {{ d.valor }}</span>
-                </div>
-                
-                <div class="rota-texto">
-                    {{ d.origem.nome }} <span class="seta-rota">➝</span> {{ d.destino.nome }}
-                </div>
-                
-                <div style="font-size:0.75rem; color:#888; margin-top:4px;">
-                    Peso: <b>{{ d.peso }} kg</b> • Via: <b>{{ d.aero_origem.iata }} ➝ {{ d.aero_destino.iata }}</b>
-                </div>
-
-                <div class="area-acao">
-                    <a href="{{ url_for('Planejamento.MontarPlanejamento', filial=d.filial, serie=d.serie, ctc=d.ctc) }}" class="btn-planejar">
-                        🗺️ Abrir no Planejador
-                    </a>
-                </div>
+        <div id="lista-ctcs" class="painel-content">
+            <div class="empty-state">
+                <i class="bi bi-map-fill" style="font-size: 2.5rem; display:block; margin-bottom:10px;"></i>
+                Clique em uma região para ver detalhes.
             </div>
-            {% endfor %}
-            
-            {% if not Dados %}
-            <div style="padding:40px; text-align:center; color:#999;">Nenhuma carga localizada.</div>
-            {% endif %}
         </div>
     </div>
-
     <div id="map-wrapper">
         <div id="map"></div>
     </div>
+</div>
 
+<div id="modal-detalhes" class="modal-overlay" onclick="FecharModal(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <div class="modal-title">
+                <i class="bi bi-file-text"></i> Detalhes do CTC: <span id="modal-ctc-id"></span>
+            </div>
+            <button class="btn-close" onclick="FecharModal(null)">&times;</button>
+        </div>
+        <div class="modal-body">
+            <table class="details-table" id="tabela-detalhes">
+                </table>
+        </div>
+    </div>
 </div>
 
 <script>
-    const dados = {{ Dados | tojson | safe }};
-    const camadas = {}; 
-    let idAtivo = null;
+    const dadosEstados = {{ Dados | tojson | safe }};
+    const ROTA_BASE = "{{ url_for('Planejamento.MontarPlanejamento', filial='__FIL__', serie='__SER__', ctc='__NUM__') }}";
+
+    const fmtShortMoney = (val) => {
+        if (val >= 1000000) return 'R$ ' + (val / 1000000).toFixed(1).replace('.', ',') + 'M';
+        if (val >= 1000) return 'R$ ' + (val / 1000).toFixed(0) + 'k';
+        return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+    };
 
     document.addEventListener("DOMContentLoaded", function() {
-        var map = L.map('map', {zoomControl: false}).setView([-14.2, -51.9], 4);
+        var map = L.map('map', {zoomControl: false}).setView([-15.7, -52], 4);
         L.control.zoom({position: 'topright'}).addTo(map);
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
             attribution: 'FlightOps', maxZoom: 18
         }).addTo(map);
 
-        const iconeCaminhao = L.divIcon({html: '<div style="font-size:16px;">🚛</div>', className: 'dummy', iconSize:[20,20]});
+        dadosEstados.forEach(est => {
+            if(est.qtd_docs === 0) return;
+            const isUrgente = est.tem_urgencia;
+            const cssClass = isUrgente ? 'map-marker is-urgente' : 'map-marker';
+            const headerClass = isUrgente ? 'bg-red' : 'bg-blue';
+            const size = 90; 
 
-        dados.forEach(d => {
-            const grupo = L.featureGroup();
-            const pOrig = [d.origem.lat, d.origem.lon];
-            const pDest = [d.destino.lat, d.destino.lon];
-            const pAeroO = [d.aero_origem.lat, d.aero_origem.lon];
-            const pAeroD = [d.aero_destino.lat, d.aero_destino.lon];
+            const iconHtml = `
+                <div class="marker-bubble">
+                    <div class="marker-header ${headerClass}">${est.uf}</div>
+                    <div class="marker-body">
+                        <div class="marker-docs">${est.qtd_docs}</div>
+                        <div class="marker-vols">${est.qtd_vols} vol</div>
+                        <div class="marker-value">${fmtShortMoney(est.valor_total)}</div>
+                    </div>
+                </div>
+            `;
 
-            // Road -> Air -> Road
-            const l1 = L.polyline([pOrig, pAeroO], { color: '#888', weight: 1, dashArray: '3, 3' }).addTo(grupo);
-            const l2 = L.polyline([pAeroO, pAeroD], { color: '#0d6efd', weight: 2, opacity: 0.6 }).addTo(grupo);
-            const l3 = L.polyline([pAeroD, pDest], { color: '#888', weight: 1, dashArray: '3, 3' }).addTo(grupo);
+            const customIcon = L.divIcon({
+                html: iconHtml, className: cssClass, iconSize: [size, size], iconAnchor: [size/2, size/2]
+            });
 
-            const m1 = L.marker(pOrig, {icon: iconeCaminhao}).bindTooltip(`CTC ${d.ctc}`, {direction:'top'}).addTo(grupo);
+            const marker = L.marker([est.coords.lat, est.coords.lon], {icon: customIcon}).addTo(map);
 
-            grupo.on('click', () => FocarRota(d.id));
-            grupo.addTo(map);
-            
-            camadas[d.id] = { grupo, linhas: [l1, l2, l3], markers: [m1] };
+            marker.on('click', () => {
+                CarregarSidebar(est);
+                map.flyTo([est.coords.lat, est.coords.lon], 6, {duration: 1.2});
+            });
         });
-
-        if (dados.length > 0) {
-            const groupAll = L.featureGroup(Object.values(camadas).map(c => c.grupo));
-            map.fitBounds(groupAll.getBounds(), {padding: [50, 50]});
-        }
     });
 
-    window.FocarRota = function(id) {
-        if (idAtivo === id) { ResetarFoco(); return; }
-        idAtivo = id;
+    function CarregarSidebar(estado) {
+        const container = document.getElementById('lista-ctcs');
+        container.innerHTML = '';
 
-        // Sidebar
-        document.querySelectorAll('.ctc-item').forEach(el => el.classList.remove('ativo'));
-        const item = document.getElementById('item-' + id);
-        if (item) {
-            item.classList.add('ativo');
-            item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const listaOrdenada = estado.lista_ctcs.sort((a, b) => {
+            if (a.eh_urgente && !b.eh_urgente) return -1;
+            if (!a.eh_urgente && b.eh_urgente) return 1;
+            return parseFloat(b.raw_frete_total || 0) - parseFloat(a.raw_frete_total || 0);
+        });
+
+        listaOrdenada.forEach(c => {
+            const isUrg = c.eh_urgente;
+            const classeCard = isUrg ? 'urgente' : 'normal';
+            const badgeHtml = isUrg ? `<span class="badge-urg"><i class="bi bi-exclamation-triangle"></i> URGENTE</span>` : ``;
+            
+            let urlFinal = ROTA_BASE
+                .replace('__FIL__', c.filial)
+                .replace('__SER__', c.serie)
+                .replace('__NUM__', c.ctc);
+            
+            // Encode para passar no onclick
+            const jsonFullData = encodeURIComponent(JSON.stringify(c.full_data));
+
+            const html = `
+                <div class="ctc-card ${classeCard}">
+                    <div class="card-header-flex">
+                        <span class="badge-serie">${c.filial}-${c.serie}-${c.ctc}</span>
+                        ${badgeHtml}
+                    </div>
+                    
+                    <div class="rota-display">
+                        ${c.origem.split('/')[0]} 
+                        <i class="bi bi-arrow-right seta-display"></i> 
+                        ${c.destino.split('/')[0]}
+                    </div>
+                    
+                    <div class="cliente-display" title="${c.remetente}">
+                        <i class="bi bi-person-circle"></i> ${c.remetente}
+                    </div>
+
+                    <div class="card-stats">
+                        <div class="stat-box">
+                            <span class="stat-label">Peso</span>
+                            <span class="stat-val">${c.peso_taxado}kg</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-label">Volumes</span>
+                            <span class="stat-val">${c.volumes}</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-label">Mercadoria</span>
+                            <span class="stat-val stat-money">${fmtShortMoney(c.raw_val_mercadoria)}</span>
+                        </div>
+                    </div>
+
+                    <div class="card-actions">
+                        <a href="${urlFinal}" class="btn-planejar">
+                            <i class="bi bi-airplane"></i> Planejar Voo
+                        </a>
+                        <button class="btn-detalhes" onclick="AbrirModalGlobal('${c.filial}', '${c.serie}', '${c.ctc}')" style="align-items:center;" 
+                        title="Ver Documento Completo">
+                            <i class="ph-bold ph-file-text"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            container.innerHTML += html;
+        });
+    }
+
+    // --- LÓGICA DO MODAL ---
+    function AbrirModal(ctcNum, jsonDataEncoded) {
+        const modal = document.getElementById('modal-detalhes');
+        const titulo = document.getElementById('modal-ctc-id');
+        const tabela = document.getElementById('tabela-detalhes');
+        
+        // Decodifica os dados
+        const data = JSON.parse(decodeURIComponent(jsonDataEncoded));
+        
+        titulo.innerText = ctcNum;
+        tabela.innerHTML = ''; // Limpa
+
+        // Gera as linhas da tabela
+        for (const [key, value] of Object.entries(data)) {
+            if(value !== null && value !== "") { // Oculta campos vazios
+                const row = `
+                    <tr>
+                        <th>${key}</th>
+                        <td>${value}</td>
+                    </tr>
+                `;
+                tabela.innerHTML += row;
+            }
         }
 
-        // Mapa
-        Object.keys(camadas).forEach(key => {
-            const obj = camadas[key];
-            const ehAlvo = (key === id);
+        modal.style.display = 'flex';
+    }
 
-            obj.linhas.forEach(l => {
-                if (ehAlvo) {
-                    l.setStyle({ opacity: 1, weight: 4, color: l.options.color === '#888' ? '#444' : '#0d6efd' }); 
-                    l.bringToFront();
-                } else {
-                    l.setStyle({ opacity: 0.1, weight: 1 });
-                }
-            });
-
-            obj.markers.forEach(m => {
-                m.setOpacity(ehAlvo ? 1 : 0.2);
-                if(ehAlvo) m.setZIndexOffset(1000);
-            });
-        });
-    };
-
-    function ResetarFoco() {
-        idAtivo = null;
-        document.querySelectorAll('.ctc-item').forEach(el => el.classList.remove('ativo'));
-        Object.values(camadas).forEach(obj => {
-            obj.linhas[0].setStyle({ opacity: 1, weight: 1, color: '#888' });
-            obj.linhas[1].setStyle({ opacity: 0.6, weight: 2, color: '#0d6efd' });
-            obj.linhas[2].setStyle({ opacity: 1, weight: 1, color: '#888' });
-            obj.markers.forEach(m => { m.setOpacity(1); m.setZIndexOffset(0); });
-        });
+    function FecharModal(event) {
+        // Se click for no overlay ou no botão fechar
+        if(!event || event.target.className === 'modal-overlay' || event.target.className === 'btn-close') {
+            document.getElementById('modal-detalhes').style.display = 'none';
+        }
     }
 </script>
 {% endblock %}

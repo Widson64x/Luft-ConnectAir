@@ -3,11 +3,28 @@ from flask_login import login_required
 from datetime import timedelta, datetime, date
 
 # Import dos Serviços
-from Services.PlanejamentoService import BuscarCtcsAereoHoje, ObterCtcDetalhado
+from Services.PlanejamentoService import BuscarCtcsAereoHoje, ObterCtcCompleto, ObterCtcDetalhado
 from Services.GeografiaService import BuscarCoordenadasCidade, BuscarAeroportoMaisProximo
 from Services.MalhaService import BuscarRotasInteligentes
 
 PlanejamentoBp = Blueprint('Planejamento', __name__)
+
+COORDENADAS_UFS = {
+    'AC': {'lat': -9.02, 'lon': -70.81}, 'AL': {'lat': -9.57, 'lon': -36.78},
+    'AP': {'lat': 0.90, 'lon': -52.00},  'AM': {'lat': -3.41, 'lon': -65.87},
+    'BA': {'lat': -12.57, 'lon': -41.70},'CE': {'lat': -5.49, 'lon': -39.32},
+    'DF': {'lat': -15.79, 'lon': -47.88},'ES': {'lat': -19.18, 'lon': -40.30},
+    'GO': {'lat': -15.82, 'lon': -49.83},'MA': {'lat': -4.96, 'lon': -45.27},
+    'MT': {'lat': -12.68, 'lon': -56.92},'MS': {'lat': -20.77, 'lon': -54.78},
+    'MG': {'lat': -18.51, 'lon': -44.55},'PA': {'lat': -1.99, 'lon': -54.93},
+    'PB': {'lat': -7.23, 'lon': -36.78}, 'PR': {'lat': -25.25, 'lon': -52.02},
+    'PE': {'lat': -8.81, 'lon': -36.95}, 'PI': {'lat': -7.71, 'lon': -42.72},
+    'RJ': {'lat': -22.90, 'lon': -43.17},'RN': {'lat': -5.40, 'lon': -36.95},
+    'RS': {'lat': -30.03, 'lon': -51.22},'RO': {'lat': -11.50, 'lon': -63.58},
+    'RR': {'lat': 2.82, 'lon': -60.67},  'SC': {'lat': -27.24, 'lon': -50.21},
+    'SP': {'lat': -23.55, 'lon': -46.63},'SE': {'lat': -10.57, 'lon': -37.38},
+    'TO': {'lat': -10.17, 'lon': -48.33}
+}
 
 @PlanejamentoBp.route('/Dashboard')
 @login_required
@@ -18,6 +35,14 @@ def Dashboard():
 @login_required
 def ApiCtcsHoje():
     Dados = BuscarCtcsAereoHoje()
+    return jsonify(Dados)
+
+@PlanejamentoBp.route('/API/Ctc-Detalhes/<string:filial>/<string:serie>/<string:ctc>')
+@login_required
+def ApiCtcDetalhes(filial, serie, ctc):
+    Dados = ObterCtcCompleto(filial, serie, ctc)
+    if not Dados:
+        return jsonify({'erro': 'CTC não encontrado'}), 404
     return jsonify(Dados)
 
 @PlanejamentoBp.route('/Montar/<string:filial>/<string:serie>/<string:ctc>')
@@ -70,43 +95,47 @@ def MontarPlanejamento(filial, serie, ctc):
 @PlanejamentoBp.route('/Mapa-Global')
 @login_required
 def MapaGlobal():
-    # 1. Pega todos os CTCs aéreos de hoje
     ListaCtcs = BuscarCtcsAereoHoje()
-    
-    DadosMapa = []
-    
-    print(f"🌍 Gerando Mapa Global para {len(ListaCtcs)} CTCs...")
+    Agrupamento = {}
+
+    print(f"🌍 Gerando Mapa Agrupado para {len(ListaCtcs)} CTCs...")
 
     for c in ListaCtcs:
         try:
-            # Separa cidade/UF (formato "Cidade/UF")
-            CidadeOrig, UfOrig = c['origem'].split('/')
-            CidadeDest, UfDest = c['destino'].split('/')
+            _, UfOrig = c['origem'].split('/')
+            UfOrig = UfOrig.strip().upper()
             
-            # Busca Coordenadas
-            CoordO = BuscarCoordenadasCidade(CidadeOrig, UfOrig)
-            CoordD = BuscarCoordenadasCidade(CidadeDest, UfDest)
+            if UfOrig not in Agrupamento:
+                Agrupamento[UfOrig] = {
+                    'uf': UfOrig,
+                    'coords': COORDENADAS_UFS.get(UfOrig, {'lat': -15, 'lon': -47}),
+                    'qtd_docs': 0,
+                    'qtd_vols': 0,
+                    'valor_total': 0.0,
+                    'tem_urgencia': False,
+                    'lista_ctcs': []
+                }
             
-            if CoordO and CoordD:
-                # Busca Aeroportos
-                AeroO = BuscarAeroportoMaisProximo(CoordO['lat'], CoordO['lon'])
-                AeroD = BuscarAeroportoMaisProximo(CoordD['lat'], CoordD['lon'])
-                
-                if AeroO and AeroD:
-                    DadosMapa.append({
-                        'id': c['id_unico'],
-                        'filial': c['filial'],
-                        'serie': c['serie'],
-                        'ctc': c['ctc'],
-                        'valor': c['val_mercadoria'],
-                        'peso': c['peso_taxado'],
-                        'origem': CoordO,
-                        'destino': CoordD,
-                        'aero_origem': AeroO,
-                        'aero_destino': AeroD
-                    })
-        except Exception as e:
-            print(f"Erro ao processar CTC {c.get('ctc')}: {e}")
-            continue
+            # Atualiza Totais
+            Agrupamento[UfOrig]['qtd_docs'] += 1
+            Agrupamento[UfOrig]['qtd_vols'] += int(c['volumes'])
+            
+            # --- CORREÇÃO AQUI ---
+            # Usa o valor bruto direto (float), sem converter string
+            Agrupamento[UfOrig]['valor_total'] += c['raw_val_mercadoria']
+            # ---------------------
+            
+            if 'URGENTE' in str(c['prioridade']).upper():
+                Agrupamento[UfOrig]['tem_urgencia'] = True
+                c['eh_urgente'] = True 
+            else:
+                c['eh_urgente'] = False
 
+            Agrupamento[UfOrig]['lista_ctcs'].append(c)
+
+        except Exception as e:
+            print(f"Erro ao agrupar CTC {c.get('ctc')}: {e}")
+            continue
+    
+    DadosMapa = list(Agrupamento.values())
     return render_template('Planejamento/MapaGlobal.html', Dados=DadosMapa)

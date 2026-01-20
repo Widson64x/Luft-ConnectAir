@@ -3,6 +3,7 @@
 {% block titulo %}Planejamento Visual | FlightOps{% endblock %}
 
 {% block conteudo %}
+{% include "Components/ModalCtc.html" %}
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -229,23 +230,69 @@
     .pop-row { display: flex; justify-content: space-between; margin-bottom: 6px; }
     .pop-val { font-weight: 700; color: var(--cor-texto-principal); } 
     .pop-lbl { color: var(--cor-texto-secundario); font-size: 0.8rem; }
+
+    /* Ajuste do Header */
+    .header-top-bar {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 8px;
+    }
+
+    /* Botão de Documento Moderno */
+    .btn-open-doc {
+        width: 34px; height: 34px;
+        border-radius: 8px;
+        border: 1px solid var(--cor-borda);
+        background: transparent;
+        color: var(--cor-texto-secundario);
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        font-size: 1.1rem;
+    }
+    .btn-open-doc:hover {
+        background: white;
+        color: var(--cor-primaria);
+        border-color: var(--cor-primaria);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    }
+    .btn-open-doc:active { transform: translateY(0); }
 </style>
 
 <div class="map-wrapper">
     <div class="glass-sidebar">
         <div class="sidebar-header">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div class="badge-serie"><i class="ph-bold ph-barcode"></i> Filial {{ Ctc.filial }} / Série {{ Ctc.serie }}</div>
+            <div class="header-top-bar">
+                <div class="badge-serie">
+                    <i class="ph-bold ph-barcode"></i> Filial {{ Ctc.filial }} / Série {{ Ctc.serie }}
+                </div>
+                
+                <button class="btn-open-doc" 
+                        onclick="AbrirModalGlobal('{{Ctc.filial}}', '{{Ctc.serie}}', '{{Ctc.ctc}}')" 
+                        title="Ver Documento Completo">
+                    <i class="ph-bold ph-file-text"></i>
+                </button>
             </div>
+
             <h1 class="ctc-title">CTC {{ Ctc.ctc }}</h1>
+            
             <div class="ctc-meta">
                 <div><i class="ph-fill ph-calendar-blank"></i> {{ Ctc.data_emissao_real.strftime('%d/%m/%Y') }}</div>
                 <div><i class="ph-fill ph-clock"></i> {{ Ctc.data_emissao_real.strftime('%H:%M') }}</div>
             </div>
+
             <div class="kpi-row">
-                <div class="kpi-box"><span class="kpi-lbl">Volumes</span><span class="kpi-val">{{ Ctc.volumes }}</span></div>
-                <div class="kpi-box"><span class="kpi-lbl">Peso</span><span class="kpi-val">{{ Ctc.peso }} kg</span></div>
-                <div class="kpi-box"><span class="kpi-lbl">Valor</span><span class="kpi-val money">R$ {{ "{:,.0f}".format(Ctc.valor) }}</span></div>
+                <div class="kpi-box">
+                    <span class="kpi-lbl">Volumes</span>
+                    <span class="kpi-val">{{ Ctc.volumes }}</span>
+                </div>
+                <div class="kpi-box">
+                    <span class="kpi-lbl">Peso</span>
+                    <span class="kpi-val">{{ Ctc.peso }} kg</span>
+                </div>
+                <div class="kpi-box">
+                    <span class="kpi-lbl">Valor</span>
+                    <span class="kpi-val money">R$ {{ "{:,.0f}".format(Ctc.valor) }}</span>
+                </div>
             </div>
         </div>
 
@@ -306,7 +353,33 @@
     const destino = { lat: {{ Destino.lat | default(0) }}, lon: {{ Destino.lon | default(0) }} };
 
     // --- POPUPS & ÍCONES ---
-    function GetPopupCtc() { return `<div class="pop-header"><span>CTC ${ctc.ctc}</span><i class="ph-fill ph-truck"></i></div><div class="pop-body"><div class="pop-row"><span class="pop-lbl">Remetente</span><span class="pop-val">${ctc.remetente.substring(0,12)}..</span></div><div class="pop-row"><span class="pop-lbl">Vol/Peso</span><span class="pop-val">${ctc.volumes} / ${ctc.peso}kg</span></div></div>`; }
+    function GetPopupCtc() { 
+        return `
+            <div class="pop-header">
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <i class="ph-fill ph-truck"></i>
+                    <span>CTC ${ctc.ctc}</span>
+                </div>
+                
+                <button onclick="AbrirModalGlobal('${ctc.filial}', '${ctc.serie}', '${ctc.ctc}')" 
+                        style="background:none; border:none; cursor:pointer; color:var(--cor-primaria); font-size:1.1rem; display:flex; align-items:center;" 
+                        title="Ver Documento Completo">
+                    <i class="ph-bold ph-file-text"></i>
+                </button>
+            </div>
+            
+            <div class="pop-body">
+                <div class="pop-row">
+                    <span class="pop-lbl">Remetente</span>
+                    <span class="pop-val">${ctc.remetente ? ctc.remetente.substring(0,12) + '..' : '-'}</span>
+                </div>
+                <div class="pop-row">
+                    <span class="pop-lbl">Vol/Peso</span>
+                    <span class="pop-val">${ctc.volumes} / ${ctc.peso}kg</span>
+                </div>
+            </div>
+        `; 
+    }  
     function GetPopupLocal(t,n,u) { return `<div class="pop-header"><span>${t}</span><i class="ph-fill ph-map-pin"></i></div><div class="pop-body"><div style="font-weight:700;">${n}</div><div style="color:var(--cor-texto-secundario);">${u}</div></div>`; }
     function GetPopupAero(i,n) { return `<div class="pop-header"><span>${i}</span><i class="ph-fill ph-airplane"></i></div><div class="pop-body">${n}</div>`; }
 

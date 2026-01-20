@@ -1,0 +1,231 @@
+<style>
+    /* CSS DO MODAL (Escopo Global) */
+    .md-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.65); z-index: 99999;
+        display: none; align-items: center; justify-content: center;
+        backdrop-filter: blur(4px); opacity: 0; transition: opacity 0.3s;
+    }
+    .md-overlay.show { opacity: 1; }
+
+    .md-box {
+        background: #f8fafc; width: 95%; max-width: 1100px; height: 90vh;
+        border-radius: 12px; box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+        display: flex; flex-direction: column; overflow: hidden;
+        border: 1px solid #cbd5e1; transform: scale(0.95); transition: transform 0.3s;
+    }
+    .md-overlay.show .md-box { transform: scale(1); }
+
+    .md-header {
+        background: #fff; padding: 15px 25px; border-bottom: 1px solid #e2e8f0;
+        display: flex; justify-content: space-between; align-items: center;
+    }
+    .md-title h4 { margin: 0; font-size: 1.4rem; font-weight: 800; color: #0f172a; letter-spacing: -0.5px; }
+    .md-title span { font-size: 0.8rem; color: #64748b; text-transform: uppercase; letter-spacing: 1px; }
+
+    .md-close { background: none; border: none; font-size: 2rem; color: #94a3b8; cursor: pointer; line-height: 0.5; transition: 0.2s;}
+    .md-close:hover { color: #ef4444; transform: rotate(90deg); }
+
+    .md-body {
+        padding: 25px; overflow-y: auto; flex: 1;
+        display: grid; grid-template-columns: repeat(12, 1fr); gap: 20px;
+    }
+
+    /* Cards e Layout Interno */
+    .md-card {
+        background: white; border: 1px solid #e2e8f0; border-radius: 8px;
+        padding: 16px; position: relative; box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+    .md-card-title {
+        font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: #64748b;
+        margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #f1f5f9;
+        display: flex; gap: 8px; align-items: center;
+    }
+    
+    /* Grids */
+    .g-full { grid-column: span 12; }
+    .g-half { grid-column: span 6; }
+    .g-4 { grid-column: span 4; }
+    .g-8 { grid-column: span 8; }
+    
+    /* Campos */
+    .f-row { display: flex; gap: 15px; flex-wrap: wrap; }
+    .f-box { display: flex; flex-direction: column; flex: 1; margin-bottom: 8px; min-width: 100px; }
+    .lb { font-size: 0.65rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 3px; }
+    .vl { font-size: 0.9rem; color: #334155; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 1.2em;}
+    .vl.lg { font-size: 1rem; font-weight: 700; color: #0f172a; }
+    .vl.mono { font-family: 'Roboto Mono', monospace; }
+    .vl.money { font-family: 'Roboto Mono', monospace; color: #059669; font-weight: 700; }
+
+    /* Loading State */
+    .md-loader {
+        position: absolute; top:0; left:0; width: 100%; height: 100%;
+        background: rgba(255,255,255,0.8); z-index: 10;
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 600; color: #0056b3; gap: 10px;
+    }
+</style>
+
+<div id="modal-global-ctc" class="md-overlay" onclick="FecharModalGlobal(event)">
+    <div class="md-box" onclick="event.stopPropagation()">
+        
+        <div class="md-header">
+            <div class="md-title">
+                <span>VISUALIZADOR DE DOCUMENTO</span>
+                <h4 id="mdg-titulo">--</h4>
+            </div>
+            <button class="md-close" onclick="FecharModalGlobal(null)">&times;</button>
+        </div>
+
+        <div class="md-body" id="mdg-body" style="position: relative;">
+            <div id="mdg-loader" class="md-loader">
+                <div class="spinner-border spinner-border-sm" role="status"></div> Carregando dados...
+            </div>
+            
+            <div id="mdg-content" style="display: contents;"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- FUNÇÃO PÚBLICA PARA ABRIR O MODAL ---
+    async function AbrirModalGlobal(filial, serie, ctc) {
+        const modal = document.getElementById('modal-global-ctc');
+        const loader = document.getElementById('mdg-loader');
+        const content = document.getElementById('mdg-content');
+        const titulo = document.getElementById('mdg-titulo');
+
+        // 1. Abre o modal e mostra loader
+        modal.style.display = 'flex';
+        requestAnimationFrame(() => modal.classList.add('show'));
+        loader.style.display = 'flex';
+        content.innerHTML = '';
+        // titulo.innerText = `FILIAL: ${filial} CTC:${ctc} SERIE:${serie}`;
+        titulo.innerText = `${ctc}-${serie} / ${filial}`;
+
+        try {
+            // 2. Busca na API
+            const response = await fetch('{{ url_for("Planejamento.ApiCtcDetalhes", filial="__FIL__", serie="__SER__", ctc="__NUM__") }}'
+                .replace('__FIL__', filial)
+                .replace('__SER__', serie)
+                .replace('__NUM__', ctc)
+            );
+            
+            if(!response.ok) throw new Error("Erro ao buscar dados");
+            
+            const d = await response.json();
+            
+            // 3. Renderiza (Usando a mesma lógica bonita de antes)
+            RenderizarModal(d);
+
+        } catch (error) {
+            content.innerHTML = `<div style="grid-column: span 12; text-align:center; padding:50px; color:#ef4444;">
+                <i class="bi bi-x-circle" style="font-size:3rem;"></i><br>
+                Erro ao carregar CTC. Tente novamente.<br>
+                <small>${error}</small>
+            </div>`;
+        } finally {
+            loader.style.display = 'none';
+        }
+    }
+
+    function FecharModalGlobal(e) {
+        const modal = document.getElementById('modal-global-ctc');
+        if(!e || e.target === modal || e.target.closest('.md-close')) {
+            modal.classList.remove('show');
+            setTimeout(() => { modal.style.display = 'none'; }, 300);
+        }
+    }
+
+    // Helpers de Formatação
+    const fmtM = (v) => parseFloat(v||0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const fmtN = (v, d=0) => parseFloat(v||0).toLocaleString('pt-BR', { minimumFractionDigits: d });
+    const fmtD = (v) => {
+        if(!v || v === 'None') return '-';
+        try { return new Date(v).toLocaleDateString('pt-BR'); } catch { return v; }
+    };
+    const ck = (v) => (v && v !== 'None' && v !== 'null') ? v : '-';
+
+    function RenderizarModal(d) {
+        const container = document.getElementById('mdg-content');
+        
+        container.innerHTML = `
+            <div class="md-card g-full">
+                <div class="md-card-title"><i class="bi bi-info-circle"></i> Informações Gerais</div>
+                <div class="f-row">
+                    <div class="f-box"><span class="lb">Emissão</span><span class="vl lg">${fmtD(d.data)}</span></div>
+                    <div class="f-box"><span class="lb">Hora</span><span class="vl">${ck(d.hora)}</span></div>
+                    <div class="f-box"><span class="lb">Previsão</span><span class="vl lg">${fmtD(d.prev_entrega)}</span></div>
+                    <div class="f-box"><span class="lb">Natureza</span><span class="vl">${ck(d.natureza)}</span></div>
+                    <div class="f-box"><span class="lb">Modal</span><span class="vl">${ck(d.modal)}</span></div>
+                    <div class="f-box"><span class="lb">Tabela</span><span class="vl" style="color:#0056b3; font-weight:700;">${ck(d.tabfrete)}</span></div>
+                </div>
+            </div>
+
+            <div class="md-card g-half">
+                <div class="md-card-title"><i class="bi bi-box-arrow-up"></i> Remetente</div>
+                <div class="f-row">
+                    <div class="f-box" style="flex:2"><span class="lb">Nome</span><span class="vl lg">${ck(d.remet_nome)}</span></div>
+                    <div class="f-box"><span class="lb">CNPJ</span><span class="vl mono">${ck(d.remet_cgc)}</span></div>
+                </div>
+                <div class="f-row">
+                    <div class="f-box"><span class="lb">Endereço</span><span class="vl">${ck(d.remet_end)}</span></div>
+                    <div class="f-box"><span class="lb">Cidade</span><span class="vl lg">${ck(d.remet_cidade)} - ${ck(d.remet_uf)}</span></div>
+                </div>
+            </div>
+
+            <div class="md-card g-half">
+                <div class="md-card-title"><i class="bi bi-box-arrow-in-down"></i> Destinatário</div>
+                <div class="f-row">
+                    <div class="f-box" style="flex:2"><span class="lb">Nome</span><span class="vl lg">${ck(d.dest_nome)}</span></div>
+                    <div class="f-box"><span class="lb">CNPJ</span><span class="vl mono">${ck(d.dest_cgc)}</span></div>
+                </div>
+                <div class="f-row">
+                    <div class="f-box"><span class="lb">Endereço</span><span class="vl">${ck(d.dest_end)}</span></div>
+                    <div class="f-box"><span class="lb">Cidade</span><span class="vl lg">${ck(d.dest_cidade)} - ${ck(d.dest_uf)}</span></div>
+                </div>
+            </div>
+
+            <div class="md-card g-8">
+                <div class="md-card-title"><i class="bi bi-truck"></i> Dados Operacionais</div>
+                <div class="f-row">
+                    <div class="f-box"><span class="lb">Volumes</span><span class="vl lg">${d.volumes}</span></div>
+                    <div class="f-box"><span class="lb">Peso Real</span><span class="vl">${fmtN(d.peso, 2)} kg</span></div>
+                    <div class="f-box"><span class="lb">Peso Taxado</span><span class="vl lg">${fmtN(d.pesotax, 2)} kg</span></div>
+                    <div class="f-box"><span class="lb">Espécie</span><span class="vl">${ck(d.especie)}</span></div>
+                </div>
+                <hr style="border:0; border-top:1px dashed #e2e8f0; margin:10px 0;">
+                <div class="f-row">
+                    <div class="f-box"><span class="lb">CFOP</span><span class="vl mono">${ck(d.cfop)}</span></div>
+                    <div class="f-box"><span class="lb">CST</span><span class="vl">${ck(d.tribut)}</span></div>
+                    <div class="f-box"><span class="lb">ICMS</span><span class="vl mono">${fmtM(d.ValorICMS)}</span></div>
+                    <div class="f-box" style="flex:2;"><span class="lb">Notas Fiscais</span><span class="vl mono small">${ck(d.nfs)}</span></div>
+                </div>
+            </div>
+
+            <div class="md-card g-4" style="grid-row: span 2;">
+                <div class="md-card-title"><i class="bi bi-currency-dollar"></i> Custos do Frete</div>
+                <table style="width:100%; font-size:0.85rem; border-collapse:collapse;">
+                    <tr><td style="padding:6px 0; border-bottom:1px dashed #eee;">Mercadoria</td><td style="text-align:right; font-weight:700; color:#059669;">${fmtM(d.valmerc)}</td></tr>
+                    <tr><td style="padding:6px 0; border-bottom:1px dashed #eee;">Frete Peso</td><td style="text-align:right;">${fmtM(d.fretepeso)}</td></tr>
+                    <tr><td style="padding:6px 0; border-bottom:1px dashed #eee;">Frete Valor</td><td style="text-align:right;">${fmtM(d.fretevalor)}</td></tr>
+                    <tr><td style="padding:6px 0; border-bottom:1px dashed #eee;">GRIS</td><td style="text-align:right;">${fmtM(d.gris)}</td></tr>
+                    <tr><td style="padding:6px 0; border-bottom:1px dashed #eee;">Tx. Coleta</td><td style="text-align:right;">${fmtM(d.txcoleta)}</td></tr>
+                    <tr><td style="padding:6px 0; border-bottom:1px dashed #eee;">Pedágio</td><td style="text-align:right;">${fmtM(d.pedagio)}</td></tr>
+                    <tr><td style="padding:6px 0; border-bottom:1px dashed #eee;">Outros</td><td style="text-align:right;">${fmtM(d.txoutros)}</td></tr>
+                    <tr>
+                        <td style="padding-top:10px; font-weight:800; font-size:1.1rem;">TOTAL</td>
+                        <td style="padding-top:10px; text-align:right; font-weight:800; font-size:1.2rem; color:#0056b3;">${fmtM(d.fretetotal)}</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="md-card g-8">
+                <div class="md-card-title"><i class="bi bi-chat-left-text"></i> Observações</div>
+                <div style="background:#fffbeb; padding:10px; border-radius:6px; border:1px solid #fcd34d; font-size:0.85rem; color:#92400e;">
+                    ${ck(d.obs_emissao)}
+                </div>
+            </div>
+        `;
+    }
+</script>
