@@ -1,7 +1,8 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from datetime import datetime
-from Services.AeroportoService import AnalisarArquivoAeroportos, ProcessarAeroportosFinal, ListarRemessasAeroportos, ExcluirRemessaAeroporto, ListarTodosParaSelect
+# Importa a CLASSE do Serviço agora, não as funções soltas
+from Services.AeroportoService import AeroportoService
 
 AeroportoBp = Blueprint('Aeroporto', __name__)
 
@@ -9,7 +10,8 @@ AeroportoBp = Blueprint('Aeroporto', __name__)
 @login_required
 def ApiListarSimples():
     try:
-        Dados = ListarTodosParaSelect()
+        # Chamada corrigida: AeroportoService.ListarTodosParaSelect()
+        Dados = AeroportoService.ListarTodosParaSelect()
         return jsonify(Dados)
     except Exception as e:
         return jsonify([]), 500
@@ -27,7 +29,8 @@ def Gerenciar():
             if Arquivo.filename == '':
                 flash('Selecione um arquivo .csv', 'warning')
             else:
-                Sucesso, Info = AnalisarArquivoAeroportos(Arquivo)
+                # Chamada corrigida
+                Sucesso, Info = AeroportoService.AnalisarArquivoAeroportos(Arquivo)
                 
                 if not Sucesso:
                     flash(Info, 'danger')
@@ -36,7 +39,8 @@ def Gerenciar():
                         ModalConfirmacao = True
                         DadosConfirmacao = Info
                     else:
-                        Ok, Msg = ProcessarAeroportosFinal(
+                        # Chamada corrigida
+                        Ok, Msg = AeroportoService.ProcessarAeroportosFinal(
                             Info['caminho_temp'], 
                             Info['mes_ref'], 
                             Info['nome_arquivo'], 
@@ -57,7 +61,8 @@ def Gerenciar():
             if MesStr and ' ' in MesStr: MesStr = MesStr.split(' ')[0]
             DataRef = datetime.strptime(MesStr, '%Y-%m-%d').date()
 
-            Ok, Msg = ProcessarAeroportosFinal(
+            # Chamada corrigida
+            Ok, Msg = AeroportoService.ProcessarAeroportosFinal(
                 CaminhoTemp, 
                 DataRef, 
                 NomeOriginal, 
@@ -68,7 +73,8 @@ def Gerenciar():
             else: flash(Msg, 'danger')
             return redirect(url_for('Aeroporto.Gerenciar'))
 
-    Historico = ListarRemessasAeroportos()
+    # Chamada corrigida
+    Historico = AeroportoService.ListarRemessasAeroportos()
     return render_template('Aeroportos/Gerenciar.html', 
                            ListaRemessas=Historico, 
                            ExibirModal=ModalConfirmacao, 
@@ -77,7 +83,8 @@ def Gerenciar():
 @AeroportoBp.route('/Aeroportos/Excluir/<int:id_remessa>')
 @login_required
 def Excluir(id_remessa):
-    Sucesso, Mensagem = ExcluirRemessaAeroporto(id_remessa)
+    # Chamada corrigida
+    Sucesso, Mensagem = AeroportoService.ExcluirRemessaAeroporto(id_remessa)
     if Sucesso: flash(Mensagem, 'info')
     else: flash(Mensagem, 'danger')
     return redirect(url_for('Aeroporto.Gerenciar'))
