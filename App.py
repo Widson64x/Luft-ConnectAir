@@ -16,7 +16,12 @@ from Routes.RotasEscalas import EscalasBp
 from Routes.RotasPlanejamento import PlanejamentoBp
 from Routes.RotasAcompanhamento import AcompanhamentoBP
 
-app = Flask(__name__)
+Prefix = ConfiguracaoAtual.ROUTE_PREFIX
+
+app = Flask(__name__,
+            static_url_path=f'{Prefix}/Static', 
+            static_folder='Static')
+
 app.secret_key = 'CHAVE_SUPER_SECRETA_DO_PROJETO_VOOS' # Trocar por algo seguro depois
 
 # Configuração do Flask-Login
