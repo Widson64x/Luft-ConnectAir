@@ -17,7 +17,8 @@ def ObterEngineSqlServer():
         Engine = create_engine(
             URL_BANCO_SQL, 
             poolclass=NullPool, 
-            echo=ConfiguracaoAtual.MOSTRAR_LOGS_DB
+            # echo=ConfiguracaoAtual.MOSTRAR_LOGS_DB
+            echo=False
         )
         return Engine
     except Exception as Erro:
@@ -41,7 +42,8 @@ def ObterEnginePostgres():
         Engine = create_engine(
             URL_BANCO_PG, 
             pool_pre_ping=True, # Verifica se o banco tá vivo antes de tentar query
-            echo=ConfiguracaoAtual.MOSTRAR_LOGS_DB
+            # echo=ConfiguracaoAtual.MOSTRAR_LOGS_DB
+            echo=False
         )
         return Engine
     except Exception as Erro:

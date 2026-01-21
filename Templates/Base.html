@@ -73,6 +73,13 @@
                    </div>
                 </a>
 
+                <a href="{{ url_for('Acompanhamento.Painel') }}" 
+                   class="menu-link {{ 'ativo' if request.endpoint and 'Acompanhamento' in request.endpoint else '' }}">
+                   <div class="link-content">
+                       <i class="ph-bold ph-airplane-in-flight"></i>
+                       <span>Acompanhamento</span>
+                   </div>
+                </a>
                 <div class="menu-divider"></div>
 
                 <a href="#" class="menu-link">

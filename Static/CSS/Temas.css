@@ -1,28 +1,44 @@
 /* Definição das Variáveis de Cores (CSS Variables) */
 :root {
     /* --- TEMA LIGHT (Padrão) --- */
-    --cor-fundo-principal: #f4f6f9;       /* Cinza muito claro (nuvem) */
-    --cor-fundo-painel: #ffffff;          /* Branco */
-    --cor-texto-principal: #333333;       /* Preto suave */
-    --cor-texto-secundario: #666666;      /* Cinza médio */
+    --cor-fundo-principal: #f0f2f5;       
+    --cor-fundo-painel: #ffffff;          
+    --cor-texto-principal: #1f2937;       
+    --cor-texto-secundario: #6b7280;      
     
-    --cor-primaria: #0056b3;              /* Azul Aviação */
-    --cor-primaria-hover: #004494;
+    --cor-primaria: #2563eb;              /* Azul Royal Moderno */
+    --cor-primaria-rgb: 37, 99, 235;      /* Para opacidade */
+    --cor-primaria-hover: #1d4ed8;
+
+    /* Cores Semânticas (Status) */
+    --cor-sucesso: #10b981; --cor-sucesso-rgb: 16, 185, 129;
+    --cor-aviso: #f59e0b;   --cor-aviso-rgb: 245, 158, 11;
+    --cor-erro: #ef4444;    --cor-erro-rgb: 239, 68, 68;
+    --cor-info: #3b82f6;    --cor-info-rgb: 59, 130, 246;
     
-    --cor-borda: #dee2e6;
-    --sombra-card: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --cor-borda: #e5e7eb;
+    --sombra-suave: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    --sombra-card: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
 }
 
-/* --- TEMA DARK (Modo Noturno / Cockpit) --- */
+/* --- TEMA DARK (Modo Noturno) --- */
 [data-theme="dark"] {
-    --cor-fundo-principal: #121212;       /* Preto quase absoluto */
-    --cor-fundo-painel: #1e1e2f;          /* Azul noturno profundo */
-    --cor-texto-principal: #e0e0e0;       /* Branco gelo */
-    --cor-texto-secundario: #a0a0b0;      /* Cinza azulado */
+    --cor-fundo-principal: #0f172a;       
+    --cor-fundo-painel: #1e293b;          
+    --cor-texto-principal: #f8fafc;       
+    --cor-texto-secundario: #94a3b8;      
     
-    --cor-primaria: #3a8dde;              /* Azul mais claro (brilho) */
-    --cor-primaria-hover: #5aa4ea;
+    --cor-primaria: #60a5fa;              
+    --cor-primaria-rgb: 96, 165, 250;
+    --cor-primaria-hover: #93c5fd;
     
-    --cor-borda: #2d2d44;
-    --sombra-card: 0 4px 15px rgba(0, 0, 0, 0.5);
+    /* Ajuste de brilho para modo noturno */
+    --cor-sucesso: #34d399; --cor-sucesso-rgb: 52, 211, 153;
+    --cor-aviso: #fbbf24;   --cor-aviso-rgb: 251, 191, 36;
+    --cor-erro: #f87171;    --cor-erro-rgb: 248, 113, 113;
+    --cor-info: #60a5fa;    --cor-info-rgb: 96, 165, 250;
+    
+    --cor-borda: #334155;
+    --sombra-suave: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    --sombra-card: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
 }

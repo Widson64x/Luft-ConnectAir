@@ -198,7 +198,7 @@ nav { display: flex; flex-direction: column; gap: 6px; flex: 1; }
 .btn-logout:hover { background: rgba(224, 49, 49, 0.1); }
 
 /* --- CONTEÚDO --- */
-.conteudo-pagina { padding: 32px; flex: 1; overflow-y: auto; }
+.conteudo-pagina { padding: 25px; flex: 1; overflow-y: auto; }
 
 /* Botões Gerais */
 .btn-primario {
@@ -229,5 +229,84 @@ nav { display: flex; flex-direction: column; gap: 6px; flex: 1; }
 .alert-success { border-color: #2fb344; color: #2fb344; }
 .alert-danger { border-color: #fa5252; color: #fa5252; }
 .alert i { font-size: 1.4rem; }
+
+:root {
+    --sidebar-width: 280px;
+    --header-height: 72px;
+    --radius-default: 16px; /* Mais arredondado = mais moderno */
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; outline: none; }
+
+/* Scrollbar Personalizada (Fina e elegante) */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb { background: #475569; }
+
+body {
+    background-color: var(--cor-fundo-principal);
+    color: var(--cor-texto-principal);
+    height: 100vh;
+    overflow: hidden;
+    font-size: 14px; /* Base ligeiramente menor para painéis densos */
+}
+
+.layout-wrapper { display: flex; height: 100vh; width: 100vw; }
+
+/* --- SIDEBAR E HEADER (Mantidos com pequenos ajustes de cor) --- */
+.sidebar {
+    width: var(--sidebar-width);
+    background: var(--cor-fundo-painel);
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+    border-right: 1px solid var(--cor-borda);
+    z-index: 50;
+}
+
+.sidebar-logo {
+    display: flex; align-items: center; gap: 12px;
+    font-size: 1.25rem; font-weight: 800; letter-spacing: -0.5px;
+    color: var(--cor-texto-principal); margin-bottom: 40px;
+}
+.sidebar-logo i { color: var(--cor-primaria); font-size: 1.6rem; }
+
+nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+
+.menu-link {
+    text-decoration: none; color: var(--cor-texto-secundario);
+    padding: 10px 14px; border-radius: 8px;
+    font-weight: 500; display: flex; align-items: center; gap: 12px;
+    transition: all 0.2s;
+}
+.menu-link i { font-size: 1.1rem; }
+.menu-link:hover { background: rgba(var(--cor-primaria-rgb), 0.05); color: var(--cor-primaria); }
+.menu-link.ativo { 
+    background: rgba(var(--cor-primaria-rgb), 0.1); 
+    color: var(--cor-primaria); font-weight: 600; 
+}
+
+.main-content { flex: 1; display: flex; flex-direction: column; background: var(--cor-fundo-principal); position: relative; }
+
+/* --- UTILITÁRIOS PARA O PAINEL --- */
+.card-glass {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--cor-borda);
+    box-shadow: var(--sombra-suave);
+}
+[data-theme="dark"] .card-glass { background: rgba(30, 41, 59, 0.9); }
+
+.badge {
+    padding: 4px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.5px; display: inline-flex; align-items: center; gap: 4px;
+}
+/* Variantes de Badge usando RGB para opacidade automática */
+.badge-success { background: rgba(var(--cor-sucesso-rgb), 0.15); color: var(--cor-sucesso); }
+.badge-warning { background: rgba(var(--cor-aviso-rgb), 0.15); color: var(--cor-aviso); }
+.badge-danger  { background: rgba(var(--cor-erro-rgb), 0.15); color: var(--cor-erro); }
+.badge-info    { background: rgba(var(--cor-info-rgb), 0.15); color: var(--cor-info); }
 
 @keyframes fadeSlide { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }

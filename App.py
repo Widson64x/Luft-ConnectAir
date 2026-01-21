@@ -14,6 +14,7 @@ from Routes.RotasAeroportos import AeroportoBp
 from Routes.RotasCidades import CidadeBp
 from Routes.RotasEscalas import EscalasBp
 from Routes.RotasPlanejamento import PlanejamentoBp
+from Routes.RotasAcompanhamento import AcompanhamentoBP
 
 app = Flask(__name__)
 app.secret_key = 'CHAVE_SUPER_SECRETA_DO_PROJETO_VOOS' # Trocar por algo seguro depois
@@ -81,6 +82,7 @@ app.register_blueprint(AeroportoBp, url_prefix=Prefix)
 app.register_blueprint(CidadeBp, url_prefix=Prefix)
 app.register_blueprint(PlanejamentoBp, url_prefix=f'{Prefix}/Planejamento')
 app.register_blueprint(EscalasBp, url_prefix=f'{Prefix}/Escalas')
+app.register_blueprint(AcompanhamentoBP, url_prefix=f'{Prefix}/Acompanhamento')
 
 # Rota principal do Dashboard com o prefixo
 @app.route(f'{Prefix}/')

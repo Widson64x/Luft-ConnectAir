@@ -1,0 +1,627 @@
+{% extends "Base.html" %}
+
+{% block titulo %}Painel de Acompanhamento | FlightOps{% endblock %}
+
+{% block conteudo %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+<style>
+    /* --- LAYOUT GLOBAL --- */
+    .dashboard-container {
+        display: flex;
+        flex-direction: column;
+        gap: 6px; /* Reduzi um pouco o espaço entre elementos */
+        height: 100vh; /* Ocupa 100% da altura da janela */
+        padding: 10px;
+        overflow: hidden; /* Remove scroll da página inteira para focar nos elementos internos */
+    }
+    
+    /* --- TOP BAR (FILTROS) --- */
+    .filter-bar {
+        flex: 0 0 auto; /* Altura fixa baseada no conteúdo */
+        background: var(--cor-fundo-painel);
+        border-radius: var(--radius-default);
+        border: 1px solid var(--cor-borda);
+        box-shadow: var(--sombra-suave);
+        padding: 12px 20px;
+        display: flex;
+        align-items: flex-end; 
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .filter-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 150px; }
+    .filter-group.small { flex: 0 0 150px; }
+    .filter-group.btn-area { flex: 0 0 auto; min-width: auto; }
+
+    .input-label { 
+        font-size: 0.7rem; font-weight: 700; color: var(--cor-texto-secundario); 
+        text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    
+    .input-field {
+        width: 100%; padding: 8px 12px; /* Inputs mais compactos */
+        background: var(--cor-fundo-principal); border: 1px solid var(--cor-borda);
+        border-radius: 8px; color: var(--cor-texto-principal); transition: 0.2s;
+        font-size: 0.9rem;
+    }
+    .input-field:focus { border-color: var(--cor-primaria); box-shadow: 0 0 0 3px rgba(var(--cor-primaria-rgb), 0.1); }
+    
+    .btn-apply {
+        background: var(--cor-primaria); color: #fff; border: none; 
+        padding: 8px 20px; height: 38px; /* Altura ajustada */
+        border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s;
+        display: flex; align-items: center; gap: 8px; white-space: nowrap;
+    }
+    .btn-apply:hover { background: var(--cor-primaria-hover); transform: translateY(-1px); }
+
+    .kpi-resumo {
+        margin-left: auto; padding-left: 20px;
+        border-left: 1px solid var(--cor-borda);
+        text-align: right;
+    }
+
+    /* --- MAPA GRANDE (ALTERADO) --- */
+    .map-section {
+        width: 100%;
+        flex: 1; /* Ocupa 2 partes do espaço disponível (Prioridade Alta) */
+        min-height: 300px; /* Garante que nunca fique pequeno demais */
+        border-radius: var(--radius-default);
+        overflow: hidden;
+        border: 1px solid var(--cor-borda);
+        box-shadow: var(--sombra-card);
+        position: relative;
+        background: #fff;
+    }
+
+    /* --- TABELA MENOR (ALTERADO) --- */
+    .table-section {
+        flex: 1; /* Ocupa 1 parte do espaço (metade da importância do mapa) */
+        background: var(--cor-fundo-painel);
+        border-radius: var(--radius-default);
+        border: 1px solid var(--cor-borda);
+        box-shadow: var(--sombra-card);
+        display: flex; flex-direction: column;
+        overflow: hidden; /* Importante para o scroll interno funcionar */
+        min-height: 0; /* Permite que o flexbox encolha este container se necessário */
+    }
+
+    .table-header { padding: 12px 24px; border-bottom: 1px solid var(--cor-borda); display: flex; justify-content: space-between; align-items: center; flex: 0 0 auto; }
+    .table-title { font-weight: 700; font-size: 1rem; color: var(--cor-texto-principal); display: flex; align-items: center; gap: 10px; }
+    
+    /* Área de Scroll da Tabela */
+    .table-responsive { 
+        width: 100%; 
+        overflow-y: auto; /* Scroll Vertical APENAS aqui dentro */
+        flex: 1;
+    }
+    
+    table { width: 100%; border-collapse: collapse; }
+    
+    th {
+        text-align: left; padding: 12px 24px;
+        font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--cor-texto-secundario);
+        background: #f8fafc; /* Cor sólida para cobrir ao rolar */
+        position: sticky; top: 0; z-index: 10; /* Cabeçalho Fixo */
+        border-bottom: 1px solid var(--cor-borda);
+    }
+    td { padding: 12px 24px; border-bottom: 1px solid var(--cor-borda); font-size: 0.85rem; color: var(--cor-texto-principal); vertical-align: middle; }
+    
+    .row-main { cursor: pointer; transition: 0.2s; background: #fff; }
+    .row-main:hover { background-color: #f1f5f9; }
+    .row-main.active { background-color: #eff6ff; border-left: 4px solid var(--cor-primaria); }
+
+    /* Timeline Detalhada */
+    .detail-cell { background: #f8fafc; padding: 0 !important; border-bottom: 1px solid var(--cor-borda); }
+    .timeline-container { padding: 20px 40px; }
+    
+    .map-legend {
+        position: absolute; bottom: 20px; left: 20px; z-index: 500;
+        background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px);
+        padding: 8px 12px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        display: flex; gap: 15px; font-size: 0.75rem; font-weight: 700; color: #555;
+    }
+
+    /* --- NOVO: Botão e Legenda Flutuante do Mapa --- */
+    .map-controls-container {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        z-index: 1000; /* Acima do mapa Leaflet */
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    /* O Botão "i" */
+    .btn-map-info {
+        width: 36px; height: 36px;
+        background: #fff;
+        border-radius: 8px; /* Quadrado arredondado moderno */
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer;
+        font-size: 1.2rem; color: var(--cor-primaria);
+        transition: 0.2s;
+        border: 1px solid var(--cor-borda);
+    }
+    .btn-map-info:hover {
+        background: var(--cor-primaria); color: #fff; transform: scale(1.05);
+    }
+
+    /* O Painel de Legenda (Escondido por padrão) */
+    .map-legend-panel {
+        position: absolute;
+        top: 0; left: 45px; /* Aparece ao lado do botão */
+        width: 240px;
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(8px);
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        border: 1px solid var(--cor-borda);
+        
+        /* Animação de aparecer */
+        opacity: 0; visibility: hidden;
+        transform: translateX(-10px);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        pointer-events: none; /* Evita clique quando invisível */
+    }
+
+    /* Mostrar quando passar o mouse no container PAI */
+    .map-controls-container:hover .map-legend-panel {
+        opacity: 1; visibility: visible;
+        transform: translateX(0);
+        pointer-events: auto;
+    }
+
+    /* Estilo interno da legenda */
+    .lg-section { margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+    .lg-section:last-child { margin-bottom: 0; border: none; padding-bottom: 0; }
+    .lg-title { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: #94a3b8; margin-bottom: 8px; letter-spacing: 0.5px; }
+    .lg-item { display: flex; align-items: center; gap: 10px; font-size: 0.8rem; color: #334155; margin-bottom: 6px; font-weight: 500; }
+    .lg-icon { width: 16px; display: flex; justify-content: center; }
+
+    /* Bolinhas e Linhas */
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: block; }
+    .line { width: 16px; height: 3px; border-radius: 2px; display: block; }
+
+</style>
+
+<div class="dashboard-container">
+    
+    <div class="filter-bar">
+        <div class="filter-group">
+            <label class="input-label">Buscar AWB</label>
+            <div style="position: relative;">
+                <i class="ph-bold ph-magnifying-glass" style="position: absolute; top: 11px; left: 10px; color: #94a3b8;"></i>
+                <input type="text" id="buscaAwb" class="input-field" placeholder="Ex: 957-..." style="padding-left: 32px;">
+            </div>
+        </div>
+
+        <div class="filter-group small">
+            <label class="input-label">De</label>
+            <input type="date" id="dataInicio" class="input-field" value="{{ data_inicio }}">
+        </div>
+
+        <div class="filter-group small">
+            <label class="input-label">Até</label>
+            <input type="date" id="dataFim" class="input-field" value="{{ data_fim }}">
+        </div>
+
+        <div class="filter-group btn-area">
+            <button class="btn-apply" onclick="CarregarDados()">
+                Filtrar <i class="ph-bold ph-caret-right"></i>
+            </button>
+        </div>
+
+        <div class="kpi-resumo">
+            <div style="font-size: 0.7rem; text-transform: uppercase; color: var(--cor-texto-secundario); font-weight: 700;">Listadas</div>
+            <div style="font-size: 1.8rem; font-weight: 800; color: var(--cor-primaria); line-height: 1;" id="lbl-total">0</div>
+        </div>
+    </div>
+
+    <div class="map-section">
+        <div id="mapa-voos" style="width: 100%; height: 100%; z-index: 1;"></div>
+        
+        <div class="map-controls-container">
+            <div class="btn-map-info">
+                <i class="ph-bold ph-info"></i>
+            </div>
+
+            <div class="map-legend-panel">
+                <div class="lg-section">
+                    <div class="lg-title">Status da Localização</div>
+                    <div class="lg-item">
+                        <div class="lg-icon"><span class="dot" style="background: #10b981; border: 2px solid #fff; box-shadow: 0 0 0 1px #10b981;"></span></div>
+                        <span>Origem (Embarque)</span>
+                    </div>
+                    <div class="lg-item">
+                        <div class="lg-icon"><span class="dot" style="background: #ef4444; border: 2px solid #fff; box-shadow: 0 0 0 1px #ef4444;"></span></div>
+                        <span>Local Atual (Carga)</span>
+                    </div>
+                    <div class="lg-item">
+                        <div class="lg-icon"><span class="dot" style="background: #94a3b8; border: 2px dashed #fff;"></span></div>
+                        <span>Destino Final</span>
+                    </div>
+                </div>
+
+                <div class="lg-section">
+                    <div class="lg-title">Linhas de Rota</div>
+                    <div class="lg-item">
+                        <div class="lg-icon"><span class="line" style="background: #e30613;"></span></div>
+                        <span>Voo LATAM</span>
+                    </div>
+                    <div class="lg-item">
+                        <div class="lg-icon"><span class="line" style="background: #ff7020;"></span></div>
+                        <span>Voo GOL</span>
+                    </div>
+                    <div class="lg-item">
+                        <div class="lg-icon"><span class="line" style="background: #0d6efd;"></span></div>
+                        <span>Voo AZUL</span>
+                    </div>
+                    <div class="lg-item">
+                        <div class="lg-icon"><span class="line" style="background: #94a3b8; border-bottom: 2px dashed #94a3b8; height: 0;"></span></div>
+                        <span>Rota Pendente</span>
+                    </div>
+                </div>
+                
+                <div class="lg-section">
+                    <div class="lg-title">Ícones Especiais</div>
+                    <div class="lg-item">
+                        <div class="lg-icon"><i class="ph-fill ph-airplane-tilt" style="color: #10b981;"></i></div>
+                        <span>Chegou ao Destino</span>
+                    </div>
+                    <div class="lg-item">
+                        <div class="lg-icon"><i class="ph-fill ph-airplane-tilt" style="color: #f59e0b;"></i></div>
+                        <span>Em Trânsito Aéreo</span>
+                    </div>
+                    <div class="lg-item">
+                        <div class="lg-icon"><i class="ph-fill ph-airplane-tilt" style="color: #ef4444;"></i></div>
+                        <span>Aguardando Decolagem</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-section">
+        <div class="table-header">
+            <span class="table-title"><i class="ph-duotone ph-airplane-in-flight"></i> Detalhamento das Cargas</span>
+        </div>
+        <div class="table-responsive">
+            <table id="tabela-awbs">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;"></th>
+                        <th>AWB</th>
+                        <th>Cia Aérea</th>
+                        <th>Rota</th>
+                        <th>Voo Atual</th>
+                        <th>Peso (Kg)</th>
+                        <th>Status</th>
+                        <th>Atualização</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    var map = null;
+    var layerGeral = new L.LayerGroup(); 
+    var layerFoco = new L.LayerGroup();  
+    var cacheAwbs = [];
+
+    // --- CORREÇÃO DE CORES (LATAM FIXED) ---
+    function GetCorPorCia(texto) {
+        if(!texto) return '#64748b'; // Cinza default
+        
+        // Normaliza para maiúsculo e remove espaços extras
+        const t = texto.toUpperCase().trim(); 
+        
+        // 1. LATAM (Vermelho)
+        // Regra: Contém 'LATAM', 'TAM', ou começa com 'LA'/'JJ' seguido de nada, numeros ou traço
+        if (
+            t.includes('LATAM') || 
+            t.includes('TAM') || 
+            /^(LA|JJ)(\s|-|\d|$)/.test(t)
+        ) {
+            return '#e30613';
+        }
+        
+        // 2. GOL (Laranja)
+        // Regra: Contém 'GOL' ou começa com 'G3'
+        if (
+            t.includes('GOL') || 
+            /^(G3)(\s|-|\d|$)/.test(t)
+        ) {
+            return '#ff7020';
+        }
+
+        // 3. AZUL (Azul)
+        // Regra: Contém 'AZUL' ou começa com 'AD'
+        if (
+            t.includes('AZUL') || 
+            /^(AD)(\s|-|\d|$)/.test(t)
+        ) {
+            return '#0d6efd';
+        }
+
+        return '#64748b';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => { InitMap(); CarregarDados(); });
+
+    function InitMap() {
+        if(map) return;
+        map = L.map('mapa-voos', { zoomControl: false }).setView([-14.2350, -51.9253], 4);
+        L.control.zoom({ position: 'topright' }).addTo(map);
+        // Usando um estilo de mapa mais "clean" (CartoDB Positron)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { 
+            attribution: '&copy; FlightOps', maxZoom: 18 
+        }).addTo(map);
+        layerGeral.addTo(map);
+        layerFoco.addTo(map);
+    }
+
+    function CarregarDados() {
+        const inicio = document.getElementById('dataInicio').value;
+        const fim = document.getElementById('dataFim').value;
+        const awbBusca = document.getElementById('buscaAwb').value;
+        const tbody = document.querySelector('#tabela-awbs tbody');
+
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:60px; color:var(--cor-texto-secundario);"><i class="ph-spinner ph-spin" style="font-size:28px;"></i><br><span style="margin-top:10px; display:block">Buscando cargas na malha aérea...</span></td></tr>`;
+        
+        ResetarMapaVisual(); 
+
+        fetch(`{{ url_for('Acompanhamento.ApiListarAwbs') }}?dataInicio=${inicio}&dataFim=${fim}&numeroAwb=${awbBusca}`)
+            .then(res => res.json())
+            .then(data => {
+                cacheAwbs = data;
+                tbody.innerHTML = '';
+                document.getElementById('lbl-total').innerText = data.length;
+
+                if(data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:40px; color:var(--cor-texto-secundario);">Nenhum registro encontrado. Tente ajustar as datas.</td></tr>`;
+                    return;
+                }
+
+                data.forEach(awb => {
+                    PlotarRotaResumo(awb);
+                    const rowId = `row-${awb.CodigoId}`;
+                    
+                    let badgeClass = 'badge-warning'; 
+                    if(awb.Status.includes('ENTREGUE')) badgeClass = 'badge-success';
+                    if(awb.Status.includes('CANCELADO')) badgeClass = 'badge-danger';
+                    if(awb.Status.includes('TRANSITO') || awb.Status.includes('VOO')) badgeClass = 'badge-info';
+
+                    const corCia = GetCorPorCia(awb.CiaAerea);
+
+                    let trMain = document.createElement('tr');
+                    trMain.className = 'row-main';
+                    trMain.id = rowId;
+                    trMain.onclick = (e) => ToggleTree(awb.Numero, rowId);
+                    
+                    trMain.innerHTML = `
+                        <td style="text-align:center;">
+                            <div style="width:24px; height:24px; background:#f1f5f9; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:auto;">
+                                <i class="ph-bold ph-caret-right" id="icon-${rowId}" style="font-size:12px; transition:0.3s; color:#64748b;"></i>
+                            </div>
+                        </td>
+                        <td style="font-weight:700; color:var(--cor-primaria); font-family:monospace; font-size:0.95rem;">${awb.Numero}</td>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:${corCia};"></span>
+                                <span style="font-weight:600; color:${corCia};">${awb.CiaAerea || 'INDEF'}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span style="font-weight:700;">${awb.Origem}</span> 
+                                <i class="ph-bold ph-arrow-right" style="font-size:0.8rem; color:#ccc;"></i> 
+                                <span style="font-weight:700;">${awb.Destino}</span>
+                            </div>
+                        </td>
+                        <td>${awb.Voo || '<span style="color:#ccc;">-</span>'}</td>
+                        <td>${awb.Peso.toFixed(1)} kg</td>
+                        <td><span class="badge ${badgeClass}">${awb.Status}</span></td>
+                        <td style="color:var(--cor-texto-secundario); font-size:0.8rem;">${awb.DataStatus}</td>
+                    `;
+
+                    let trDetail = document.createElement('tr');
+                    trDetail.id = `detail-${rowId}`;
+                    trDetail.style.display = 'none';
+                    trDetail.innerHTML = `
+                        <td colspan="8" class="detail-cell">
+                            <div id="container-${rowId}" style="min-height:100px;">
+                                <div style="text-align:center; padding:30px; color:var(--cor-texto-secundario);">
+                                    <i class="ph-spinner ph-spin"></i> Carregando timeline...
+                                </div>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(trMain);
+                    tbody.appendChild(trDetail);
+                });
+            });
+    }
+
+    function PlotarRotaResumo(awb) {
+        if(awb.RotaMap && awb.RotaMap.Origem) {
+            const linha = L.polyline([awb.RotaMap.Origem, awb.RotaMap.Destino], {
+                color: GetCorPorCia(awb.CiaAerea), weight: 2, opacity: 0.4, dashArray: '3, 6'
+            });
+            linha.awbNumero = awb.Numero; 
+            linha.addTo(layerGeral);
+        }
+    }
+
+    function ToggleTree(numeroAwb, rowId) {
+        const trMain = document.getElementById(rowId);
+        const trDetail = document.getElementById(`detail-${rowId}`);
+        const icon = document.getElementById(`icon-${rowId}`);
+        const container = document.getElementById(`container-${rowId}`);
+        
+        // Fecha outros
+        document.querySelectorAll('[id^="detail-"]').forEach(el => { if(el.id !== `detail-${rowId}`) el.style.display = 'none'; });
+        document.querySelectorAll('.row-main').forEach(el => { if(el.id !== rowId) el.classList.remove('active'); });
+        document.querySelectorAll('.ph-caret-right').forEach(el => el.style.transform = 'rotate(0deg)');
+
+        const isClosed = trDetail.style.display === 'none';
+
+        if (isClosed) {
+            trMain.classList.add('active');
+            trDetail.style.display = 'table-row';
+            icon.style.transform = 'rotate(90deg)';
+            FocarRotaNoMapa(numeroAwb);
+            
+            fetch(`{{ url_for('Acompanhamento.ApiHistorico', numero_awb='') }}${encodeURIComponent(numeroAwb)}`)
+                .then(res => res.json())
+                .then(resp => {
+                    RenderizarTimeline(resp, container);
+                    DesenharRotaReal(resp, numeroAwb);
+                });
+        } else {
+            trMain.classList.remove('active');
+            trDetail.style.display = 'none';
+            icon.style.transform = 'rotate(0deg)';
+            ResetarMapaVisual();
+        }
+    }
+
+    function RenderizarTimeline(data, container) {
+        const historico = data.Historico || [];
+        if(historico.length === 0) {
+            container.innerHTML = `<div style="padding:30px; text-align:center;">Sem histórico disponível.</div>`;
+            return;
+        }
+
+        let html = `<div class="timeline-container">`;
+        historico.forEach((h, index) => {
+            let statusClass = 'completed'; 
+            if(index === 0 && !h.Status.includes('ENTREGUE')) statusClass = 'active';
+
+            html += `
+                <div class="tl-item ${statusClass}" style="display:flex; gap:20px; padding-bottom:20px; position:relative;">
+                    <div style="position:absolute; left:7px; top:20px; bottom:0; width:2px; background:#e2e8f0; z-index:1;"></div>
+                    
+                    <div style="width:16px; height:16px; border-radius:50%; background:${statusClass === 'active' ? '#fff' : '#10b981'}; border:2px solid ${statusClass === 'active' ? '#f59e0b' : '#10b981'}; z-index:2; flex-shrink:0;"></div>
+                    
+                    <div style="flex:1;">
+                        <div style="font-weight:700; color:#1e293b;">${h.Status}</div>
+                        <div style="font-size:0.8rem; color:#64748b;">${h.Data}</div>
+                        <div style="margin-top:6px; font-size:0.8rem; display:flex; gap:12px;">
+                            <span style="background:#f1f5f9; padding:2px 8px; border-radius:4px;"><i class="ph-map-pin"></i> ${h.Local}</span>
+                            ${h.Voo && h.Voo.length > 2 ? `<span style="background:#e0f2fe; color:#0369a1; padding:2px 8px; border-radius:4px;"><i class="ph-airplane-tilt"></i> ${h.Voo}</span>` : ''}
+                        </div>
+                    </div>
+                </div>`;
+        });
+        html += `</div>`;
+        container.innerHTML = html.replace(/<div style="position:absolute;[^>]*><\/div>\s*<div[^>]*><\/div>\s*<div style="flex:1;">/g, (match, offset, string) => {
+             // Hack rápido para remover linha do último item (pode ser feito com CSS :last-child)
+             return match; 
+        }).replace(/class="tl-item[^"]*"/g, 'class="tl-item"'); // Simplificado para usar o style inline acima
+    }
+    
+    // Pequeno ajuste CSS para ocultar a linha do último item via JS
+    const styleSheet = document.createElement("style");
+    styleSheet.innerText = ".tl-item:last-child > div:first-child { display: none; }";
+    document.head.appendChild(styleSheet);
+
+
+    function FocarRotaNoMapa(numeroAwb) {
+        layerGeral.eachLayer(l => {
+            if(l.awbNumero === numeroAwb) l.setStyle({ opacity: 0 }); 
+            else l.setStyle({ opacity: 0.05 });
+        });
+        layerFoco.clearLayers();
+    }
+
+    function DesenharRotaReal(data, numeroAwb) {
+        const trajetos = data.TrajetoCompleto || [];
+        const pendente = data.RotaPendente;
+        let bounds = [];
+
+        // Ícones auxiliares
+        const iconDot = (color) => L.divIcon({ className: '', html: `<div style="background:${color}; width:12px; height:12px; border:2px solid #fff; border-radius:50%; box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div>`, iconSize: [12, 12] });
+        // Ícone de Avião (Rotação 45deg para parecer voando)
+        const iconPlane = (color) => L.divIcon({ className: '', html: `<div style="background:${color}; width:26px; height:26px; display:flex; align-items:center; justify-content:center; border:2px solid #fff; border-radius:6px; box-shadow:0 3px 6px rgba(0,0,0,0.2);"><i class="ph-fill ph-airplane-tilt" style="color:#fff; font-size:16px;"></i></div>`, iconSize: [26, 26] });
+
+        // 1. Desenha Trajetos VOADOS (Coloridos pela Cia)
+        if(trajetos.length > 0) {
+            // Marcador Origem Inicial
+            L.marker(trajetos[0].CoordOrigem, { icon: iconDot('#10b981') })
+             .addTo(layerFoco)
+             .bindPopup(`<b>Origem:</b> ${trajetos[0].Origem}`);
+            
+            bounds.push(trajetos[0].CoordOrigem);
+
+            trajetos.forEach((leg, idx) => {
+                // AQUI A MÁGICA: Pega a cor baseada no voo (Ex: "LA-3706" -> Vermelho)
+                const corRota = GetCorPorCia(leg.Voo);
+                
+                const p1 = leg.CoordOrigem;
+                const p2 = leg.CoordDestino;
+                
+                // Desenha a linha sólida
+                L.polyline([p1, p2], { color: corRota, weight: 4, opacity: 0.9 }).addTo(layerFoco)
+                 .bindPopup(`<b>Voo ${leg.Voo}</b><br>${leg.Origem} ➝ ${leg.Destino}`);
+
+                // Se for o último trecho voado
+                if(idx === trajetos.length - 1) {
+                    // Ícone final: Se tem pendencia é Avião (Laranja/Amarelo), se acabou é Check (Verde)
+                    // Mas se o voo acabou de pousar, usamos a cor da Cia ou Verde
+                    let iconFinal;
+                    if(pendente) {
+                        // Ainda tem chão pela frente
+                        iconFinal = iconPlane('#f59e0b'); // Laranja = Atenção/Transito
+                    } else {
+                        // Chegou no destino final
+                        iconFinal = iconPlane('#10b981'); // Verde = Sucesso
+                    }
+                    L.marker(p2, { icon: iconFinal }).addTo(layerFoco).bindPopup(`<b>Local Atual:</b> ${leg.Destino}`);
+                } else {
+                    // Ponto de conexão (Bolinha branca simples)
+                    L.marker(p2, { icon: iconDot('#fff') }).addTo(layerFoco).bindPopup(`Conexão em ${leg.Destino}`);
+                }
+                bounds.push(p2);
+            });
+        } 
+        // Caso sem voos (Só embarcado na origem)
+        else if (pendente) {
+             L.marker(pendente.CoordOrigem, { icon: iconPlane('#ef4444') })
+              .addTo(layerFoco)
+              .bindPopup("Origem (Aguardando Decolagem)");
+             bounds.push(pendente.CoordOrigem);
+        }
+
+        // 2. Rota Pendente (Tracejado Cinza)
+        if (pendente) {
+            L.polyline([pendente.CoordOrigem, pendente.CoordDestino], { 
+                color: '#94a3b8', weight: 3, dashArray: '5, 10', opacity: 0.8 
+            }).addTo(layerFoco)
+              .bindPopup("Rota Prevista / Pendente");
+            
+            L.marker(pendente.CoordDestino, { icon: iconDot('#cbd5e1') })
+             .addTo(layerFoco)
+             .bindPopup(`<b>Destino Final:</b> ${pendente.Destino}`);
+            
+            bounds.push(pendente.CoordDestino);
+        }
+
+        if(bounds.length > 0) map.fitBounds(bounds, { padding: [60, 60], maxZoom: 6 });
+    }
+
+    function ResetarMapaVisual() {
+        layerFoco.clearLayers();
+        layerGeral.eachLayer(l => l.setStyle({ opacity: 0.3, weight: 2 }));
+        map.setView([-14.2350, -51.9253], 4);
+    }
+</script>
+{% endblock %}
