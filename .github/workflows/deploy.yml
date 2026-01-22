@@ -15,85 +15,92 @@ jobs:
     - name: Atualizar Aplicação no Servidor
       shell: powershell
       run: |
-        # --- CONFIGURAÇÃO DE LOG ---
+        # --- CONFIGURAÇÕES ---
+        $ServiceName = "Luft-FlightOps"
+        $AppPath = "C:\ProjetosPython\T-FlightOps"
+        $nssmPath = "C:\nssm-2.24\win64\nssm.exe"
         $LogFile = "C:\actions-runner\deploy-log.txt"
-        Start-Transcript -Path $LogFile -Append
-        Write-Host "--- NOVO DEPLOY INICIADO: $(Get-Date) ---"
-
-        # Ativa modo estrito globalmente (para parar se der erro grave)
-        $ErrorActionPreference = "Stop"
-
-        try {
-            # --- SEUS CAMINHOS ---
-            $ServiceName = "Luft-FlightOps"
-            $AppPath = "C:\ProjetosPython\T-FlightOps"
-            $nssmPath = "C:\nssm-2.24\win64\nssm.exe"
-
-            # 1. Parar o serviço Python
-            Write-Host "1. Parando serviço $ServiceName..."
-            if (Get-Service $ServiceName -ErrorAction SilentlyContinue) {
-                # Usamos cmd /c e ignoramos erro aqui para garantir que pare
-                cmd /c "$nssmPath stop $ServiceName" 2>&1 | Out-Null
-                Start-Sleep -Seconds 5
-            } else {
-                Write-Host "Serviço não estava rodando."
-            }
-
-            # 2. Limpar a pasta (Protegendo .venv e .git)
-            Write-Host "2. Limpando arquivos antigos..."
-            if (Test-Path $AppPath) {
-                Get-ChildItem -Path $AppPath -Exclude ".venv", ".git" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-            } else {
-                New-Item -ItemType Directory -Force -Path $AppPath
-            }
-
-            # 3. Copiar os arquivos novos
-            Write-Host "3. Copiando nova versão..."
-            Copy-Item -Path ".\*" -Destination $AppPath -Recurse -Force -Exclude ".git", ".github"
-
-            # 4. Instalar dependências (SOLUÇÃO BLINDADA)
-            Write-Host "4. Instalando bibliotecas (pip)..."
-            Set-Location $AppPath
-            
-            if (Test-Path ".venv\Scripts\python.exe") {
-                # --- TRUQUE: Relaxar a verificação de erro só para o PIP ---
-                $OldPreference = $ErrorActionPreference
-                $ErrorActionPreference = "Continue"
-
-                # Executa redirecionando o fluxo de erro para o fluxo normal (2>&1)
-                # O '| Write-Host' garante que o texto apareça no log mas não seja tratado como exceção
-                & .\.venv\Scripts\python.exe -m pip install -r requirements.txt 2>&1 | Write-Host
-
-                # Verifica se houve erro REAL (código de saída diferente de 0)
-                if ($LASTEXITCODE -ne 0) { 
-                    throw "O PIP falhou com código de erro: $LASTEXITCODE" 
-                }
-
-                # Restaura a verificação estrita
-                $ErrorActionPreference = $OldPreference
-            } else {
-                throw "A pasta .venv não existe em $AppPath! O deploy falhou."
-            }
-
-            # 5. Reiniciar Serviço Python
-            Write-Host "5. Iniciando serviço $ServiceName..."
-            # Relaxa erro aqui também, pois o NSSM às vezes solta texto na saída de erro
-            $ErrorActionPreference = "Continue"
-            & $nssmPath start $ServiceName 2>&1 | Write-Host
-            $ErrorActionPreference = "Stop"
-
-            # 6. Reiniciar Nginx
-            Write-Host "6. Reiniciando Nginx..."
-            Restart-Service "nginx" -ErrorAction Continue
-
-            Write-Host "--- DEPLOY CONCLUÍDO COM SUCESSO ---"
         
-        } catch {
-            Write-Error "!!! ERRO FATAL DURANTE O DEPLOY !!!"
-            Write-Error $_
-            Write-Error $_.ScriptStackTrace
-            exit 1
-        } finally {
-            Write-Host "--- FIM DO LOG ---"
-            Stop-Transcript
+        # Inicia Log
+        Start-Transcript -Path $LogFile -Append
+        Write-Host "--- DEPLOY LINEAR INICIADO: $(Get-Date) ---"
+
+        # Garante que erros de comando não matem o script imediatamente, nós vamos checar manualmente
+        $ErrorActionPreference = "Continue"
+
+        # -----------------------------------------------------------
+        # 1. PARAR SERVIÇO
+        # -----------------------------------------------------------
+        Write-Host "1. Parando serviço $ServiceName..."
+        # Tenta parar. Se der erro (ex: já estava parado), apenas avisa e continua.
+        & $nssmPath stop $ServiceName
+        Start-Sleep -Seconds 5
+
+        # -----------------------------------------------------------
+        # 2. LIMPEZA
+        # -----------------------------------------------------------
+        Write-Host "2. Limpando arquivos antigos..."
+        if (Test-Path $AppPath) {
+            Get-ChildItem -Path $AppPath -Exclude ".venv", ".git" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+        } else {
+            New-Item -ItemType Directory -Force -Path $AppPath
         }
+
+        # -----------------------------------------------------------
+        # 3. COPIA
+        # -----------------------------------------------------------
+        Write-Host "3. Copiando arquivos..."
+        Copy-Item -Path ".\*" -Destination $AppPath -Recurse -Force -Exclude ".git", ".github"
+        
+        # Verifica se a cópia funcionou
+        if (-not (Test-Path "$AppPath\WSGI.py")) {
+            Write-Error "ERRO FATAL: Arquivos não foram copiados corretamente."
+            Stop-Transcript
+            exit 1
+        }
+
+        # -----------------------------------------------------------
+        # 4. INSTALAÇÃO (PIP)
+        # -----------------------------------------------------------
+        Write-Host "4. Instalando dependências..."
+        Set-Location $AppPath
+        if (Test-Path ".venv\Scripts\python.exe") {
+            # Roda o PIP. Se tiver avisos (amarelo), ele mostra mas não trava.
+            & .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+            
+            # Checa se o PIP quebrou de verdade (ExitCode diferente de 0)
+            if ($LASTEXITCODE -ne 0) {
+                Write-Error "ERRO FATAL: Falha ao instalar requirements.txt"
+                Stop-Transcript
+                exit 1
+            }
+        } else {
+            Write-Error "ERRO FATAL: .venv não encontrada!"
+            Stop-Transcript
+            exit 1
+        }
+
+        # -----------------------------------------------------------
+        # 5. INICIAR SERVIÇO
+        # -----------------------------------------------------------
+        Write-Host "5. Iniciando serviço $ServiceName..."
+        & $nssmPath start $ServiceName
+        
+        # Espera um pouco para ver se o serviço firma
+        Start-Sleep -Seconds 5
+        
+        # Verifica se o serviço está rodando
+        $ServiceStatus = Get-Service $ServiceName
+        if ($ServiceStatus.Status -ne 'Running') {
+            Write-Warning "ATENÇÃO: O serviço parece não ter iniciado corretamente. Status: $($ServiceStatus.Status)"
+            # Não vamos dar exit 1 aqui para tentar reiniciar o Nginx mesmo assim
+        }
+
+        # -----------------------------------------------------------
+        # 6. REINICIAR NGINX
+        # -----------------------------------------------------------
+        Write-Host "6. Reiniciando Nginx..."
+        & $nssmPath restart "Nginx" -ErrorAction Continue
+
+        Write-Host "--- DEPLOY CONCLUÍDO ---"
+        Stop-Transcript
