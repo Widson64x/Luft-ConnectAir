@@ -7,7 +7,6 @@ from Models.SQL_SERVER.Usuario import Usuario, UsuarioGrupo
 from Models.UsuarioModel import UsuarioSistema
 from Configuracoes import ConfiguracaoAtual # Importação da Configuração
 from Services.VersaoService import VersaoService
-
 # Importação das Rotas e Modelos
 from Routes.Auth import AuthBp
 from Routes.Malha import MalhaBp

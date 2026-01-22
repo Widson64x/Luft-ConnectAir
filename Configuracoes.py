@@ -92,5 +92,5 @@ MapaConfiguracao = {
 NomeAmbiente = os.getenv("AMBIENTE_APP", "desenvolvimento").lower()
 ConfiguracaoAtual = MapaConfiguracao.get(NomeAmbiente, ConfiguracaoDesenvolvimento)()
 
-print(f"🔧 Configurações carregadas em modo: {NomeAmbiente.upper()}")
-print(f"🐘 Banco Postgres Alvo: {ConfiguracaoAtual.PG_DB_NAME}")
+print(f"[OK] Configurações carregadas em modo: {NomeAmbiente.upper()}")
+print(f"[OK] Banco Postgres Alvo: {ConfiguracaoAtual.PG_DB_NAME}")

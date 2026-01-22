@@ -18,6 +18,8 @@ jobs:
       env:
         COMMIT_MSG: ${{ github.event.head_commit.message }}
         COMMIT_AUTHOR: ${{ github.actor }}
+        PYTHONUTF8: "1"            # Força o Python a usar UTF-8
+        PYTHONIOENCODING: "utf-8"  # Garante a saída do console em UTF-8
       run: |
         # --- CONFIGURAÇÕES ---
         $ServiceName = "Luft-FlightOps"
