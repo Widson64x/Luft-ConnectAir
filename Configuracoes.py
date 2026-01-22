@@ -34,6 +34,10 @@ class ConfiguracaoBase:
     # Define se mostra logs de conexão (SQLAlchemy Echo)
     MOSTRAR_LOGS_DB = os.getenv("DB_CONNECT_LOGS", "False").lower() == "true"
 
+    DIR_UPLOADS = os.path.join(DIR_BASE, "Data", "Uploads")
+    DIR_TEMP    = os.path.join(DIR_BASE, "Data", "Temp")
+    DIR_LOGS    = os.path.join(DIR_BASE, "Logs")
+
     def ObterUrlSqlServer(self):
         """
         Gera a string de conexão para o SQL Server.

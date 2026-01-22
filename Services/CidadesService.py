@@ -3,7 +3,10 @@ import pandas as pd
 from datetime import date
 from sqlalchemy import desc
 from Conexoes import ObterSessaoPostgres
+from Configuracoes import ConfiguracaoBase
 from Models.POSTGRES.Cidade import RemessaCidade, Cidade
+
+DIR_TEMP = ConfiguracaoBase.DIR_TEMP
 
 class CidadesService:
     """

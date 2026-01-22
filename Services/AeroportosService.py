@@ -4,11 +4,9 @@ from datetime import datetime, date
 from sqlalchemy import desc
 from Conexoes import ObterSessaoPostgres
 from Models.POSTGRES.Aeroporto import RemessaAeroportos, Aeroporto
+from Configuracoes import ConfiguracaoBase
 
-# Pasta temporária
-DIR_TEMP = 'Data/Temp_Aeroportos'
-if not os.path.exists(DIR_TEMP):
-    os.makedirs(DIR_TEMP)
+DIR_TEMP = ConfiguracaoBase.DIR_TEMP
 
 class AeroportoService:
     
