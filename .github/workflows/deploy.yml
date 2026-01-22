@@ -16,16 +16,15 @@ jobs:
       shell: powershell
       run: |
         # --- CONFIGURAÇÃO DE LOG ---
-        # Define onde o log será salvo no servidor
         $LogFile = "C:\actions-runner\deploy-log.txt"
-        
-        # Inicia a gravação de tudo (Transkript)
         Start-Transcript -Path $LogFile -Append
         Write-Host "--- NOVO DEPLOY INICIADO: $(Get-Date) ---"
 
-        # Bloco TRY/CATCH para capturar qualquer erro fatal
+        # Define preferência de erro para parar o script se algo grave acontecer
+        $ErrorActionPreference = "Stop"
+
         try {
-            # --- SE SUAS VARIÁVEIS ---
+            # --- SEUS CAMINHOS ---
             $ServiceName = "Luft-FlightOps"
             $AppPath = "C:\ProjetosPython\T-FlightOps"
             $nssmPath = "C:\nssm-2.24\win64\nssm.exe"
@@ -33,10 +32,11 @@ jobs:
             # 1. Parar o serviço Python
             Write-Host "1. Parando serviço $ServiceName..."
             if (Get-Service $ServiceName -ErrorAction SilentlyContinue) {
-                & $nssmPath stop $ServiceName
+                # Usamos cmd /c aqui também para evitar erros falsos no stop
+                cmd /c "$nssmPath stop $ServiceName"
                 Start-Sleep -Seconds 5
             } else {
-                Write-Host "Serviço não estava rodando ou não existe."
+                Write-Host "Serviço não estava rodando."
             }
 
             # 2. Limpar a pasta (Protegendo .venv e .git)
@@ -51,23 +51,26 @@ jobs:
             Write-Host "3. Copiando nova versão..."
             Copy-Item -Path ".\*" -Destination $AppPath -Recurse -Force -Exclude ".git", ".github"
 
-            # 4. Instalar dependências
+            # 4. Instalar dependências (CORREÇÃO DO ERRO AQUI)
             Write-Host "4. Instalando bibliotecas (pip)..."
             Set-Location $AppPath
             if (Test-Path ".venv\Scripts\python.exe") {
-                .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+                # O comando 'cmd /c' blinda o script contra avisos amarelos do pip
+                cmd /c ".\.venv\Scripts\python.exe -m pip install -r requirements.txt"
+                
+                # Verificamos se deu erro real (código diferente de 0)
+                if ($LASTEXITCODE -ne 0) { throw "Erro fatal ao instalar dependências via PIP." }
             } else {
-                Write-Error "ERRO: A pasta .venv não existe em $AppPath! O deploy pode falhar."
+                throw "A pasta .venv não existe em $AppPath! O deploy falhou."
             }
 
             # 5. Reiniciar Serviço Python
             Write-Host "5. Iniciando serviço $ServiceName..."
-            & $nssmPath start $ServiceName
+            cmd /c "$nssmPath start $ServiceName"
 
-            # 6. Reiniciar Nginx (Tentativa segura)
+            # 6. Reiniciar Nginx
             Write-Host "6. Reiniciando Nginx..."
-            # Tenta reiniciar nativo do Windows primeiro, se falhar tenta via NSSM
-            try { Restart-Service "nginx" -ErrorAction Stop } catch { & $nssmPath restart "Nginx" }
+            Restart-Service "nginx" -ErrorAction Continue # Se o Nginx falhar, não mata o deploy, apenas avisa
 
             Write-Host "--- DEPLOY CONCLUÍDO COM SUCESSO ---"
         
@@ -75,7 +78,6 @@ jobs:
             Write-Error "!!! ERRO FATAL DURANTE O DEPLOY !!!"
             Write-Error $_
             Write-Error $_.ScriptStackTrace
-            # Isso força o GitHub a marcar como Vermelho (Falha)
             exit 1
         } finally {
             Write-Host "--- FIM DO LOG ---"
