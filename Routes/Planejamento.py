@@ -3,7 +3,7 @@ from flask_login import login_required
 from datetime import timedelta, datetime, date
 
 # Import dos Serviços
-from Services.PlanejamentoService import BuscarCtcsAereoHoje, ObterCtcCompleto, ObterCtcDetalhado
+from Services.PlanejamentoService import PlanejamentoService
 from Services.Shared.GeoService import BuscarCoordenadasCidade, BuscarAeroportoMaisProximo
 from Services.MalhaService import MalhaService
 
@@ -34,13 +34,13 @@ def Dashboard():
 @PlanejamentoBp.route('/API/CTCs-Hoje')
 @login_required
 def ApiCtcsHoje():
-    Dados = BuscarCtcsAereoHoje()
+    Dados = PlanejamentoService.BuscarCtcsAereoHoje()
     return jsonify(Dados)
 
 @PlanejamentoBp.route('/API/Ctc-Detalhes/<string:filial>/<string:serie>/<string:ctc>')
 @login_required
 def ApiCtcDetalhes(filial, serie, ctc):
-    Dados = ObterCtcCompleto(filial, serie, ctc)
+    Dados = PlanejamentoService.ObterCtcCompleto(filial, serie, ctc)
     if not Dados:
         return jsonify({'erro': 'CTC não encontrado'}), 404
     return jsonify(Dados)
@@ -50,7 +50,7 @@ def ApiCtcDetalhes(filial, serie, ctc):
 def MontarPlanejamento(filial, serie, ctc):
     
     # 1. Dados
-    DadosCtc = ObterCtcDetalhado(filial, serie, ctc)
+    DadosCtc = PlanejamentoService.ObterCtcDetalhado(filial, serie, ctc)
     if not DadosCtc: return "Não encontrado", 404
 
     # 2. Geografia
@@ -95,7 +95,7 @@ def MontarPlanejamento(filial, serie, ctc):
 @PlanejamentoBp.route('/Mapa-Global')
 @login_required
 def MapaGlobal():
-    ListaCtcs = BuscarCtcsAereoHoje()
+    ListaCtcs = PlanejamentoService.BuscarCtcsAereoHoje()
     Agrupamento = {}
 
     print(f"🌍 Gerando Mapa Agrupado para {len(ListaCtcs)} CTCs...")
