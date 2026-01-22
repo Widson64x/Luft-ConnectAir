@@ -27,7 +27,8 @@ def ApiListarAwbs():
     filtros = {
         'DataInicio': request.args.get('dataInicio'),
         'DataFim': request.args.get('dataFim'),
-        'NumeroAwb': request.args.get('numeroAwb')
+        'NumeroAwb': request.args.get('numeroAwb'),
+        'FilialCtc': request.args.get('filialCtc') # <--- Captura o novo filtro
     }
     dados = AcompanhamentoService.ListarAwbs(filtros)
     return jsonify(dados)
@@ -36,3 +37,29 @@ def ApiListarAwbs():
 def ApiHistorico(numero_awb):
     historico = AcompanhamentoService.ObterHistoricoAwb(numero_awb)
     return jsonify(historico)
+
+@AcompanhamentoBP.route('/Api/DetalhesVooModal', methods=['GET'])
+def ApiDetalhesVooModal():
+    numero = request.args.get('numeroVoo')
+    data = request.args.get('dataRef') # Espera formato dd/mm/yyyy HH:MM ou yyyy-mm-dd
+    
+    detalhes = AcompanhamentoService.BuscarDetalhesVooModal(numero, data)
+    
+    if detalhes:
+        return jsonify({'sucesso': True, 'dados': detalhes})
+    else:
+        return jsonify({'sucesso': False, 'msg': 'Voo não encontrado na malha prevista.'})
+    
+@AcompanhamentoBP.route('/Api/DetalhesAwbModal', methods=['GET'])
+def ApiDetalhesAwbModal():
+    cod_awb = request.args.get('codAwb')
+    if not cod_awb:
+        return jsonify({'sucesso': False, 'msg': 'Código AWB não informado.'})
+        
+    dados = AcompanhamentoService.BuscarDetalhesAwbCompleto(cod_awb)
+    
+    if dados:
+        return jsonify({'sucesso': True, 'dados': dados})
+    else:
+        return jsonify({'sucesso': False, 'msg': 'AWB não encontrada.'}) 
+    

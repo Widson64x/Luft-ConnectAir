@@ -1,0 +1,675 @@
+<style>
+    /* --- MODAL WRAPPER (Overlay) --- */
+    .mda-overlay {
+        position: fixed; inset: 0; 
+        background: rgba(15, 23, 42, 0.85); 
+        backdrop-filter: blur(6px);
+        z-index: 9999; 
+        display: none; align-items: center; justify-content: center;
+        opacity: 0; transition: opacity 0.3s ease;
+    }
+    .mda-overlay.show { opacity: 1; }
+
+    /* --- CAIXA PRINCIPAL --- */
+    .mda-box {
+        width: 95%; max-width: 1200px; height: 90vh;
+        background: #f8fafc; border-radius: 16px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        display: flex; flex-direction: column; overflow: hidden;
+        transform: scale(0.95); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+    .mda-overlay.show .mda-box { transform: scale(1); }
+
+    /* --- HEADER --- */
+    .mda-header {
+        background: #ffffff; padding: 20px 32px; 
+        border-bottom: 1px solid #e2e8f0;
+        display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
+    }
+    .mda-title-group { display: flex; align-items: center; gap: 16px; }
+    .mda-badge-awb {
+        background: #0f172a; color: #fff; 
+        padding: 8px 16px; border-radius: 8px;
+        font-weight: 800; font-size: 1.2rem; letter-spacing: 1px; 
+        display: flex; align-items: center; gap: 10px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    .mda-sub-info { display: flex; flex-direction: column; line-height: 1.2; }
+    .mda-cia-name { font-weight: 700; font-size: 1rem; color: #334155; }
+    .mda-label-sm { font-size: 0.75rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; }
+
+    /* --- CLOSE BUTTON --- */
+    .mda-close {
+        background: transparent; border: none; font-size: 2rem; color: #94a3b8;
+        cursor: pointer; transition: 0.2s; line-height: 1; display: flex; align-items: center;
+    }
+    .mda-close:hover { color: #ef4444; transform: scale(1.1); }
+
+    /* --- BODY & TABS --- */
+    .mda-body { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+    
+    .mda-tabs-nav {
+        display: flex; padding: 0 32px; gap: 24px; background: #fff;
+        border-bottom: 1px solid #e2e8f0; flex-shrink: 0;
+    }
+    .mda-tab-btn {
+        padding: 16px 4px; background: none; border: none;
+        font-size: 0.9rem; font-weight: 600; color: #64748b;
+        border-bottom: 3px solid transparent; cursor: pointer; transition: 0.2s;
+    }
+    .mda-tab-btn:hover { color: #2563eb; }
+    .mda-tab-btn.active { color: #2563eb; border-bottom-color: #2563eb; }
+
+    .mda-content-area { 
+        flex: 1; overflow-y: auto; padding: 32px; background: #f1f5f9; 
+        scroll-behavior: smooth;
+    }
+
+    /* --- GRIDS & CARDS --- */
+    .g-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 20px; }
+    .span-12 { grid-column: span 12; }
+    .span-8  { grid-column: span 8; }
+    .span-6  { grid-column: span 6; }
+    .span-4  { grid-column: span 4; }
+    .span-3  { grid-column: span 3; }
+
+    @media (max-width: 1024px) { .span-3, .span-4 { grid-column: span 6; } }
+    @media (max-width: 768px) { .span-6, .span-8 { grid-column: span 12; } }
+
+    .g-card {
+        background: #fff; border-radius: 12px;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+        border: 1px solid #e2e8f0; overflow: hidden;
+        display: flex; flex-direction: column; height: 100%;
+    }
+    .g-head {
+        padding: 12px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+        font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .g-body { padding: 20px; flex: 1; display: flex; flex-direction: column; gap: 16px; }
+
+    /* --- FIELDS (KEY-VALUE) --- */
+    .kv-group { display: flex; flex-direction: column; }
+    .kv-label { font-size: 0.7rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; }
+    .kv-value { font-size: 0.95rem; color: #1e293b; font-weight: 500; word-break: break-word; min-height: 1.2em; }
+    
+    .val-lg { font-size: 1.1rem; font-weight: 700; color: #0f172a; }
+    .val-money { font-family: 'Roboto Mono', monospace; color: #059669; font-weight: 700; }
+    .val-mono { font-family: 'Roboto Mono', monospace; font-size: 0.85rem; }
+    .val-status-ok { color: #16a34a; font-weight: 700; background: #dcfce7; padding: 2px 8px; border-radius: 4px; display: inline-block; }
+    .val-status-err { color: #dc2626; font-weight: 700; background: #fee2e2; padding: 2px 8px; border-radius: 4px; display: inline-block; }
+
+    /* --- TABELAS INTERNAS --- */
+    .clean-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .clean-table th { text-align: left; padding: 10px 16px; background: #f8fafc; border-bottom: 2px solid #e2e8f0; color: #64748b; font-weight: 700; text-transform: uppercase; font-size: 0.7rem; }
+    .clean-table td { padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #334155; vertical-align: middle; }
+    .clean-table tr:last-child td { border-bottom: none; }
+    .clean-table tr:hover { background: #f8fafc; }
+
+    /* --- ROTA VISUAL (CONEXÕES) --- */
+    .rota-container {
+        display: flex; align-items: center; justify-content: space-between; 
+        gap: 0; width: 100%; padding: 10px 0; overflow-x: auto;
+    }
+    .rota-node {
+        display: flex; flex-direction: column; align-items: center; 
+        min-width: 90px; text-align: center; z-index: 2; position: relative;
+    }
+    .node-icon {
+        width: 40px; height: 40px; border-radius: 50%; 
+        background: #fff; color: #64748b; 
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.2rem; border: 2px solid #e2e8f0; 
+        margin-bottom: 8px; transition: 0.2s;
+    }
+    .node-icon.origem { background: #dcfce7; color: #16a34a; border-color: #dcfce7; }
+    .node-icon.destino { background: #eff6ff; color: #2563eb; border-color: #eff6ff; }
+    .node-icon.conex { background: #f1f5f9; color: #f59e0b; border-color: #fbbf24; font-size: 1rem; }
+
+    .node-code { font-weight: 800; font-size: 1.1rem; color: #0f172a; line-height: 1; }
+    .node-label { font-size: 0.65rem; color: #64748b; font-weight: 700; text-transform: uppercase; margin-top: 4px; }
+    
+    .rota-line-group {
+        flex: 1; display: flex; flex-direction: column; align-items: center; 
+        position: relative; min-width: 140px;
+    }
+    .rota-line {
+        width: 100%; height: 3px; background: #e2e8f0; position: absolute; top: 20px; z-index: 1;
+    }
+    .flight-badge {
+        background: #fff; padding: 4px 10px; border-radius: 12px;
+        font-size: 0.75rem; color: #0f172a; font-weight: 700;
+        border: 2px solid #e2e8f0; z-index: 2; position: relative; top: 4px;
+        display: flex; align-items: center; gap: 6px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .flight-badge i { color: #2563eb; }
+
+    /* --- LOADER --- */
+    .mda-loader {
+        position: absolute; inset: 0; background: rgba(255, 255, 255, 0.95); z-index: 50;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 15px;
+    }
+    .spinner-ring {
+        width: 40px; height: 40px; border: 4px solid #e2e8f0;
+        border-top-color: #2563eb; border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* --- UTILITARIOS --- */
+    .row-flex { display: flex; gap: 16px; align-items: flex-start; }
+    .divider { height: 1px; background: #e2e8f0; margin: 8px 0; }
+</style>
+
+<div id="modal-awb-full" class="mda-overlay" onclick="FecharModalAwb(event)">
+    <div class="mda-box" onclick="event.stopPropagation()">
+        
+        <div class="mda-header">
+            <div class="mda-title-group">
+                <div class="mda-badge-awb">
+                    <i class="ph-bold ph-airplane-tilt"></i> 
+                    <span id="maw-num">---</span>
+                </div>
+                <div class="mda-sub-info">
+                    <span class="mda-cia-name" id="maw-cia">---</span>
+                    <span class="mda-label-sm">Detalhamento da Carga</span>
+                </div>
+            </div>
+            <button class="mda-close" onclick="FecharModalAwb(null)">&times;</button>
+        </div>
+
+        <div class="mda-body">
+            <div id="maw-loader" class="mda-loader">
+                <div class="spinner-ring"></div>
+                <div style="font-weight:600; color:#64748b;">Carregando dados da AWB...</div>
+            </div>
+
+            <div class="mda-tabs-nav">
+                <button class="mda-tab-btn active" onclick="MudarAba('geral')"><i class="ph-bold ph-squares-four"></i> Visão Geral</button>
+                <button class="mda-tab-btn" onclick="MudarAba('notas')"><i class="ph-bold ph-receipt"></i> Itens e Notas</button>
+                <button class="mda-tab-btn" onclick="MudarAba('historico')"><i class="ph-bold ph-clock-counter-clockwise"></i> Rastreamento</button>
+                <button class="mda-tab-btn" onclick="MudarAba('detalhes')"><i class="ph-bold ph-list-magnifying-glass"></i> Detalhes & Sistema</button>
+            </div>
+
+            <div class="mda-content-area">
+                
+                <div id="tab-geral" class="tab-content" style="display:block;">
+                    <div class="g-grid">
+                        
+                        <div class="span-12 g-card" style="border-top: 4px solid #2563eb;">
+                            <div class="g-head"><i class="ph-bold ph-path"></i> Rota Aérea</div>
+                            <div class="g-body" id="maw-rota-visual" style="overflow-x: auto; padding: 40px 20px;">
+                                </div>
+                        </div>
+
+                        <div class="span-3 g-card">
+                            <div class="g-body" style="justify-content:center;">
+                                <div class="kv-group">
+                                    <span class="kv-label">Status Atual</span>
+                                    <span class="val-lg" id="maw-status-geral">--</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="span-3 g-card">
+                            <div class="g-body" style="justify-content:center;">
+                                <div class="kv-group">
+                                    <span class="kv-label">Situação</span>
+                                    <div id="maw-entregue-tag"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="span-6 g-card">
+                            <div class="g-body" style="flex-direction:row; justify-content:space-between;">
+                                <div class="kv-group">
+                                    <span class="kv-label">Emissão</span>
+                                    <span class="kv-value" id="maw-emissao-data">--</span>
+                                </div>
+                                <div class="kv-group">
+                                    <span class="kv-label">Volumes</span>
+                                    <span class="val-lg" id="maw-volumes">0</span>
+                                </div>
+                                <div class="kv-group">
+                                    <span class="kv-label">Peso Real</span>
+                                    <span class="val-lg" id="maw-peso">0 kg</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="span-6 g-card">
+                            <div class="g-head"><i class="ph-bold ph-storefront"></i> Remetente (Expedidor)</div>
+                            <div class="g-body">
+                                <div class="kv-group">
+                                    <span class="kv-label">Nome do Remetente</span>
+                                    <span class="val-lg" id="maw-rem-nome">--</span>
+                                </div>
+                                <div class="row-flex">
+                                    <div class="kv-group" style="flex:1;">
+                                        <span class="kv-label">CNPJ / IE</span>
+                                        <span class="val-mono" id="maw-rem-doc">--</span>
+                                    </div>
+                                    <div class="kv-group" style="flex:1;">
+                                        <span class="kv-label">Local</span>
+                                        <span class="kv-value" id="maw-rem-local">--</span>
+                                    </div>
+                                </div>
+                                <div class="divider"></div>
+                                <div class="kv-group">
+                                    <span class="kv-label">Endereço</span>
+                                    <span class="kv-value" style="font-size:0.85rem;" id="maw-rem-end">--</span>
+                                </div>
+                                <div class="kv-group">
+                                    <span class="kv-label">Contato</span>
+                                    <span class="kv-value" id="maw-rem-contato">--</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="span-6 g-card">
+                            <div class="g-head"><i class="ph-bold ph-user"></i> Destinatário</div>
+                            <div class="g-body">
+                                <div class="kv-group">
+                                    <span class="kv-label">Nome do Destinatário</span>
+                                    <span class="val-lg" id="maw-dest-nome">--</span>
+                                </div>
+                                <div class="row-flex">
+                                    <div class="kv-group" style="flex:1;">
+                                        <span class="kv-label">CNPJ / IE</span>
+                                        <span class="val-mono" id="maw-dest-doc">--</span>
+                                    </div>
+                                    <div class="kv-group" style="flex:1;">
+                                        <span class="kv-label">Local</span>
+                                        <span class="kv-value" id="maw-dest-local">--</span>
+                                    </div>
+                                </div>
+                                <div class="divider"></div>
+                                <div class="kv-group">
+                                    <span class="kv-label">Endereço</span>
+                                    <span class="kv-value" style="font-size:0.85rem;" id="maw-dest-end">--</span>
+                                </div>
+                                <div class="kv-group">
+                                    <span class="kv-label">Contato</span>
+                                    <span class="kv-value" id="maw-dest-contato">--</span>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div id="tab-notas" class="tab-content" style="display:none;">
+                    <div class="g-card">
+                        <div class="g-head"><i class="ph-bold ph-receipt"></i> Notas Fiscais e Itens Vinculados</div>
+                        <div style="overflow-x:auto;">
+                            <table class="clean-table">
+                                <thead>
+                                    <tr>
+                                        <th>Documento</th>
+                                        <th>Série</th>
+                                        <th>Tipo</th>
+                                        <th>Filial Orig.</th>
+                                        <th>Espécie</th>
+                                        <th>Valor Declarado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tb-notas-body">
+                                    </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-historico" class="tab-content" style="display:none;">
+                    <div class="g-card">
+                        <div class="g-head"><i class="ph-bold ph-clock-counter-clockwise"></i> Linha do Tempo da Carga</div>
+                        <div style="overflow-x:auto;">
+                            <table class="clean-table">
+                                <thead>
+                                    <tr>
+                                        <th>Data / Hora</th>
+                                        <th>Status</th>
+                                        <th>Localização</th>
+                                        <th>Voo Informado</th>
+                                        <th>Usuário / Sistema</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tb-hist-body">
+                                    </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-detalhes" class="tab-content" style="display:none;">
+                    <div class="g-grid">
+                        
+                        <div class="span-6 g-card">
+                            <div class="g-head"><i class="ph-bold ph-cube"></i> Especificações da Carga</div>
+                            <div class="g-body">
+                                <div class="row-flex">
+                                    <div class="kv-group span-6">
+                                        <span class="kv-label">Espécie</span>
+                                        <span class="kv-value" id="maw-especie">--</span>
+                                    </div>
+                                    <div class="kv-group span-6">
+                                        <span class="kv-label">Perecível?</span>
+                                        <span class="kv-value" id="maw-perecivel">--</span>
+                                    </div>
+                                </div>
+                                <div class="divider"></div>
+                                <div class="row-flex">
+                                    <div class="kv-group span-4">
+                                        <span class="kv-label">Peso Cubado</span>
+                                        <span class="kv-value" id="maw-peso-cub">--</span>
+                                    </div>
+                                    <div class="kv-group span-4">
+                                        <span class="kv-label">Valor Mercadoria</span>
+                                        <span class="val-money" id="maw-valor-merc">--</span>
+                                    </div>
+                                    <div class="kv-group span-4">
+                                        <span class="kv-label">Dimensões (CxLxA)</span>
+                                        <span class="val-mono" id="maw-dimensoes">--</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="span-6 g-card">
+                            <div class="g-head"><i class="ph-bold ph-computer-tower"></i> Integração e Sistema</div>
+                            <div class="g-body">
+                                <div class="kv-group">
+                                    <span class="kv-label">Chave CTe Vinculado</span>
+                                    <span class="val-mono" id="maw-cte">--</span>
+                                </div>
+                                <div class="kv-group">
+                                    <span class="kv-label">Número OCA</span>
+                                    <span class="kv-value" id="maw-oca">--</span>
+                                </div>
+                                <div class="row-flex">
+                                    <div class="kv-group">
+                                        <span class="kv-label">Importado em</span>
+                                        <span class="kv-value" id="maw-dt-imp">--</span>
+                                    </div>
+                                    <div class="kv-group">
+                                        <span class="kv-label">Filial Emissora</span>
+                                        <span class="kv-value" id="maw-filial">--</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="span-12 g-card" id="card-cancelamento" style="display:none; border-color:#fecaca;">
+                            <div class="g-head" style="background:#fef2f2; color:#b91c1c;">
+                                <i class="ph-bold ph-warning-circle"></i> Informações de Cancelamento
+                            </div>
+                            <div class="g-body">
+                                <div class="kv-group">
+                                    <span class="kv-label">Motivo</span>
+                                    <span class="val-lg" style="color:#b91c1c;" id="maw-canc-motivo">--</span>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- LÓGICA DE ABAS ---
+    function MudarAba(abaNome) {
+        document.querySelectorAll('.mda-tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+        
+        const btn = event.currentTarget || document.querySelector(`.mda-tab-btn[onclick*="'${abaNome}'"]`);
+        if(btn) btn.classList.add('active');
+        
+        const content = document.getElementById(`tab-${abaNome}`);
+        if(content) content.style.display = 'block';
+    }
+
+    // --- CONTROLE MODAL ---
+    async function AbrirModalAwbDetalhes(codAwb, event) {
+        if(event) { event.stopPropagation(); event.preventDefault(); }
+        
+        const modal = document.getElementById('modal-awb-full');
+        const loader = document.getElementById('maw-loader');
+        
+        modal.style.display = 'flex';
+        requestAnimationFrame(() => modal.classList.add('show'));
+        loader.style.display = 'flex';
+        
+        MudarAba('geral'); 
+
+        try {
+            const resp = await fetch(`{{ url_for('Acompanhamento.ApiDetalhesAwbModal') }}?codAwb=${codAwb}`);
+            const json = await resp.json();
+            
+            if(json.sucesso) {
+                PreencherModal(json.dados);
+            } else {
+                alert(json.msg || "Erro ao buscar dados.");
+                FecharModalAwb();
+            }
+        } catch (e) {
+            console.error("Erro modal:", e);
+            alert("Falha na comunicação.");
+            FecharModalAwb();
+        } finally {
+            loader.style.display = 'none';
+        }
+    }
+
+    function FecharModalAwb(e) {
+        const modal = document.getElementById('modal-awb-full');
+        if(!e || e.target === modal || e.target.closest('.mda-close')) {
+            modal.classList.remove('show');
+            setTimeout(() => { modal.style.display = 'none'; }, 300);
+        }
+    }
+
+    // --- RENDERIZAÇÃO ---
+    function PreencherModal(d) {
+        const fmtMoney = (v) => parseFloat(v || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+        const fmtNum = (v) => parseFloat(v || 0).toLocaleString('pt-BR');
+        const check = (v) => v || '-';
+
+        // HEADER
+        document.getElementById('maw-num').innerText = d.awb;
+        document.getElementById('maw-cia').innerText = d.cia;
+
+        // --- LÓGICA DE STATUS RECENTE ---
+        // Pega o status do primeiro item do histórico (o mais recente)
+        const statusRecente = (d.historico && d.historico.length > 0) ? d.historico[0] : null;
+        const textoStatus = statusRecente ? statusRecente.status : "SEM STATUS";
+        
+        // Verifica se a palavra "ENTREGUE" existe no texto do status atual
+        const isEntregue = textoStatus.toUpperCase().includes("ENTREGUE");
+
+        const stGeral = document.getElementById('maw-status-geral');
+        const tagEntregue = document.getElementById('maw-entregue-tag');
+
+        stGeral.innerText = textoStatus;
+        
+        if (isEntregue) {
+            stGeral.style.color = "#16a34a";
+            tagEntregue.innerHTML = `<span class="val-status-ok"><i class="ph-bold ph-check"></i> ENTREGUE</span>`;
+        } else {
+            stGeral.style.color = "#2563eb";
+            tagEntregue.innerHTML = `<span style="background:#f1f5f9; padding:2px 8px; border-radius:4px; font-weight:700; color:#64748b;">EM TRÂNSITO</span>`;
+        }
+        
+        if (d.cancelado) {
+            stGeral.innerText = "CANCELADO";
+            stGeral.style.color = "#dc2626";
+            tagEntregue.innerHTML = `<span class="val-status-err">CANCELADO</span>`;
+            document.getElementById('card-cancelamento').style.display = 'flex';
+            document.getElementById('maw-canc-motivo').innerText = d.motivo_canc;
+        } else {
+            document.getElementById('card-cancelamento').style.display = 'none';
+        }
+
+        // --- DESENHO DA ROTA COM CONEXÕES ---
+        const containerRota = document.getElementById('maw-rota-visual');
+        containerRota.innerHTML = ''; 
+
+        // Extrai Origem e Destino do cadastro principal
+        const origemIata = d.origem.split('-')[0].trim();
+        const origemNome = d.origem.split('-')[1] || 'Origem';
+        const destinoIata = d.destino.split('-')[0].trim();
+        const destinoNome = d.destino.split('-')[1] || 'Destino';
+
+        // 1. Identifica os trechos (legs) baseados no histórico
+        // Reverte histórico para ordem cronológica para montar o caminho
+        const histCrono = d.historico ? [...d.historico].reverse() : [];
+        let voosEncontrados = [];
+        let ultimoVoo = null;
+
+        histCrono.forEach(h => {
+            // Se tem um voo e é diferente do último processado, é um novo trecho
+            if(h.voo && h.voo.length > 2 && h.voo !== ultimoVoo) {
+                voosEncontrados.push({
+                    voo: h.voo,
+                    local: h.local // O local onde o voo apareceu primeiro (geralmente origem do trecho)
+                });
+                ultimoVoo = h.voo;
+            }
+        });
+
+        // 2. Constrói o HTML
+        let htmlRota = `<div class="rota-container">`;
+        
+        // Nó Origem
+        htmlRota += `
+            <div class="rota-node">
+                <div class="node-icon origem"><i class="ph-bold ph-package"></i></div>
+                <div class="node-code">${origemIata}</div>
+                <div class="node-label">ORIGEM</div>
+            </div>
+        `;
+
+        if(voosEncontrados.length <= 1) {
+            // Caso Voo Direto ou nenhum voo (desenha linha direta)
+            const vooNome = voosEncontrados.length === 1 ? voosEncontrados[0].voo : null;
+            htmlRota += `
+                <div class="rota-line-group">
+                    <div class="rota-line"></div>
+                    ${vooNome ? `<div class="flight-badge"><i class="ph-fill ph-airplane-tilt"></i> ${vooNome}</div>` : ''}
+                    <div style="margin-top:20px; font-size:0.7rem; color:#64748b; font-weight:600;">VOO DIRETO</div>
+                </div>
+            `;
+        } else {
+            // Caso Conexões
+            voosEncontrados.forEach((trecho, idx) => {
+                // Desenha a linha do voo
+                htmlRota += `
+                    <div class="rota-line-group">
+                        <div class="rota-line"></div>
+                        <div class="flight-badge"><i class="ph-fill ph-airplane-tilt"></i> ${trecho.voo}</div>
+                    </div>
+                `;
+
+                // Se não for o último voo, desenha o nó de conexão
+                if (idx < voosEncontrados.length - 1) {
+                    // O aeroporto de conexão é o 'local' onde o PRÓXIMO voo começa
+                    const proximoVoo = voosEncontrados[idx+1];
+                    const conexaoIata = proximoVoo.local || 'CONEX'; 
+                    
+                    htmlRota += `
+                        <div class="rota-node">
+                            <div class="node-icon conex"><i class="ph-bold ph-arrows-left-right"></i></div>
+                            <div class="node-code">${conexaoIata}</div>
+                            <div class="node-label">CONEXÃO</div>
+                        </div>
+                    `;
+                }
+            });
+        }
+
+        // Nó Destino
+        htmlRota += `
+            <div class="rota-node">
+                <div class="node-icon destino"><i class="ph-bold ph-map-pin"></i></div>
+                <div class="node-code">${destinoIata}</div>
+                <div class="node-label">DESTINO</div>
+            </div>
+        `;
+        htmlRota += `</div>`;
+        
+        containerRota.innerHTML = htmlRota;
+
+        // --- PREENCHIMENTO DOS CAMPOS RESTANTES ---
+        document.getElementById('maw-emissao-data').innerText = `${d.emissao.data} ${d.emissao.hora}`;
+        document.getElementById('maw-volumes').innerText = fmtNum(d.carga.volumes);
+        document.getElementById('maw-peso').innerText = fmtNum(d.carga.peso_real) + ' kg';
+
+        document.getElementById('maw-rem-nome').innerText = d.remetente.nome;
+        document.getElementById('maw-rem-doc').innerText = `${d.remetente.cnpj} / ${d.remetente.ie}`;
+        document.getElementById('maw-rem-local').innerText = d.remetente.local;
+        document.getElementById('maw-rem-end').innerText = d.remetente.endereco;
+        document.getElementById('maw-rem-contato').innerText = d.remetente.contato;
+
+        document.getElementById('maw-dest-nome').innerText = d.destinatario.nome;
+        document.getElementById('maw-dest-doc').innerText = `${d.destinatario.cnpj} / ${d.destinatario.ie}`;
+        document.getElementById('maw-dest-local').innerText = d.destinatario.local;
+        document.getElementById('maw-dest-end').innerText = d.destinatario.endereco;
+        document.getElementById('maw-dest-contato').innerText = d.destinatario.contato;
+
+        // Notas
+        const tbNotas = document.getElementById('tb-notas-body');
+        tbNotas.innerHTML = '';
+        if(!d.notas || d.notas.length === 0) {
+            tbNotas.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:30px; color:#94a3b8;">Nenhum item vinculado encontrado.</td></tr>`;
+        } else {
+            d.notas.forEach(n => {
+                tbNotas.innerHTML += `
+                    <tr>
+                        <td><span style="font-weight:700; color:#334155;">${n.nota}</span></td>
+                        <td>${check(n.serie)}</td>
+                        <td><span style="font-family:monospace; background:#f1f5f9; padding:2px 4px; border-radius:3px;">${check(n.tipo)}</span></td>
+                        <td>${check(n.filial)}</td>
+                        <td>${check(n.especie)}</td>
+                        <td style="font-weight:700; color:#059669;">${fmtMoney(n.valor)}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        // Histórico
+        const tbHist = document.getElementById('tb-hist-body');
+        tbHist.innerHTML = '';
+        if(!d.historico || d.historico.length === 0) {
+            tbHist.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:#94a3b8;">Histórico não disponível.</td></tr>`;
+        } else {
+            d.historico.forEach(h => {
+                tbHist.innerHTML += `
+                    <tr>
+                        <td style="font-weight:600;">${h.data}</td>
+                        <td><span style="background:#e0f2fe; color:#0284c7; padding:2px 8px; border-radius:12px; font-weight:700; font-size:0.75rem;">${h.status}</span></td>
+                        <td>${check(h.local)}</td>
+                        <td>${h.voo ? `<i class="ph-bold ph-airplane-tilt"></i> ${h.voo}` : '-'}</td>
+                        <td style="font-size:0.8rem; color:#64748b;">${check(h.usuario)}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        // Detalhes
+        document.getElementById('maw-especie').innerText = d.carga.especie;
+        document.getElementById('maw-perecivel').innerText = d.carga.perecivel ? `SIM (${d.carga.perecivel})` : 'NÃO';
+        document.getElementById('maw-peso-cub').innerText = fmtNum(d.carga.peso_cubado) + ' kg';
+        document.getElementById('maw-valor-merc').innerText = fmtMoney(d.carga.valor);
+        document.getElementById('maw-dimensoes').innerText = d.carga.dimensoes;
+
+        document.getElementById('maw-cte').innerText = d.integracao.chave_cte || '-';
+        document.getElementById('maw-oca').innerText = d.integracao.nOca || '-';
+        document.getElementById('maw-dt-imp').innerText = d.integracao.dt_importacao || '-';
+        document.getElementById('maw-filial').innerText = d.emissao.filial || '-';
+    }
+</script>
