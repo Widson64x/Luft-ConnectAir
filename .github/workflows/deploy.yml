@@ -16,7 +16,6 @@ jobs:
       shell: powershell
       run: |
         # --- CONFIGURAÇÕES ---
-        $ServiceName = "Luft-FlightOps"
         $AppPath = "C:\ProjetosPython\T-FlightOps"
         $nssmPath = "C:\nssm-2.24\win64\nssm.exe"
         $LogFile = "C:\actions-runner\deploy-log.txt"
@@ -41,7 +40,7 @@ jobs:
         # -----------------------------------------------------------
         Write-Host "2. Limpando arquivos antigos..."
         if (Test-Path $AppPath) {
-            Get-ChildItem -Path $AppPath -Exclude ".venv", ".git" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+            Get-ChildItem -Path $AppPath -Exclude ".venv", ".git", ".env" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
         } else {
             New-Item -ItemType Directory -Force -Path $AppPath
         }
