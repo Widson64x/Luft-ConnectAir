@@ -18,6 +18,7 @@ def Executar():
     parser_nova.add_argument('--estagio', default='Alpha', help='Estágio inicial (ex: Alpha)')
     parser_nova.add_argument('--msg', default='Atualização automática', help='Notas da versão')
     parser_nova.add_argument('--dev', default='Sistema', help='Responsável')
+    parser_nova.add_argument('--hash', default=None, help='Hash do Commit Git')
 
     # Comando: Promover (Usado pelo Dev)
     parser_promover = subparsers.add_parser('promover', help='Promove o estágio da versão atual')
@@ -29,7 +30,7 @@ def Executar():
     args = parser.parse_args()
 
     if args.comando == 'nova':
-        VersaoService.RegistrarNovaVersao(args.numero, args.estagio, args.msg, args.dev)
+        VersaoService.RegistrarNovaVersao(args.numero, args.estagio, args.msg, args.dev, hash_commit=args.hash)
     
     elif args.comando == 'promover':
         VersaoService.PromoverEstagio(args.estagio)

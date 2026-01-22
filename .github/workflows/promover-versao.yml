@@ -6,12 +6,13 @@ on:
       novo_estagio:
         description: 'Novo estágio da versão'
         required: true
-        default: 'Beta'
+        default: 'Stable'
         type: choice
         options:
-        - Beta
-        - Release Candidate
-        - Stable
+        - Alpha                # <--- Desenvolvimento inicial
+        - Beta                 # <--- Testes de usuários chave
+        - Release Candidate    # <--- Candidata a oficial (NOVO)
+        - Stable               # <--- Produção oficial
 
 jobs:
   promover:

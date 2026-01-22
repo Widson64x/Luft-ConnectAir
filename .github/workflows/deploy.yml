@@ -18,6 +18,7 @@ jobs:
       env:
         COMMIT_MSG: ${{ github.event.head_commit.message }}
         COMMIT_AUTHOR: ${{ github.actor }}
+        COMMIT_HASH: ${{ github.sha }}
         PYTHONUTF8: "1"            # Força o Python a usar UTF-8
         PYTHONIOENCODING: "utf-8"  # Garante a saída do console em UTF-8
       run: |
@@ -86,9 +87,10 @@ jobs:
                 # Limpa aspas da mensagem de commit para não quebrar o comando
                 $CleanMsg = $env:COMMIT_MSG -replace '"', ''
                 $Author = $env:COMMIT_AUTHOR
+                $Hash = $env:COMMIT_HASH
 
                 # Roda o script Python usando a venv
-                cmd /c ".\.venv\Scripts\python.exe Scripts/GestaoVersao.py nova --numero `"$VersionNum`" --estagio `"Alpha`" --msg `"$CleanMsg`" --dev `"$Author`""
+                cmd /c ".\.venv\Scripts\python.exe Scripts/GestaoVersao.py nova --numero `"$VersionNum`" --estagio `"Alpha`" --msg `"$CleanMsg`" --dev `"$Author`" --hash `"$Hash`""
                 
                 Write-Host "Versão $VersionNum registrada."
             } else {
