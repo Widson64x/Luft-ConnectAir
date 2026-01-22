@@ -217,6 +217,17 @@
             </div>
         </div>
 
+        <div class="input-group" style="margin-top: 5px;">
+            <label class="input-label">Nº Voo (Opcional)</label>
+            <div style="position: relative;">
+                <input type="text" id="filtro-voo" class="custom-input" 
+                       placeholder="Ex: 3678 ou LA3678" 
+                       style="padding-left: 36px; font-weight: 600; text-transform: uppercase;">
+                <i class="ph-bold ph-airplane-tilt" 
+                   style="position: absolute; left: 12px; top: 11px; color: var(--cor-texto-secundario);"></i>
+            </div>
+        </div>
+
         <div class="action-row">
             <button class="btn-search" onclick="CarregarMapa()">
                 <i class="ph-bold ph-magnifying-glass"></i> Buscar Rotas
@@ -317,6 +328,7 @@
         const fim = document.getElementById('data-fim').value;
         const origem = document.getElementById('filtro-origem').value;
         const destino = document.getElementById('filtro-destino').value;
+        const voo = document.getElementById('filtro-voo').value; // --- CAPTURA O CAMPO NOVO
 
         if(!inicio || !fim) return alert("Selecione o período.");
 
@@ -332,6 +344,7 @@
             let url = `${API_URLS.buscarRotas}?inicio=${inicio}&fim=${fim}`;
             if(origem) url += `&origem=${origem}`;
             if(destino) url += `&destino=${destino}`;
+            if(voo) url += `&numero_voo=${voo}`; // --- ENVIA NA URL
 
             const response = await fetch(url);
             const dadosBrutos = await response.json();
@@ -382,6 +395,7 @@
         const voo = grupo[index];
         const total = grupo.length;
         const estilo = ObterEstiloVoo(voo.cia, voo.tipo_resultado);
+        // Tratamento simples para limpar "Airport" do nome
         const nomeOrigem = voo.origem.nome ? voo.origem.nome.replace('International Airport', '').replace('Airport', '') : '';
         const nomeDestino = voo.destino.nome ? voo.destino.nome.replace('International Airport', '').replace('Airport', '') : '';
 
@@ -451,6 +465,7 @@
     function LimparFiltros() {
         document.getElementById('filtro-origem').value = '';
         document.getElementById('filtro-destino').value = '';
+        document.getElementById('filtro-voo').value = ''; // --- LIMPA O CAMPO NOVO
         CarregarMapa();
     }
 </script>

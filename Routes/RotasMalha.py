@@ -10,8 +10,9 @@ MalhaBp = Blueprint('Malha', __name__)
 def ApiRotas():
     Inicio = request.args.get('inicio')
     Fim = request.args.get('fim')
-    Origem = request.args.get('origem')   # Novo
-    Destino = request.args.get('destino') # Novo
+    Origem = request.args.get('origem')
+    Destino = request.args.get('destino')
+    NumeroVoo = request.args.get('numero_voo') # Novo parâmetro capturado
     
     if not Inicio or not Fim:
         return jsonify([])
@@ -21,8 +22,9 @@ def ApiRotas():
         DataIni = datetime.strptime(Inicio, '%Y-%m-%d').date()
         DataFim = datetime.strptime(Fim, '%Y-%m-%d').date()
         
-        # Chama a busca inteligente
-        Dados = BuscarRotasInteligentes(DataIni, DataFim, Origem, Destino)
+        # Chama a busca inteligente passando o novo parâmetro
+        Dados = BuscarRotasInteligentes(DataIni, DataFim, Origem, Destino, NumeroVoo)
+        
         return jsonify(Dados)
     except Exception as e:
         return jsonify({'erro': str(e)}), 500
