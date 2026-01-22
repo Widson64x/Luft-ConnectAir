@@ -1,7 +1,7 @@
 /* Definição das Variáveis de Cores (CSS Variables) */
 :root {
     /* --- TEMA LIGHT (Padrão) --- */
-    --cor-fundo-principal: #ff0000;       
+    --cor-fundo-principal: #f0f2f5;       
     --cor-fundo-painel: #ffffff;          
     --cor-texto-principal: #1f2937;       
     --cor-texto-secundario: #6b7280;      
