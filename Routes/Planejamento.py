@@ -4,7 +4,7 @@ from datetime import timedelta, datetime, date
 
 # Import dos Serviços
 from Services.PlanejamentoService import BuscarCtcsAereoHoje, ObterCtcCompleto, ObterCtcDetalhado
-from Services.GeografiaService import BuscarCoordenadasCidade, BuscarAeroportoMaisProximo
+from Services.Shared.GeoService import BuscarCoordenadasCidade, BuscarAeroportoMaisProximo
 from Services.MalhaService import BuscarRotasInteligentes
 
 PlanejamentoBp = Blueprint('Planejamento', __name__)

@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, login_required, current_user
-from Services.AutenticacaoService import AutenticarAd
+from Services.AuthService import AutenticarAd
 from Models.UsuarioModel import UsuarioSistema
 
 # Novos imports para conectar no Banco

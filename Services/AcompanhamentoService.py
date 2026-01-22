@@ -15,7 +15,7 @@ from Models.POSTGRES.Aeroporto import Aeroporto
 from Conexoes import ObterSessaoPostgres
 
 # --- SERVICES ---
-from Services.AeroportoService import AeroportoService
+from Services.AeroportosService import AeroportoService
 
 class AcompanhamentoService:
     

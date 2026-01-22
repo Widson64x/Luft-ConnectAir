@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from datetime import datetime
 # Importa a CLASSE do Serviço agora, não as funções soltas
-from Services.AeroportoService import AeroportoService
+from Services.AeroportosService import AeroportoService
 
 AeroportoBp = Blueprint('Aeroporto', __name__)
 
