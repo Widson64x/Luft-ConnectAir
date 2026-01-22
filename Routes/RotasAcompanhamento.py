@@ -13,14 +13,14 @@ def Painel():
         hoje = datetime.now().strftime('%Y-%m-%d')
         
         return render_template(
-            'Acompanhamento/Painel.html', 
+            'Acompanhamento/Index.html', 
             resumo=resumo, 
             data_inicio=hoje, 
             data_fim=hoje
         )
     except:
         hoje = datetime.now().strftime('%Y-%m-%d')
-        return render_template('Acompanhamento/Painel.html', resumo={}, data_inicio=hoje, data_fim=hoje)
+        return render_template('Acompanhamento/Index.html', resumo={}, data_inicio=hoje, data_fim=hoje)
 
 @AcompanhamentoBP.route('/Api/ListarAwbs', methods=['GET'])
 def ApiListarAwbs():

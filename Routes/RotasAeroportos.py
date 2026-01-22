@@ -75,7 +75,7 @@ def Gerenciar():
 
     # Chamada corrigida
     Historico = AeroportoService.ListarRemessasAeroportos()
-    return render_template('Aeroportos/Gerenciar.html', 
+    return render_template('Aeroportos/Manager.html', 
                            ListaRemessas=Historico, 
                            ExibirModal=ModalConfirmacao, 
                            DadosModal=DadosConfirmacao)

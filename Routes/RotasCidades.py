@@ -43,7 +43,7 @@ def Gerenciar():
             return redirect(url_for('Cidade.Gerenciar'))
 
     Historico = ListarRemessasCidades()
-    return render_template('Cidades/Gerenciar.html', ListaRemessas=Historico, ExibirModal=ModalConfirmacao, DadosModal=DadosConfirmacao)
+    return render_template('Cidades/Manager.html', ListaRemessas=Historico, ExibirModal=ModalConfirmacao, DadosModal=DadosConfirmacao)
 
 @CidadeBp.route('/Cidades/Excluir/<int:id_remessa>')
 @login_required

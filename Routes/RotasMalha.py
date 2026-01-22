@@ -98,7 +98,7 @@ def Gerenciar():
 
     Historico = ListarRemessas()
     
-    return render_template('Malha/Gerenciar.html', 
+    return render_template('Malha/Manager.html', 
                            ListaRemessas=Historico, 
                            ExibirModal=ModalConfirmacao, 
                            DadosModal=DadosConfirmacao)

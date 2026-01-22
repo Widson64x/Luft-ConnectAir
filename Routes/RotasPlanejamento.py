@@ -29,7 +29,7 @@ COORDENADAS_UFS = {
 @PlanejamentoBp.route('/Dashboard')
 @login_required
 def Dashboard():
-    return render_template('Planejamento/Dashboard.html')
+    return render_template('Planejamento/Index.html')
 
 @PlanejamentoBp.route('/API/CTCs-Hoje')
 @login_required
@@ -58,7 +58,7 @@ def MontarPlanejamento(filial, serie, ctc):
     CoordDestino = BuscarCoordenadasCidade(DadosCtc['destino_cidade'], DadosCtc['destino_uf'])
     
     if not CoordOrigem or not CoordDestino:
-        return render_template('Planejamento/Montar.html', Erro="Erro Geo", Ctc=DadosCtc)
+        return render_template('Planejamento/Editor.html', Erro="Erro Geo", Ctc=DadosCtc)
 
     # 3. Aeroportos
     AeroOrigem = BuscarAeroportoMaisProximo(CoordOrigem['lat'], CoordOrigem['lon'])
@@ -86,7 +86,7 @@ def MontarPlanejamento(filial, serie, ctc):
             )
             if RotasSugeridas: break
 
-    return render_template('Planejamento/Montar.html', 
+    return render_template('Planejamento/Editor.html', 
                            Ctc=DadosCtc, 
                            Origem=CoordOrigem, Destino=CoordDestino,
                            AeroOrigem=AeroOrigem, AeroDestino=AeroDestino,
@@ -138,4 +138,4 @@ def MapaGlobal():
             continue
     
     DadosMapa = list(Agrupamento.values())
-    return render_template('Planejamento/MapaGlobal.html', Dados=DadosMapa)
+    return render_template('Planejamento/Map.html', Dados=DadosMapa)
