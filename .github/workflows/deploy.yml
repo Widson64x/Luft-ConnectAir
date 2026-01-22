@@ -1,0 +1,83 @@
+name: Deploy Automatico T-FlightOps
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    
+    steps:
+    - name: Baixar código atualizado
+      uses: actions/checkout@v4
+
+    - name: Atualizar Aplicação no Servidor
+      shell: powershell
+      run: |
+        # --- CONFIGURAÇÃO DE LOG ---
+        # Define onde o log será salvo no servidor
+        $LogFile = "C:\actions-runner\deploy-log.txt"
+        
+        # Inicia a gravação de tudo (Transkript)
+        Start-Transcript -Path $LogFile -Append
+        Write-Host "--- NOVO DEPLOY INICIADO: $(Get-Date) ---"
+
+        # Bloco TRY/CATCH para capturar qualquer erro fatal
+        try {
+            # --- SE SUAS VARIÁVEIS ---
+            $ServiceName = "Luft-FlightOps"
+            $AppPath = "C:\ProjetosPython\T-FlightOps"
+            $nssmPath = "C:\nssm-2.24\win64\nssm.exe"
+
+            # 1. Parar o serviço Python
+            Write-Host "1. Parando serviço $ServiceName..."
+            if (Get-Service $ServiceName -ErrorAction SilentlyContinue) {
+                & $nssmPath stop $ServiceName
+                Start-Sleep -Seconds 5
+            } else {
+                Write-Host "Serviço não estava rodando ou não existe."
+            }
+
+            # 2. Limpar a pasta (Protegendo .venv e .git)
+            Write-Host "2. Limpando arquivos antigos..."
+            if (Test-Path $AppPath) {
+                Get-ChildItem -Path $AppPath -Exclude ".venv", ".git" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+            } else {
+                New-Item -ItemType Directory -Force -Path $AppPath
+            }
+
+            # 3. Copiar os arquivos novos
+            Write-Host "3. Copiando nova versão..."
+            Copy-Item -Path ".\*" -Destination $AppPath -Recurse -Force -Exclude ".git", ".github"
+
+            # 4. Instalar dependências
+            Write-Host "4. Instalando bibliotecas (pip)..."
+            Set-Location $AppPath
+            if (Test-Path ".venv\Scripts\python.exe") {
+                .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+            } else {
+                Write-Error "ERRO: A pasta .venv não existe em $AppPath! O deploy pode falhar."
+            }
+
+            # 5. Reiniciar Serviço Python
+            Write-Host "5. Iniciando serviço $ServiceName..."
+            & $nssmPath start $ServiceName
+
+            # 6. Reiniciar Nginx (Tentativa segura)
+            Write-Host "6. Reiniciando Nginx..."
+            # Tenta reiniciar nativo do Windows primeiro, se falhar tenta via NSSM
+            try { Restart-Service "nginx" -ErrorAction Stop } catch { & $nssmPath restart "Nginx" }
+
+            Write-Host "--- DEPLOY CONCLUÍDO COM SUCESSO ---"
+        
+        } catch {
+            Write-Error "!!! ERRO FATAL DURANTE O DEPLOY !!!"
+            Write-Error $_
+            Write-Error $_.ScriptStackTrace
+            # Isso força o GitHub a marcar como Vermelho (Falha)
+            exit 1
+        } finally {
+            Write-Host "--- FIM DO LOG ---"
+            Stop-Transcript
+        }
