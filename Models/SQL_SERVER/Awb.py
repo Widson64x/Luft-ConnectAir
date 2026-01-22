@@ -7,78 +7,153 @@ class Awb(Base):
     __tablename__ = 'tb_airAWB'
     __table_args__ = {'schema': 'intec.dbo'}
 
-    # Chave Primária
+    # Chave Primária (Baseado no CSV: codawb é NO Nullable)
     codawb = Column(String(15), primary_key=True)
 
-    # Dados Gerais
+    # --- Colunas tb_airAWB (Ordem do CSV) ---
     awb = Column(String(15))
     dig = Column(String(1))
     cia = Column(String(3))
     nomecia = Column(String(100))
     cgccia = Column(String(14))
+    inscrestcia = Column(String(20))
     filial = Column(String(2))
-    data = Column(DateTime)
-    hora = Column(String(8))
-    
-    # Remetente / Expedidor
-    nomeexp = Column(String(60))
-    cnpjexp = Column(String(14))
-    cidadexp = Column(String(60))
-    ufexp = Column(String(2))
-    
-    # Destinatário
-    nomedes = Column(String(60))
-    cnpjdes = Column(String(14))
-    cidadedes = Column(String(60))
-    ufdes = Column(String(50)) # No CSV está varchar(50)
-    
-    # Rota e Aeroportos
-    siglaorigem = Column(String(3))
-    aeroportoorigem = Column(String(50))
-    siglades = Column(String(3))
-    aeroportodestino = Column(String(50))
-    
-    # Valores e Pesos
+    licensaiata = Column(String(15))
+    codiataprod = Column(String(4))
+    especie = Column(String(30))
+    notas = Column(Numeric)
+    valmerc = Column(Numeric)
     volumes = Column(Numeric)
+    comprimento = Column(Numeric)
+    largura = Column(Numeric)
+    altura = Column(Numeric)
     pesoreal = Column(Numeric)
     pesocubado = Column(Numeric)
-    valmerc = Column(Numeric)
+    nomeexp = Column(String(60))
+    cnpjexp = Column(String(14))
+    inscrestexp = Column(String(20))
+    endexp = Column(String(435))
+    cepexp = Column(String(10))
+    bairroexp = Column(String(60))
+    cidadexp = Column(String(60))
+    ufexp = Column(String(2))
+    telexp = Column(String(30))
+    faxexp = Column(String(15))
+    segexp = Column(String(50))
+    apoliceexp = Column(String(20))
+    nomedes = Column(String(60))
+    cnpjdes = Column(String(14))
+    inscrestdes = Column(String(20))
+    enddes = Column(String(435))
+    cepdes = Column(String(10))
+    bairrodes = Column(String(60))
+    cidadedes = Column(String(60))
+    ufdes = Column(String(50))
+    teldes = Column(String(15))
+    faxdes = Column(String(15))
+    segdes = Column(String(50))
+    apolicedes = Column(String(20))
+    siglaorigem = Column(String(3))
+    cidadeorigem = Column(String(100))
+    uforigem = Column(String(2))
+    aeroportoorigem = Column(String(50))
+    siglavia = Column(String(3))
+    cidadevia = Column(String(100))
+    ufvia = Column(String(2))
+    aeroportovia = Column(String(50))
+    siglades = Column(String(3))
+    cidadedestino = Column(String(100))
+    ufdestino = Column(String(2))
+    aeroportodestino = Column(String(50))
+    tipotaxa = Column(String(20))
+    kilo = Column(Numeric)
+    fretenacional = Column(Numeric)
+    freteregional = Column(Numeric)
+    advalorem = Column(Numeric)
+    tipoadval = Column(Numeric)
+    percadval = Column(Numeric)
+    txorigem = Column(Numeric)
+    txdestino = Column(Numeric)
+    txredesp = Column(Numeric)
+    txagente = Column(Numeric)
+    txtransp = Column(Numeric)
+    txoutros1 = Column(Numeric)
+    descrtxoutros1 = Column(String(50))
+    txoutros2 = Column(Numeric)
+    descrtxoutros2 = Column(String(50))
     fretetotal = Column(Numeric)
-    
-    # Status e Controle
-    ENTREGUE = Column(String(1))
+    aliquota = Column(Numeric)
+    icms = Column(Numeric)
+    fretetotalliq = Column(Numeric)
+    spotautorizador = Column(String(50))
+    spotkilo = Column(Numeric)
+    descrprodsis = Column(String(150))
+    descrprodoutros = Column(String(50))
+    perecivel = Column(String(1))
+    modal = Column(String(20))
+    retira = Column(String(1))
+    localretirada = Column(String(150))
+    obsemissor = Column(String(255))
+    obssis = Column(String(255))
+    data = Column(DateTime)
+    hora = Column(String(8))
+    emissor = Column(String(30))
+    lugar = Column(String(3))
     cancelado = Column(String(1))
+    canc_usu = Column(String(15))
+    canc_data = Column(DateTime)
+    canc_hora = Column(String(8))
     canc_motivo = Column(String(250))
-    Data_Importacao = Column(DateTime)
-    nOca = Column(String(100))
+    emissaocia = Column(String(1))
+    filialmanifesto = Column(String(8))
+    VersaoSistema = Column(String(20))
+    ipmaquina = Column(String(18))
+    Tipo_Servico = Column(String(50))
+    ENTREGUE = Column(String(1))
+    perecivel_duracao = Column(String(20))
+    Arquivo = Column(String(100))
+    Erro_AWB = Column(String(1))
+    idAWB = Column(Integer) # Campo int NO nullable
     chCTe_AWB = Column(String(44))
+    Data_Importacao = Column(DateTime)
+    Data_Calculo = Column(Date)
+    nOca = Column(String(100))
+    CTe_Xml = Column(Text) # xml no banco vira Text no SQLAlchemy
+
+class AwbNota(Base):
+    __tablename__ = 'tb_airAWBnota'
+    __table_args__ = {'schema': 'intec.dbo'}
+
+    # Pelo CSV, Id é 'int' e 'NO' nullable, assumindo como PK
+    Id = Column(Integer, primary_key=True) 
+
+    # --- Colunas tb_airAWBnota (Estritamente do CSV) ---
+    coditem = Column(Numeric)
+    codawb = Column(String(15))
+    filialctc = Column(String(10))
+    tipo = Column(String(1))
+    nota = Column(String(300))
+    serie = Column(String(3))
+    valor = Column(Numeric)
 
 class AwbStatus(Base):
     __tablename__ = 'TB_AWB_STATUS'
     __table_args__ = {'schema': 'intec.dbo'}
 
-    # Chave Composta (Log)
+    # Chave Composta (Baseado em colunas NO nullable no CSV e lógica de log)
     CODAWB = Column(String(15), primary_key=True)
     STATUS_AWB = Column(String(50), primary_key=True)
     DATA_INSERT = Column(DateTime, primary_key=True)
     DATAHORA_STATUS = Column(DateTime, primary_key=True)
     
+    # --- Colunas TB_AWB_STATUS (Estritamente do CSV) ---
     CIA = Column(String(2))
     LOCAL_STATUS = Column(String(50))
     VOO = Column(String(20))
     VOLUMES = Column(Integer)
     FILIAL = Column(String(2))
     DIG = Column(String(1))
-    Usuario = Column(String(30))
     TIPO_INCLUSAO = Column(String(1))
-
-class AwbNota(Base):
-    __tablename__ = 'tb_airAWBnota'
-    __table_args__ = {'schema': 'intec.dbo'}
-
-    Id = Column(Integer, primary_key=True) # Identificado ID no CSV
-    codawb = Column(String(15))
-    filialctc = Column(String(10))
-    nota = Column(String(300))
-    serie = Column(String(3))
-    valor = Column(Numeric)
+    Usuario = Column(String(30))
+    F_EnvComprovei = Column(Boolean) # bit -> Boolean
+    Protocolo_EnvComp = Column(String(500))

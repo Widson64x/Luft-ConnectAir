@@ -58,6 +58,7 @@ def BuscarCtcsAereoHoje():
             Ctc.data >= Inicio,
             Ctc.data <= Fim,
             Ctc.tipodoc != 'COB',
+            Ctc.motivodoc != 'DEV', # Retirando Devolução
             Ctc.modal.like('AEREO%')
         ).order_by(
             desc(Ctc.data),

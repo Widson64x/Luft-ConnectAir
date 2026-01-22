@@ -139,7 +139,7 @@ def ProcessarMalhaFinal(CaminhoArquivo, DataRef, NomeOriginal, Usuario, TipoAcao
         Sessao.close()
 
 # --- BUSCA INTELIGENTE E ROTEAMENTO (ATUALIZADA) ---
-def BuscarRotasInteligentes(DataInicio, DataFim, OrigemIata=None, DestinoIata=None):
+def BuscarRotasInteligentes(DataInicio, DataFim, OrigemIata=None, DestinoIata=None, NumeroVoo=None):
     Sessao = ObterSessaoPostgres()
     try:
         # 1. Filtros para o Banco
@@ -148,20 +148,37 @@ def BuscarRotasInteligentes(DataInicio, DataFim, OrigemIata=None, DestinoIata=No
 
         OrigemIata = OrigemIata.upper().strip() if OrigemIata else None
         DestinoIata = DestinoIata.upper().strip() if DestinoIata else None
+        NumeroVoo = NumeroVoo.strip() if NumeroVoo else None # Limpeza do input
         
-        VoosDB = Sessao.query(VooMalha)\
+        # Inicia a Query Base
+        Query = Sessao.query(VooMalha)\
             .join(RemessaMalha)\
             .filter(
                 RemessaMalha.Ativo == True,
                 VooMalha.DataPartida >= FiltroDataInicio, 
                 VooMalha.DataPartida <= FiltroDataFim + timedelta(days=1)
-            ).all()
+            )
+
+        # --- FILTRO ESPECÍFICO DE NÚMERO DE VOO ---
+        if NumeroVoo:
+            # Usa ILIKE para buscar partes do texto (ex: "3678" encontra "LA3678")
+            Query = Query.filter(VooMalha.NumeroVoo.ilike(f"%{NumeroVoo}%"))
+
+        VoosDB = Query.all()
         
         DadosAeroportos = {}
-        G = nx.DiGraph()
         ListaGeral = [] 
 
-        # 3. Monta o Grafo
+        # --- RETORNO RÁPIDO (Se filtrou por voo) ---
+        # Se o usuário buscou um número de voo, não precisamos montar grafo de conexões.
+        # Retornamos exatamente o que foi encontrado.
+        if NumeroVoo:
+            CompletarCacheDestinos(Sessao, VoosDB, DadosAeroportos)
+            return FormatarListaRotas(VoosDB, DadosAeroportos, 'Geral')
+
+        # 3. Monta o Grafo (Lógica original mantida para buscas de rota)
+        G = nx.DiGraph()
+        
         for Voo in VoosDB:
             if not (OrigemIata and DestinoIata):
                 if (not OrigemIata or Voo.AeroportoOrigem == OrigemIata) and \
@@ -196,10 +213,10 @@ def BuscarRotasInteligentes(DataInicio, DataFim, OrigemIata=None, DestinoIata=No
             
             if not RotasValidas: return []
 
-            # CRITÉRIOS DE ORDENAÇÃO ATUALIZADOS:
-            # 1. Número de trocas de CIA (Menor é melhor) - Prioridade Máxima
-            # 2. Duração Total (Menor é melhor)
-            # 3. Número de Escalas (Menor é melhor)
+            # CRITÉRIOS DE ORDENAÇÃO:
+            # 1. Trocas de CIA
+            # 2. Duração Total
+            # 3. Número de Escalas
             
             def ContarTrocasCia(Rota):
                 trocas = 0
