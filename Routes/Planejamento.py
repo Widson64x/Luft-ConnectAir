@@ -5,7 +5,7 @@ from datetime import timedelta, datetime, date
 # Import dos Serviços
 from Services.PlanejamentoService import BuscarCtcsAereoHoje, ObterCtcCompleto, ObterCtcDetalhado
 from Services.Shared.GeoService import BuscarCoordenadasCidade, BuscarAeroportoMaisProximo
-from Services.MalhaService import BuscarRotasInteligentes
+from Services.MalhaService import MalhaService
 
 PlanejamentoBp = Blueprint('Planejamento', __name__)
 
@@ -79,7 +79,7 @@ def MontarPlanejamento(filial, serie, ctc):
         
         for Dias in [3, 10, 30]: # Busca progressiva, 3 dias, 10 dias, 30 dias, se necessário
             DataLimite = DataInicioBusca + timedelta(days=Dias)
-            RotasSugeridas = BuscarRotasInteligentes(
+            RotasSugeridas = MalhaService.BuscarRotasInteligentes(
                 DataInicioBusca, # Vai dar Data/Hora calculada de Emissão do CTC + 10h
                 DataLimite, 
                 AeroOrigem['iata'], AeroDestino['iata']

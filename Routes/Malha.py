@@ -1,8 +1,7 @@
 from flask import Blueprint, jsonify, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
 from datetime import datetime
-from Services.MalhaService import AnalisarArquivo, ProcessarMalhaFinal, ListarRemessas, ExcluirRemessa, BuscarRotasInteligentes
-
+from Services.MalhaService import MalhaService
 MalhaBp = Blueprint('Malha', __name__)
 
 @MalhaBp.route('/Malha/API/Rotas')
@@ -23,7 +22,7 @@ def ApiRotas():
         DataFim = datetime.strptime(Fim, '%Y-%m-%d').date()
         
         # Chama a busca inteligente passando o novo parâmetro
-        Dados = BuscarRotasInteligentes(DataIni, DataFim, Origem, Destino, NumeroVoo)
+        Dados = MalhaService.BuscarRotasInteligentes(DataIni, DataFim, Origem, Destino, NumeroVoo)
         
         return jsonify(Dados)
     except Exception as e:
@@ -43,7 +42,7 @@ def Gerenciar():
             if Arquivo.filename == '':
                 flash('Selecione um arquivo.', 'warning')
             else:
-                Sucesso, Info = AnalisarArquivo(Arquivo)
+                Sucesso, Info = MalhaService.AnalisarArquivo(Arquivo)
                 
                 if not Sucesso:
                     flash(Info, 'danger')
@@ -54,7 +53,7 @@ def Gerenciar():
                         DadosConfirmacao = Info
                     else:
                         # Se NÃO tem conflito, processa direto como 'Importação'
-                        Ok, Msg = ProcessarMalhaFinal(
+                        Ok, Msg = MalhaService.ProcessarMalhaFinal(
                             Info['caminho_temp'], 
                             Info['mes_ref'], 
                             Info['nome_arquivo'], 
@@ -81,7 +80,7 @@ def Gerenciar():
                 # Converte string para objeto date
                 DataRef = datetime.strptime(MesStr, '%Y-%m-%d').date()
                 
-                Ok, Msg = ProcessarMalhaFinal(
+                Ok, Msg = MalhaService.ProcessarMalhaFinal(
                     CaminhoTemp, 
                     DataRef, 
                     NomeOriginal, 
@@ -96,7 +95,7 @@ def Gerenciar():
 
             return redirect(url_for('Malha.Gerenciar'))
 
-    Historico = ListarRemessas()
+    Historico = MalhaService.ListarRemessas()
     
     return render_template('Malha/Manager.html', 
                            ListaRemessas=Historico, 
@@ -106,7 +105,7 @@ def Gerenciar():
 @MalhaBp.route('/Malha/Excluir/<int:id_remessa>')
 @login_required
 def Excluir(id_remessa):
-    Sucesso, Mensagem = ExcluirRemessa(id_remessa)
+    Sucesso, Mensagem = MalhaService.ExcluirRemessa(id_remessa)
     if Sucesso: flash(Mensagem, 'info')
     else: flash(Mensagem, 'danger')
     return redirect(url_for('Malha.Gerenciar'))

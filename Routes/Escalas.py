@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, render_template
 from flask_login import login_required
 from datetime import datetime
-from Services.MalhaService import ObterTotalVoosData
+from Services.MalhaService import MalhaService
 
 EscalasBp = Blueprint('Escalas', __name__)
 
@@ -19,5 +19,5 @@ def Mapa():
 def ApiVoosHoje():
     Hoje = datetime.now()
     # Chama a função do Service que aceita a data
-    Quantidade = ObterTotalVoosData(Hoje)
+    Quantidade = MalhaService.ObterTotalVoosData(Hoje)
     return jsonify(Quantidade)
