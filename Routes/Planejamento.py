@@ -60,11 +60,33 @@ def MontarPlanejamento(filial, serie, ctc):
     if not CoordOrigem or not CoordDestino:
         return render_template('Planejamento/Editor.html', Erro="Erro Geo", Ctc=DadosCtc)
 
-    # 3. Aeroportos
+    # 3. Consolidação - Busca CTCs com mesma origem/destino
+    CtcsConsolidados = PlanejamentoService.BuscarCtcsConsolidaveis(
+        DadosCtc['origem_cidade'], 
+        DadosCtc['origem_uf'],
+        DadosCtc['destino_cidade'], 
+        DadosCtc['destino_uf'],
+        DadosCtc['data_emissao_real'],
+        filial,
+        ctc
+    )
+    
+    print(f"📦 Consolidação: Encontrados {len(CtcsConsolidados)} CTCs adicionais com mesma origem/destino")
+    
+    # Calcula totais consolidados
+    TotaisConsolidados = {
+        'qtd_ctcs': len(CtcsConsolidados) + 1,  # +1 para incluir o CTC principal
+        'volumes_total': DadosCtc['volumes'] + sum(c['volumes'] for c in CtcsConsolidados),
+        'peso_total': DadosCtc['peso'] + sum(c['peso_taxado'] for c in CtcsConsolidados),
+        'valor_total': float(DadosCtc['valor']) + sum(c['val_mercadoria'] for c in CtcsConsolidados),
+        'notas_total': sum(c['qtd_notas'] for c in CtcsConsolidados) + 1  # +1 estimado para o principal
+    }
+
+    # 4. Aeroportos
     AeroOrigem = BuscarAeroportoMaisProximo(CoordOrigem['lat'], CoordOrigem['lon'])
     AeroDestino = BuscarAeroportoMaisProximo(CoordDestino['lat'], CoordDestino['lon'])
 
-    # 4. Busca
+    # 5. Busca de Rotas
     RotasSugeridas = []
     if AeroOrigem and AeroDestino:
         """
@@ -90,7 +112,9 @@ def MontarPlanejamento(filial, serie, ctc):
                            Ctc=DadosCtc, 
                            Origem=CoordOrigem, Destino=CoordDestino,
                            AeroOrigem=AeroOrigem, AeroDestino=AeroDestino,
-                           Rotas=RotasSugeridas)
+                           Rotas=RotasSugeridas,
+                           CtcsConsolidados=CtcsConsolidados,
+                           TotaisConsolidados=TotaisConsolidados)
     
 @PlanejamentoBp.route('/Mapa-Global')
 @login_required

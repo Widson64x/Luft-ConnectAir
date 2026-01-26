@@ -1,6 +1,6 @@
 from datetime import datetime, date, time, timedelta
 from decimal import Decimal
-from sqlalchemy import desc
+from sqlalchemy import desc, func
 from Conexoes import ObterSessaoSqlServer
 from Models.SQL_SERVER.Ctc import Ctc
 
@@ -235,5 +235,112 @@ class PlanejamentoService:
                 'remetente': str(CtcEncontrado.remet_nome).strip(),
                 'destinatario': str(CtcEncontrado.dest_nome).strip()
             }
+        finally:
+            Sessao.close()
+    @staticmethod
+    def BuscarCtcsConsolidaveis(cidade_origem, uf_origem, cidade_destino, uf_destino, data_base, filial_excluir=None, ctc_excluir=None):
+        """
+        Busca todos os CTCs aéreos do mesmo dia que compartilham a mesma origem e destino.
+        Utilizado para consolidação de cargas no planejamento.
+        
+        Args:
+            cidade_origem: Cidade de origem
+            uf_origem: UF de origem
+            cidade_destino: Cidade de destino
+            uf_destino: UF de destino
+            data_base: Data de referência (date ou datetime)
+            filial_excluir: Filial do CTC principal (para não incluir na lista)
+            ctc_excluir: Número do CTC principal (para não incluir na lista)
+        
+        Returns:
+            Lista de CTCs consolidáveis com dados resumidos
+        """
+        Sessao = ObterSessaoSqlServer()
+        try:
+            # Normaliza a data para buscar todo o dia
+            if isinstance(data_base, datetime):
+                data_base = data_base.date()
+            
+            Inicio = datetime.combine(data_base, time.min)
+            Fim = datetime.combine(data_base, time.max)
+            
+            # Normaliza strings para comparação
+            cidade_origem = str(cidade_origem).strip().upper()
+            uf_origem = str(uf_origem).strip().upper()
+            cidade_destino = str(cidade_destino).strip().upper()
+            uf_destino = str(uf_destino).strip().upper()
+            
+            # Query para buscar CTCs com mesma origem e destino
+            Query = Sessao.query(Ctc).filter(
+                Ctc.data >= Inicio,
+                Ctc.data <= Fim,
+                Ctc.tipodoc != 'COB',
+                Ctc.modal.like('AEREO%'),
+                func.upper(func.trim(Ctc.cidade_orig)) == cidade_origem,
+                func.upper(func.trim(Ctc.uf_orig)) == uf_origem,
+                func.upper(func.trim(Ctc.cidade_dest)) == cidade_destino,
+                func.upper(func.trim(Ctc.uf_dest)) == uf_destino
+            )
+            
+            # Exclui o CTC principal da lista
+            if filial_excluir and ctc_excluir:
+                Query = Query.filter(
+                    ~((Ctc.filial == str(filial_excluir).strip()) & 
+                      (Ctc.filialctc == str(ctc_excluir).strip()))
+                )
+            
+            Resultados = Query.order_by(desc(Ctc.data), desc(Ctc.hora)).all()
+            
+            # Formata os dados para retorno
+            ListaConsolidados = []
+            for c in Resultados:
+                def to_float(val): return float(val) if val else 0.0
+                def to_int(val): return int(val) if val else 0
+                def to_str(val): return str(val).strip() if val else ''
+                
+                # Formata hora
+                HoraFormatada = '--:--'
+                if c.hora:
+                    h = str(c.hora).strip()
+                    if len(h) == 4 and ':' not in h: h = f"{h[:2]}:{h[2:]}"
+                    elif len(h) == 3 and ':' not in h: h = f"0{h[:1]}:{h[1:]}"
+                    elif len(h) <= 2: h = f"{h.zfill(2)}:00"
+                    HoraFormatada = h
+                
+                # Conta notas
+                raw_notas = getattr(c, 'notas', '') or getattr(c, 'nfs', '')
+                qtd_notas_calc = 0
+                if raw_notas:
+                    s_notas = str(raw_notas).replace('/', ',').replace(';', ',').replace('-', ',')
+                    lista_n = [n for n in s_notas.split(',') if n.strip()]
+                    qtd_notas_calc = len(lista_n)
+                if qtd_notas_calc == 0 and to_int(c.volumes) > 0:
+                    qtd_notas_calc = 1
+                
+                ListaConsolidados.append({
+                    'filial': to_str(c.filial),
+                    'ctc': to_str(c.filialctc),
+                    'serie': to_str(c.seriectc),
+                    'data_emissao': c.data.strftime('%d/%m/%Y') if c.data else '',
+                    'hora_emissao': HoraFormatada,
+                    'prioridade': to_str(c.prioridade),
+                    'remetente': to_str(c.remet_nome),
+                    'destinatario': to_str(c.dest_nome),
+                    'volumes': to_int(c.volumes),
+                    'peso_taxado': to_float(c.pesotax),
+                    'peso_real': to_float(c.peso),
+                    'val_mercadoria': to_float(c.valmerc),
+                    'frete_total': to_float(c.fretetotalbruto),
+                    'qtd_notas': qtd_notas_calc,
+                    'tabela_frete': to_str(c.tabfrete),
+                    'natureza': to_str(c.natureza),
+                    'especie': to_str(c.especie),
+                    # Campos para expansão futura
+                    'tipo_produto': to_str(c.natureza),  # Pode ser refinado
+                    'valor_tarifa': to_float(c.fretetotalbruto),  # Placeholder
+                })
+            
+            return ListaConsolidados
+            
         finally:
             Sessao.close()
