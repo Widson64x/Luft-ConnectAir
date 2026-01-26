@@ -14,18 +14,27 @@
 </head>
 <body>
     <div class="layout-wrapper">
-        <aside class="sidebar">
-            <div class="sidebar-logo">
-                <i class="ph-fill ph-airplane-tilt"></i>
-                <span>FlightOps</span>
+        <aside class="sidebar" id="sidebar">
+            <button onclick="ToggleSidebar()" class="sidebar-toggle-btn" title="Expandir/Recolher">
+                <i class="ph-bold ph-caret-left"></i>
+            </button>
+
+            <div class="sidebar-header">
+                <div class="sidebar-logo">
+                    <i class="ph-fill ph-airplane-tilt"></i>
+                    <div class="logo-text-wrapper">
+                        <span class="logo-full">FlightOps</span>
+                        <span class="logo-mini">TFO</span>
+                    </div>
+                </div>
             </div>
             
-            <nav>
+            <nav class="sidebar-nav">
                 <a href="{{ url_for('Dashboard') }}" 
                    class="menu-link {{ 'ativo' if request.endpoint == 'Dashboard' else '' }}">
                    <div class="link-content">
                        <i class="ph-bold ph-chart-pie-slice"></i>
-                       <span>Dashboard</span>
+                       <span class="link-text">Dashboard</span>
                    </div>
                 </a>
 
@@ -34,7 +43,7 @@
                             onclick="ToggleMenu(this)">
                         <div class="link-content">
                             <i class="ph-bold ph-folder-notch"></i>
-                            <span>Cadastros</span>
+                            <span class="link-text">Cadastros</span>
                         </div>
                         <i class="ph-bold ph-caret-down seta-menu"></i>
                     </button>
@@ -42,17 +51,17 @@
                     <div class="submenu {{ 'aberto' if 'Malha' in request.endpoint or 'Aeroporto' in request.endpoint or 'Cidade' in request.endpoint else '' }}">
                         <a href="{{ url_for('Malha.Gerenciar') }}" 
                            class="menu-link {{ 'ativo' if request.endpoint and 'Malha' in request.endpoint else '' }}">
-                           <span>Malha Aérea</span>
+                           <span class="link-text">Malha Aérea</span>
                         </a>
 
                         <a href="{{ url_for('Aeroporto.Gerenciar') }}" 
                            class="menu-link {{ 'ativo' if request.endpoint and 'Aeroporto' in request.endpoint else '' }}">
-                           <span>Aeroportos</span>
+                           <span class="link-text">Aeroportos</span>
                         </a>
 
                         <a href="{{ url_for('Cidade.Gerenciar') }}" 
                            class="menu-link {{ 'ativo' if request.endpoint and 'Cidade' in request.endpoint else '' }}">
-                           <span>Cidades</span>
+                           <span class="link-text">Cidades</span>
                         </a>
                     </div>
                 </div>
@@ -61,7 +70,7 @@
                    class="menu-link {{ 'ativo' if request.endpoint and 'Planejamento' in request.endpoint else '' }}">
                    <div class="link-content">
                        <i class="ph-bold ph-globe-hemisphere-west"></i>
-                       <span>Planejamento</span>
+                       <span class="link-text">Planejamento</span>
                    </div>
                 </a>
                 
@@ -69,7 +78,7 @@
                    class="menu-link {{ 'ativo' if request.endpoint and 'Escalas' in request.endpoint else '' }}">
                    <div class="link-content">
                        <i class="ph-bold ph-calendar-blank"></i>
-                       <span>Escalas</span>
+                       <span class="link-text">Escalas</span>
                    </div>
                 </a>
 
@@ -77,31 +86,25 @@
                    class="menu-link {{ 'ativo' if request.endpoint and 'Acompanhamento' in request.endpoint else '' }}">
                    <div class="link-content">
                        <i class="ph-bold ph-airplane-in-flight"></i>
-                       <span>Acompanhamento</span>
+                       <span class="link-text">Acompanhamento</span>
                    </div>
                 </a>
+                
                 <div class="menu-divider"></div>
 
                 <a href="#" class="menu-link">
                     <div class="link-content">
                         <i class="ph-bold ph-gear"></i>
-                        <span>Configurações</span>
+                        <span class="link-text">Configurações</span>
                     </div>
                 </a>
             </nav>
 
-            <div title="v{{ SistemaVersao.NumeroVersao }} ({{ SistemaVersao.Estagio }})" class="sidebar-footer">
-                <span>v{{ SistemaVersao.NumeroVersao }} ({{ SistemaVersao.Estagio }})</span>
-            </div>
-        </aside>
-
-        <main class="main-content">
-            <header class="top-bar">
-                <button onclick="AlternarTema()" class="btn-icon" title="Alternar Tema">
-                    <i class="ph-bold ph-moon"></i>
-                </button>
-                
+            <div class="sidebar-footer">
                 <div class="user-profile">
+                    <div class="user-avatar">
+                        <i class="ph-fill ph-user"></i>
+                    </div>
                     <div class="user-info">
                         <span class="user-name">
                             {% if current_user.is_authenticated %}
@@ -112,15 +115,25 @@
                         </span>
                         <span class="user-role">Flight Dispatcher</span>
                     </div>
-                    <div class="user-avatar">
-                        <i class="ph-fill ph-user"></i>
-                    </div>
-                    <a href="{{ url_for('Auth.Logout') }}" class="btn-logout" title="Sair">
+                </div>
+
+                <div class="sidebar-actions">
+                    <button onclick="AlternarTema()" class="action-btn" title="Alternar Tema">
+                        <i class="ph-bold ph-moon"></i>
+                    </button>
+
+                    <a href="{{ url_for('Auth.Logout') }}" class="action-btn logout" title="Sair">
                         <i class="ph-bold ph-sign-out"></i>
                     </a>
                 </div>
-            </header>
 
+                <div class="version-info">
+                    <span class="link-text">v{{ SistemaVersao.NumeroVersao }}</span>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content">
             <div class="conteudo-pagina">
                 {% with messages = get_flashed_messages(with_categories=true) %}
                   {% if messages %}
@@ -139,55 +152,86 @@
     </div>
 
     <script>
+        // --- FUNÇÃO DO MENU EXPANSÍVEL (Submenu) ---
         function ToggleMenu(btn) {
+            // Se a sidebar estiver colapsada, expandir ela primeiro para ver o submenu
+            const sidebar = document.getElementById('sidebar');
+            if(sidebar.classList.contains('collapsed')) {
+                ToggleSidebar(); // Abre a sidebar
+                // Pequeno delay para abrir o submenu suavemente
+                setTimeout(() => {
+                    toggleSubmenuLogic(btn);
+                }, 100);
+            } else {
+                toggleSubmenuLogic(btn);
+            }
+        }
+
+        function toggleSubmenuLogic(btn) {
             btn.classList.toggle('ativo');
             const submenu = btn.nextElementSibling;
             submenu.classList.toggle('aberto');
         }
 
+        // --- FUNÇÃO TOGGLE SIDEBAR ---
+        function ToggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('collapsed');
+            
+            // Salvar estado no localStorage
+            const isCollapsed = sidebar.classList.contains('collapsed');
+            localStorage.setItem('sidebar-collapsed', isCollapsed);
+        }
+
+        // --- TEMA E INICIALIZAÇÃO ---
         function AlternarTema() {
             const html = document.documentElement;
             const novoTema = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
             html.setAttribute('data-theme', novoTema);
             localStorage.setItem('tema', novoTema);
             
-            // Troca ícone do tema dinamicamente
-            const icon = document.querySelector('.btn-icon i');
-            if(novoTema === 'dark') {
-                icon.classList.replace('ph-moon', 'ph-sun');
-            } else {
-                icon.classList.replace('ph-sun', 'ph-moon');
-            }
+            // Atualiza ícones em todos os botões de tema
+            const icons = document.querySelectorAll('.action-btn i.ph-moon, .action-btn i.ph-sun');
+            icons.forEach(icon => {
+                if(novoTema === 'dark') {
+                    icon.classList.replace('ph-moon', 'ph-sun');
+                } else {
+                    icon.classList.replace('ph-sun', 'ph-moon');
+                }
+            });
         }
         
-        // Inicialização
-        const temaSalvo = localStorage.getItem('tema');
-        if (temaSalvo) {
-            document.documentElement.setAttribute('data-theme', temaSalvo);
-            if(temaSalvo === 'dark') document.querySelector('.btn-icon i').classList.replace('ph-moon', 'ph-sun');
-        }
-
-        // --- REGRA PARA ELIMINAR ALERTAS APÓS 5 SEGUNDOS ---
+        // Inicialização ao carregar a página
         document.addEventListener("DOMContentLoaded", function() {
-            const alerts = document.querySelectorAll('.alert'); // Pega todos os alertas
-            
+            // 1. Restaurar Tema
+            const temaSalvo = localStorage.getItem('tema');
+            if (temaSalvo) {
+                document.documentElement.setAttribute('data-theme', temaSalvo);
+                const icons = document.querySelectorAll('.action-btn i.ph-moon, .action-btn i.ph-sun');
+                icons.forEach(icon => {
+                    if(temaSalvo === 'dark') icon.classList.replace('ph-moon', 'ph-sun');
+                });
+            }
+
+            // 2. Restaurar Sidebar
+            const sidebarSalva = localStorage.getItem('sidebar-collapsed');
+            if (sidebarSalva === 'true') {
+                document.getElementById('sidebar').classList.add('collapsed');
+            }
+
+            // 3. Alertas
+            const alerts = document.querySelectorAll('.alert');
             if (alerts.length > 0) {
                 setTimeout(() => {
                     alerts.forEach(alert => {
-                        // 1. Efeito visual: Torna transparente e sobe um pouco
                         alert.style.transition = 'all 0.5s ease';
                         alert.style.opacity = '0';
-                        alert.style.transform = 'translateY(-20px)'; // Efeito de saída para cima
-
-                        // 2. Remove do DOM (HTML) após a animação terminar (500ms)
-                        setTimeout(() => {
-                            alert.remove();
-                        }, 500);
+                        alert.style.transform = 'translateY(-20px)';
+                        setTimeout(() => alert.remove(), 500);
                     });
-                }, 5000); // Espera 5 segundos antes de começar
+                }, 5000);
             }
         });
-        
     </script>
 </body>
 </html>

@@ -63,7 +63,7 @@ class PlanejamentoService:
         """
         Sessao = ObterSessaoSqlServer()
         try:
-            Hoje = date.today() - timedelta(days=1) # Ajuste para pegar os CTCs do dia atual
+            Hoje = date.today() - timedelta(days=0) # Ajuste para pegar os CTCs do dia atual
             Inicio = datetime.combine(Hoje, time.min)
             Fim = datetime.combine(Hoje, time.max)
             
@@ -231,7 +231,7 @@ class PlanejamentoService:
                 'destino_uf': str(CtcEncontrado.uf_dest).strip(),
                 'peso': float(CtcEncontrado.peso or 0),
                 'volumes': int(CtcEncontrado.volumes or 0),
-                'valor': float(CtcEncontrado.valmerc or 0),
+                'valor': (CtcEncontrado.valmerc or 0),
                 'remetente': str(CtcEncontrado.remet_nome).strip(),
                 'destinatario': str(CtcEncontrado.dest_nome).strip()
             }

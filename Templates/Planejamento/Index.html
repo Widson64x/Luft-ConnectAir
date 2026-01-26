@@ -6,159 +6,178 @@
 {% include "Components/_ModalCtc.html" %}
 
 <style>
-    /* --- VARIÁVEIS DO TEMA --- */
+    /* --- CORREÇÃO DE LAYOUT (FIX DO CORTE) --- */
+    
+    /* 1. Resetamos o container pai da Base para ele não impor padding/scroll */
+    .conteudo-pagina {
+        padding: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        height: 100% !important;
+        overflow: hidden !important;
+        max-width: 100%; /* Garante que não vaze a largura */
+    }
+
+    /* 2. O Dashboard assume controle total do espaço */
+    .monitoring-dashboard {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        width: calc(100% - 195px); /* Ajuste se houver sidebar */
+        padding: 24px; /* O padding vem pra cá */
+        gap: 20px;
+        min-width: 0; /* O SEGREDO: Permite que o flex item encolha quando a sidebar abre */
+        overflow-x: hidden; /* Corta horizontalmente se vazar, mas o wrap evita isso */
+    }
+
+    /* --- CABEÇALHO FLEXÍVEL --- */
+    .dash-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center; /* Alinha verticalmente pelo centro */
+        flex-wrap: wrap;     /* PERMITE QUEBRA DE LINHA SE FICAR APERTADO */
+        gap: 16px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid var(--cor-borda);
+        flex-shrink: 0;      /* Não deixa o header ser esmagado verticalmente */
+    }
+
+    .header-title {
+        min-width: 0; /* Permite encolher o texto se necessário */
+    }
+
+    .header-title h2 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--cor-texto-principal);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 4px;
+        white-space: nowrap; /* Mantém em uma linha, mas o wrap do pai protege */
+    }
+    
+    .header-subtitle {
+        font-size: 0.9rem;
+        color: var(--text-muted);
+        font-weight: 500;
+        display: flex; align-items: center; gap: 8px;
+        white-space: nowrap;
+    }
+
+    /* --- BOTÃO (O CULPADO DO CORTE) --- */
+    .btn-action-primary {
+        background: var(--cor-texto-principal);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        text-decoration: none;
+        display: flex; align-items: center; gap: 10px;
+        transition: all 0.2s;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        white-space: nowrap; /* Texto não quebra */
+        flex-shrink: 0;      /* Botão não encolhe */
+    }
+    .btn-action-primary:hover {
+        transform: translateY(-2px);
+        background: #000;
+    }
+
+    /* --- KPIS (ADAPTÁVEIS) --- */
+    .kpi-grid {
+        display: grid;
+        /* auto-fit joga os cards pra baixo se faltar espaço */
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 20px;
+        flex-shrink: 0;
+    }
+    
+    /* Variáveis e Cards KPI (Mantidos iguais) */
     :root {
         --kpi-bg: var(--cor-fundo-painel);
         --table-header-bg: #f8fafc;
         --table-row-hover: rgba(var(--cor-primaria-rgb), 0.03);
-        --success-color: #10b981;
-        --warning-color: #f59e0b;
-        --danger-color: #ef4444;
-        --text-muted: #64748b;
+        --success-color: #10b981; --warning-color: #f59e0b; --danger-color: #ef4444; --text-muted: #64748b;
     }
-    
-    /* Layout Principal */
-    .monitoring-dashboard {
-        display: flex; flex-direction: column; gap: 20px;
-        height: calc(100vh - 100px);
-    }
-
-    /* --- CABEÇALHO --- */
-    .dash-header {
-        display: flex; justify-content: space-between; align-items: flex-end;
-        padding-bottom: 20px; border-bottom: 1px solid var(--cor-borda);
-    }
-    .header-title h2 {
-        font-size: 1.5rem; font-weight: 700; color: var(--cor-texto-principal);
-        display: flex; align-items: center; gap: 12px; margin-bottom: 6px;
-    }
-    .header-subtitle {
-        font-size: 0.9rem; color: var(--text-muted); font-weight: 500;
-        display: flex; align-items: center; gap: 8px;
-    }
-
-    /* Badge Ao Vivo */
-    .live-indicator {
-        display: inline-flex; align-items: center; gap: 6px;
-        background: rgba(16, 185, 129, 0.1); color: var(--success-color);
-        padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700;
-        border: 1px solid rgba(16, 185, 129, 0.2);
-    }
-    .live-dot {
-        width: 8px; height: 8px; background: var(--success-color); border-radius: 50%;
-        animation: pulse-green 2s infinite;
-    }
-    @keyframes pulse-green {
-        0% { transform: scale(0.95); opacity: 1; }
-        70% { transform: scale(1.4); opacity: 0; }
-        100% { transform: scale(0.95); opacity: 0; }
-    }
-
-    /* Botão Principal */
-    .btn-action-primary {
-        background: var(--cor-texto-principal); color: white; padding: 12px 20px;
-        border-radius: 8px; font-weight: 600; text-decoration: none;
-        display: flex; align-items: center; gap: 10px; transition: all 0.2s;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    .btn-action-primary:hover {
-        transform: translateY(-2px); background: #000;
-    }
-
-    /* --- KPIS --- */
-    .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
     .kpi-card {
         background: var(--kpi-bg); border: 1px solid var(--cor-borda);
         border-radius: 12px; padding: 20px; display: flex; align-items: center; gap: 16px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.02); transition: 0.2s;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.02);
     }
     .kpi-icon {
         width: 48px; height: 48px; border-radius: 10px;
-        display: flex; align-items: center; justify-content: center; font-size: 1.8rem;
+        display: flex; align-items: center; justify-content: center; font-size: 1.8rem; flex-shrink: 0;
     }
     .icon-blue { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
     .icon-orange { background: rgba(249, 115, 22, 0.1); color: #f97316; }
     .icon-green { background: rgba(16, 185, 129, 0.1); color: #10b981; }
-    
-    .kpi-info { display: flex; flex-direction: column; }
-    .kpi-label { font-size: 0.75rem; text-transform: uppercase; font-weight: 600; color: var(--text-muted); }
+    .kpi-info { display: flex; flex-direction: column; overflow: hidden; }
+    .kpi-label { font-size: 0.75rem; text-transform: uppercase; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
     .kpi-value { font-size: 1.4rem; font-weight: 700; color: var(--cor-texto-principal); margin-top: 2px; }
 
-    /* --- BARRA DE FERRAMENTAS (NOVO) --- */
+    /* --- TOOLBAR --- */
     .toolbar-container {
         display: flex; gap: 12px; align-items: center;
-        margin-bottom: -10px; /* Aproxima da tabela */
+        flex-wrap: wrap; /* Importante para telas menores */
+        flex-shrink: 0;
     }
-    .search-group {
-        position: relative; flex: 1; max-width: 400px;
-    }
-    .search-group i {
-        position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
-        color: var(--text-muted); pointer-events: none;
-    }
+    .search-group { position: relative; flex: 1; min-width: 250px; }
+    .search-group i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
     .input-filter {
-        width: 100%; padding: 10px 10px 10px 40px;
-        border: 1px solid var(--cor-borda); border-radius: 8px;
-        background: var(--cor-fundo-painel); color: var(--cor-texto-principal);
-        font-size: 0.9rem; outline: none; transition: border 0.2s;
+        width: 100%; padding: 10px 10px 10px 40px; border: 1px solid var(--cor-borda); border-radius: 8px;
+        background: var(--cor-fundo-painel); color: var(--cor-texto-principal); outline: none;
     }
-    .input-filter:focus { border-color: var(--cor-primaria); }
-
     .select-filter {
-        padding: 0 16px; height: 40px;
-        border: 1px solid var(--cor-borda); border-radius: 8px;
-        background: var(--cor-fundo-painel); color: var(--cor-texto-principal);
-        font-size: 0.85rem; outline: none; cursor: pointer;
+        padding: 0 16px; height: 38px; border: 1px solid var(--cor-borda); border-radius: 8px;
+        background: var(--cor-fundo-painel); color: var(--cor-texto-principal); cursor: pointer;
     }
 
-    /* --- TABELA --- */
+    /* --- TABELA (CONTAINER DE SCROLL ROBUSTO) --- */
     .table-container {
-        flex: 1; background: var(--cor-fundo-painel);
+        flex: 1; /* Ocupa o resto da altura vertical */
+        min-height: 0; /* Permite scroll interno */
+        background: var(--cor-fundo-painel);
         border: 1px solid var(--cor-borda); border-radius: 12px;
-        overflow: hidden; display: flex; flex-direction: column;
+        display: flex; flex-direction: column;
+        overflow: hidden; /* Corta bordas arredondadas */
         box-shadow: 0 4px 20px rgba(0,0,0,0.03);
     }
-    .table-scroll-area { flex: 1; overflow: auto; }
-    .flight-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; white-space: nowrap; }
-
-    /* Ordenação nos Headers */
-    .flight-table th {
-        background: var(--table-header-bg); color: var(--text-muted);
-        font-weight: 600; text-transform: uppercase; font-size: 0.75rem;
-        padding: 16px; text-align: left; position: sticky; top: 0; z-index: 10;
-        border-bottom: 1px solid var(--cor-borda);
-        cursor: pointer; user-select: none; transition: background 0.2s;
+    
+    .table-scroll-area {
+        flex: 1;
+        overflow: auto; /* Scroll aparece aqui */
+        width: 100%;
     }
-    .flight-table th:hover { background: #f1f5f9; color: var(--cor-primaria); }
-    .flight-table th i.sort-icon { margin-left: 5px; opacity: 0.3; font-size: 0.8rem; }
-    .flight-table th.sorted-asc i.sort-icon, 
-    .flight-table th.sorted-desc i.sort-icon { opacity: 1; color: var(--cor-primaria); }
 
+    .flight-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; white-space: nowrap; }
+    
+    .flight-table th {
+        background: var(--table-header-bg); padding: 16px; text-align: left;
+        position: sticky; top: 0; z-index: 10; border-bottom: 1px solid var(--cor-borda);
+        color: var(--text-muted); font-weight: 600; text-transform: uppercase; font-size: 0.75rem;
+        cursor: pointer;
+    }
     .flight-table td { padding: 14px 16px; border-bottom: 1px solid var(--cor-borda); color: var(--cor-texto-principal); vertical-align: middle; }
     .flight-table tr:hover td { background: var(--table-row-hover); }
 
-    /* Colunas Específicas */
+    /* Badge Ao Vivo */
+    .live-indicator { display: inline-flex; align-items: center; gap: 6px; background: rgba(16, 185, 129, 0.1); color: var(--success-color); padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; border: 1px solid rgba(16, 185, 129, 0.2); margin-left: 10px; }
+    .live-dot { width: 6px; height: 6px; background: var(--success-color); border-radius: 50%; animation: pulse-green 2s infinite; }
+
+    /* Classes Utilitárias Tabela */
     .col-ctc { font-family: 'Monaco', monospace; font-weight: 700; color: var(--cor-primaria); }
     .col-route { font-weight: 600; display: flex; align-items: center; gap: 6px; }
-    .col-route i { color: var(--text-muted); font-size: 0.8rem; }
     .col-money { font-family: 'Monaco', monospace; font-weight: 600; text-align: right; color: var(--success-color); }
-    
     .badge-prio { padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
-    .prio-urgent { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); }
-    .prio-normal { background: rgba(100, 116, 139, 0.1); color: #64748b; border: 1px solid rgba(100, 116, 139, 0.2); }
-
-    .btn-plan {
-        width: 34px; height: 34px; border-radius: 8px;
-        background: transparent; border: 1px solid var(--cor-borda); color: var(--text-muted);
-        display: flex; align-items: center; justify-content: center; transition: 0.2s; text-decoration: none;
-    }
-    .btn-plan:hover { background: var(--cor-primaria); color: white; border-color: var(--cor-primaria); transform: scale(1.05); }
-
+    .prio-urgent { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+    .prio-normal { background: rgba(100, 116, 139, 0.1); color: #64748b; }
+    .btn-plan { width: 32px; height: 32px; border-radius: 6px; background: transparent; border: 1px solid var(--cor-borda); color: var(--text-muted); display: flex; align-items: center; justify-content: center; text-decoration: none; transition: 0.2s; }
+    .btn-plan:hover { background: var(--cor-primaria); color: white; border-color: var(--cor-primaria); }
     .new-row { animation: flash-row 1.5s ease-out; }
+    .empty-state { text-align: center; padding: 40px; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; gap: 10px; }
     @keyframes flash-row { 0% { background-color: rgba(16, 185, 129, 0.2); } 100% { background-color: transparent; } }
-    
-    .empty-state { text-align: center; padding: 60px; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; gap: 10px; }
-    .empty-state i { font-size: 3rem; color: var(--cor-borda); }
+
 </style>
 
 <div class="monitoring-dashboard">
