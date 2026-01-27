@@ -31,7 +31,7 @@ COORDENADAS_UFS = {
 def Dashboard():
     return render_template('Planejamento/Index.html')
 
-@PlanejamentoBp.route('/API/CTCs-Hoje')
+@PlanejamentoBp.route('/API/Listar')
 @login_required
 def ApiCtcsHoje():
     Dados = PlanejamentoService.BuscarCtcsAereoHoje()
@@ -68,7 +68,8 @@ def MontarPlanejamento(filial, serie, ctc):
         DadosCtc['destino_uf'],
         DadosCtc['data_emissao_real'],
         filial,
-        ctc
+        ctc,
+        DadosCtc['tipo_carga']
     )
     
     # Unifica (Apenas memória, NÃO GRAVA AINDA)
@@ -110,13 +111,13 @@ def SalvarPlanejamento():
         
         # Recebe a lista completa de voos (rota)
         rota_completa = dados_front.get('rota_completa', []) 
-        
-        # ... (Busca CTC e Consolidações igual antes) ...
+
         DadosCtc = PlanejamentoService.ObterCtcDetalhado(filial, serie, ctc)
         CtcsCandidatos = PlanejamentoService.BuscarCtcsConsolidaveis(
             DadosCtc['origem_cidade'], DadosCtc['origem_uf'],
             DadosCtc['destino_cidade'], DadosCtc['destino_uf'],
-            DadosCtc['data_emissao_real'], filial, ctc
+            DadosCtc['data_emissao_real'], filial, ctc,
+            DadosCtc['tipo_carga']
         )
         DadosUnificados = PlanejamentoService.UnificarConsolidacao(DadosCtc, CtcsCandidatos)
         

@@ -138,8 +138,10 @@ celerybeat.pid
 .env
 .envrc
 .venv
+Logs
 env/
 venv/
+Logs/
 ENV/
 env.bak/
 venv.bak/

@@ -2,7 +2,8 @@ import math
 
 def Haversine(lat1, lon1, lat2, lon2):
     """
-    Calcula a distância em Km entre dois pontos geográficos.
+    Calcula a distância em Km entre dois pontos geográficos. Com base na fórmula Haversine.
+    Retorna 999999 se algum dos pontos for inválido. Utiliza das coordenadas em decimal.
     """
     if not lat1 or not lon1 or not lat2 or not lon2:
         return 999999 # Retorna infinito se faltar dados

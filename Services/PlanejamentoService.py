@@ -202,6 +202,7 @@ class PlanejamentoService:
     def ObterCtcDetalhado(Filial, Serie, Numero):
         """
         Captura detalhes completos do CTC a partir da Filial, Série e Número.
+        AGORA COM JOIN NA TABELA COMPLEMENTAR PARA PEGAR O TIPO DE CARGA.
         """
         Sessao = ObterSessaoSqlServer()
         try:
@@ -209,25 +210,37 @@ class PlanejamentoService:
             s = str(Serie).strip()
             n = str(Numero).strip()
 
-            CtcEncontrado = Sessao.query(CtcEsp).filter(
+            # 1. ALTERAÇÃO: Trazemos a tupla (CtcEsp, CtcEspCpl)
+            Query = Sessao.query(CtcEsp, CtcEspCpl).outerjoin(
+                CtcEspCpl, 
+                CtcEsp.filialctc == CtcEspCpl.filialctc
+            ).filter(
                 CtcEsp.filial == f, CtcEsp.seriectc == s, CtcEsp.filialctc == n
-            ).first()
+            )
+
+            Resultado = Query.first()
             
-            if not CtcEncontrado:
-                CtcEncontrado = Sessao.query(CtcEsp).filter(
+            # Tentativas de busca flexível (zeros à esquerda)
+            if not Resultado:
+                Query = Sessao.query(CtcEsp, CtcEspCpl).outerjoin(CtcEspCpl, CtcEsp.filialctc == CtcEspCpl.filialctc).filter(
                     CtcEsp.filial == f, CtcEsp.seriectc == s, CtcEsp.filialctc == n.lstrip('0')
-                ).first()
+                )
+                Resultado = Query.first()
 
-            if not CtcEncontrado:
-                 CtcEncontrado = Sessao.query(CtcEsp).filter(
+            if not Resultado:
+                 Query = Sessao.query(CtcEsp, CtcEspCpl).outerjoin(CtcEspCpl, CtcEsp.filialctc == CtcEspCpl.filialctc).filter(
                     CtcEsp.filial == f, CtcEsp.seriectc == s, CtcEsp.filialctc == n.zfill(10)
-                ).first()
+                )
+                 Resultado = Query.first()
 
-            if not CtcEncontrado: return None
+            if not Resultado: return None
             
+            # Desempacota os objetos
+            CtcEncontrado, CplEncontrado = Resultado
+
             DataBase = CtcEncontrado.data 
             HoraFinal = time(0, 0)
-            str_hora = "00:00" # Valor Padrão
+            str_hora = "00:00"
 
             if CtcEncontrado.hora:
                 try:
@@ -235,18 +248,21 @@ class PlanejamentoService:
                     h_str = h_str.zfill(4)
                     if len(h_str) >= 4:
                         HoraFinal = datetime.strptime(h_str[:4], '%H%M').time()
-                        str_hora = f"{h_str[:2]}:{h_str[2:]}" # Formata HH:MM
+                        str_hora = f"{h_str[:2]}:{h_str[2:]}"
                 except: pass
 
             DataEmissaoReal = datetime.combine(DataBase.date(), HoraFinal)
             DataBuscaVoos = DataEmissaoReal + timedelta(hours=10)
+
+            # 2. Captura o Tipo de Carga
+            TipoCargaValor = CplEncontrado.TipoCarga if CplEncontrado else None
 
             return {
                 'filial': CtcEncontrado.filial,
                 'serie': CtcEncontrado.seriectc,
                 'ctc': CtcEncontrado.filialctc,
                 'data_emissao_real': DataEmissaoReal,
-                'hora_formatada': str_hora, # <--- CAMPO PARA O REGISTRO DO PRINCIPAL
+                'hora_formatada': str_hora,
                 'data_busca': DataBuscaVoos,
                 'origem_cidade': str(CtcEncontrado.cidade_orig).strip(),
                 'origem_uf': str(CtcEncontrado.uf_orig).strip(),
@@ -256,18 +272,27 @@ class PlanejamentoService:
                 'volumes': int(CtcEncontrado.volumes or 0),
                 'valor': (CtcEncontrado.valmerc or 0),
                 'remetente': str(CtcEncontrado.remet_nome).strip(),
-                'destinatario': str(CtcEncontrado.dest_nome).strip()
+                'destinatario': str(CtcEncontrado.dest_nome).strip(),
+                
+                # 3. CAMPO NOVO ESSENCIAL
+                'tipo_carga': TipoCargaValor 
             }
         finally:
             Sessao.close()
 
     @staticmethod
-    def BuscarCtcsConsolidaveis(cidade_origem, uf_origem, cidade_destino, uf_destino, data_base, filial_excluir=None, ctc_excluir=None):
+    def BuscarCtcsConsolidaveis(cidade_origem, uf_origem, cidade_destino, uf_destino, data_base, filial_excluir=None, ctc_excluir=None, tipo_carga=None):
         """
-        Busca todos os CTCs aéreos do mesmo dia que compartilham a mesma origem e destino.
+        Busca todos os CTCs aéreos do mesmo dia, mesma rota e MESMO TIPO DE CARGA.
         """
         Sessao = ObterSessaoSqlServer()
         try:
+            print(f"🔎 INICIANDO BUSCA DE CONSOLIDAÇÃO")
+            print(f"   📅 Data Base: {data_base}")
+            print(f"   🏙️ CTC: {ctc_excluir}")
+            print(f"   🚩 Rota: {cidade_origem}/{uf_origem} -> {cidade_destino}/{uf_destino}")
+            print(f"   📦 Tipo Carga Exigido: [{tipo_carga}]")
+
             if isinstance(data_base, datetime): data_base = data_base.date()
             Inicio = datetime.combine(data_base, time.min)
             Fim = datetime.combine(data_base, time.max)
@@ -277,7 +302,11 @@ class PlanejamentoService:
             cidade_destino = str(cidade_destino).strip().upper()
             uf_destino = str(uf_destino).strip().upper()
             
-            Query = Sessao.query(CtcEsp).filter(
+            # ALTERADO: Trazemos (CtcEsp, CtcEspCpl) para poder dar print no tipo
+            Query = Sessao.query(CtcEsp, CtcEspCpl).outerjoin(
+                CtcEspCpl, 
+                CtcEsp.filialctc == CtcEspCpl.filialctc
+            ).filter(
                 CtcEsp.data >= Inicio, CtcEsp.data <= Fim,
                 CtcEsp.tipodoc != 'COB', CtcEsp.modal.like('AEREO%'),
                 func.upper(func.trim(CtcEsp.cidade_orig)) == cidade_origem,
@@ -286,24 +315,36 @@ class PlanejamentoService:
                 func.upper(func.trim(CtcEsp.uf_dest)) == uf_destino
             )
             
-            if filial_excluir and ctc_excluir:
+            # Filtro do Tipo de Carga
+            if tipo_carga:
+                Query = Query.filter(CtcEspCpl.TipoCarga == str(tipo_carga).strip())
+            
+            if filial_excluir and ctc_excluir:  
                 Query = Query.filter(~((CtcEsp.filial == str(filial_excluir).strip()) & (CtcEsp.filialctc == str(ctc_excluir).strip())))
             
             Resultados = Query.order_by(desc(CtcEsp.data), desc(CtcEsp.hora)).all()
             
+            print(f"   🔢 Encontrados: {len(Resultados)} candidatos potenciais.")
+
             ListaConsolidados = []
-            for c in Resultados:
+            
+            # ALTERADO: Desempacota c (CtcEsp) e cpl (CtcEspCpl)
+            for c, cpl in Resultados:
+                
+                # --- DEBUG: MOSTRA O QUE ESTÁ SENDO PROCESSADO ---
+                tipo_candidato = cpl.TipoCarga if cpl else "N/A"
+                print(f"      👉 Candidato: {c.filialctc} | Tipo: {tipo_candidato} | Status: {'✅ OK' if tipo_candidato == tipo_carga else '❌ ERRO (Não devia estar aqui)'}")
+                # --------------------------------------------------
+
                 def to_float(val): return float(val) if val else 0.0
                 def to_int(val): return int(val) if val else 0
                 def to_str(val): return str(val).strip() if val else ''
                 
-                # --- LÓGICA DE HORA ---
                 str_hora = "00:00"
                 if c.hora:
                     h_raw = str(c.hora).strip().replace(':', '').zfill(4)
                     if len(h_raw) >= 4:
                         str_hora = f"{h_raw[:2]}:{h_raw[2:]}"
-                # ----------------------
 
                 ListaConsolidados.append({
                     'filial': to_str(c.filial),
@@ -314,13 +355,13 @@ class PlanejamentoService:
                     'val_mercadoria': to_float(c.valmerc),
                     'remetente': to_str(c.remet_nome),
                     'destinatario': to_str(c.dest_nome),
-                    
-                    # Dados extras para persistência
                     'data_emissao': c.data,
-                    'hora_emissao': str_hora,  # <--- AGORA ESTÁ AQUI
+                    'hora_emissao': str_hora,
                     'origem_cidade': to_str(c.cidade_orig),
-                    'destino_cidade': to_str(c.cidade_dest)
+                    'destino_cidade': to_str(c.cidade_dest),
+                    'tipo_carga': tipo_candidato # Opcional: passar pro front se quiser ver lá
                 })
+            
             return ListaConsolidados
         finally:
             Sessao.close()
@@ -333,7 +374,8 @@ class PlanejamentoService:
         """
         if not lista_candidatos:
             ctc_principal['is_consolidado'] = False
-            ctc_principal['lista_docs'] = [ctc_principal]
+            # CORREÇÃO: Use .copy() para quebrar a referência circular
+            ctc_principal['lista_docs'] = [ctc_principal.copy()] 
             ctc_principal['qtd_docs'] = 1
             return ctc_principal
 
@@ -347,7 +389,8 @@ class PlanejamentoService:
             'peso': float(ctc_principal['peso']),
             'valor': float(ctc_principal['valor']),
             'remetente': ctc_principal['remetente'],
-            'destinatario': ctc_principal['destinatario']
+            'destinatario': ctc_principal['destinatario'],
+            'tipo_carga': ctc_principal['tipo_carga']
         }]
         
         total_volumes = docs[0]['volumes']
@@ -363,7 +406,8 @@ class PlanejamentoService:
                 'peso': float(c['peso_taxado']),
                 'valor': float(c['val_mercadoria']),
                 'remetente': c['remetente'],
-                'destinatario': c['destinatario']
+                'destinatario': c['destinatario'],
+                'tipo_carga': c['tipo_carga']
             }
             docs.append(c_doc)
             total_volumes += c_doc['volumes']

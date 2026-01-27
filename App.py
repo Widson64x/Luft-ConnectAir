@@ -7,6 +7,7 @@ from Models.SQL_SERVER.Usuario import Usuario, UsuarioGrupo
 from Models.UsuarioModel import UsuarioSistema
 from Configuracoes import ConfiguracaoAtual # Importação da Configuração
 from Services.VersaoService import VersaoService
+from Services.LogService import LogService
 # Importação das Rotas e Modelos
 from Routes.Auth import AuthBp
 from Routes.Malha import MalhaBp
@@ -15,6 +16,7 @@ from Routes.Cidades import CidadeBp
 from Routes.Escalas import EscalasBp
 from Routes.Planejamento import PlanejamentoBp
 from Routes.Acompanhamento import AcompanhamentoBP
+
 
 # --- REGISTRO DE ROTAS (BLUEPRINTS) ---
 # Pega o prefixo definido no .env ou padrão (ex: /T-FlightOps)
@@ -25,6 +27,9 @@ app = Flask(__name__,
             static_folder='Static')
 
 app.secret_key = 'CHAVE_SUPER_SECRETA_DO_PROJETO_VOOS' # Trocar por algo seguro depois
+
+LogService.Inicializar()
+LogService.Info("App", f"Iniciando aplicação no ambiente: {os.getenv('AMBIENTE_APP', 'DEV')}")
 
 # Configuração do Flask-Login
 GerenciadorLogin = LoginManager()
@@ -39,29 +44,22 @@ def InjetarDadosGlobais():
 
 @GerenciadorLogin.user_loader
 def CarregarUsuario(UserId):
-    """
-    Recarrega o usuário a partir do ID armazenado na sessão (neste caso, o Login do AD).
-    Busca dados atualizados no SQL Server a cada requisição.
-    """
     Sessao = ObterSessaoSqlServer()
     UsuarioEncontrado = None
 
     try:
-        # Busca Usuário + Grupo fazendo um JOIN
-        # UserId aqui é o Login (ex: 'joao.silva') que salvamos no cookie
+        # Log de debug para rastrear a persistência da sessão (opcional, bom para dev)
+        # LogService.Debug("App.UserLoader", f"Recarregando usuário: {UserId}")
+
         Resultado = Sessao.query(Usuario, UsuarioGrupo)\
             .outerjoin(UsuarioGrupo, Usuario.codigo_usuariogrupo == UsuarioGrupo.codigo_usuariogrupo)\
             .filter(Usuario.Login_Usuario == UserId)\
             .first()
 
         if Resultado:
-            # Desempacota a tupla retornada pela query
             DadosUsuario, DadosGrupo = Resultado
-            
-            # Trata caso o usuário esteja sem grupo vinculado
             NomeGrupo = DadosGrupo.Sigla_UsuarioGrupo if DadosGrupo else "SEM_GRUPO"
 
-            # Cria o objeto que ficará disponível em 'current_user'
             UsuarioEncontrado = UsuarioSistema(
                 Login=DadosUsuario.Login_Usuario,
                 Nome=DadosUsuario.Nome_Usuario,
@@ -71,18 +69,15 @@ def CarregarUsuario(UserId):
             )
             
     except Exception as Erro:
-        print(f"⚠️ Erro ao recarregar usuário do banco: {Erro}")
-        # Em caso de erro de banco, retornamos None para forçar o logout por segurança
+        # AQUI O LOG É CRÍTICO
+        LogService.Error("App.UserLoader", f"Falha crítica ao recarregar usuário {UserId}", Erro)
         return None
     
     finally:
-        # CRÍTICO: Sempre fechar a sessão para não travar o SQL Server de produção
         if Sessao:
             Sessao.close()
 
     return UsuarioEncontrado
-
-
 
 # O Auth geralmente fica separado, ex: /T-FlightOps/auth
 app.register_blueprint(AuthBp, url_prefix=f'{Prefix}/auth')
