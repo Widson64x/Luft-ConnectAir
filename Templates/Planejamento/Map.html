@@ -162,7 +162,7 @@
 
 <script>
     const dadosEstados = {{ Dados | tojson | safe }};
-    const ROTA_BASE = "{{ url_for('Planejamento.MontarPlanejamento', filial='__FIL__', serie='__SER__', ctc='__NUM__') }}";
+    const URL_BASE_MONTAR = "{{ url_for('Planejamento.MontarPlanejamento', filial='__FIL__', serie='__SER__', ctc='__NUM__') }}";
 
     const fmtShortMoney = (val) => {
         if (val >= 1000000) return 'R$ ' + (val / 1000000).toFixed(1).replace('.', ',') + 'M';
@@ -224,7 +224,7 @@
             const classeCard = isUrg ? 'urgente' : 'normal';
             const badgeHtml = isUrg ? `<span class="badge-urg"><i class="bi bi-exclamation-triangle"></i> URGENTE</span>` : ``;
             
-            let urlFinal = ROTA_BASE
+            let urlFinal = URL_BASE_MONTAR
                 .replace('__FIL__', c.filial)
                 .replace('__SER__', c.serie)
                 .replace('__NUM__', c.ctc);
