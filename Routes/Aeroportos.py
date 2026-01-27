@@ -3,6 +3,7 @@ from flask_login import login_required, current_user
 from datetime import datetime
 # Importa a CLASSE do Serviço agora, não as funções soltas
 from Services.AeroportosService import AeroportoService
+from Services.LogService import LogService # <--- Import Log
 
 AeroportoBp = Blueprint('Aeroporto', __name__)
 
@@ -14,6 +15,7 @@ def ApiListarSimples():
         Dados = AeroportoService.ListarTodosParaSelect()
         return jsonify(Dados)
     except Exception as e:
+        LogService.Error("Route.Aeroportos", "Erro na API Listar-Simples", e)
         return jsonify([]), 500
 
 @AeroportoBp.route('/Aeroportos/Gerenciar', methods=['GET', 'POST'])
@@ -26,6 +28,8 @@ def Gerenciar():
         # --- Upload Inicial ---
         if 'arquivo_csv' in request.files:
             Arquivo = request.files['arquivo_csv']
+            LogService.Info("Route.Aeroportos", f"Usuário {current_user.Nome} enviou arquivo: {Arquivo.filename}")
+            
             if Arquivo.filename == '':
                 flash('Selecione um arquivo .csv', 'warning')
             else:
@@ -34,10 +38,12 @@ def Gerenciar():
                 
                 if not Sucesso:
                     flash(Info, 'danger')
+                    LogService.Warning("Route.Aeroportos", f"Falha na análise inicial: {Info}")
                 else:
                     if Info['conflito']:
                         ModalConfirmacao = True
                         DadosConfirmacao = Info
+                        LogService.Info("Route.Aeroportos", "Conflito detectado, solicitando confirmação ao usuário.")
                     else:
                         # Chamada corrigida
                         Ok, Msg = AeroportoService.ProcessarAeroportosFinal(
@@ -53,6 +59,7 @@ def Gerenciar():
 
         # --- Confirmação do Modal ---
         elif 'confirmar_substituicao' in request.form:
+            LogService.Info("Route.Aeroportos", f"Usuário {current_user.Nome} confirmou substituição de base.")
             CaminhoTemp = request.form.get('caminho_temp')
             NomeOriginal = request.form.get('nome_arquivo')
             MesStr = request.form.get('mes_ref') # Vem como 'YYYY-MM-DD'
@@ -83,6 +90,7 @@ def Gerenciar():
 @AeroportoBp.route('/Aeroportos/Excluir/<int:id_remessa>')
 @login_required
 def Excluir(id_remessa):
+    LogService.Info("Route.Aeroportos", f"Usuário {current_user.Nome} solicitou exclusão da remessa {id_remessa}")
     # Chamada corrigida
     Sucesso, Mensagem = AeroportoService.ExcluirRemessaAeroporto(id_remessa)
     if Sucesso: flash(Mensagem, 'info')

@@ -7,6 +7,7 @@ from Models.POSTGRES.Aeroporto import Aeroporto
 from Models.POSTGRES.MalhaAerea import RemessaMalha, VooMalha
 from Utils.Formatadores import PadronizarData
 from Configuracoes import ConfiguracaoBase
+from Services.LogService import LogService  # <--- Import Adicionado
 import networkx as nx
 
 DIR_TEMP = ConfiguracaoBase.DIR_TEMP
@@ -21,7 +22,11 @@ class MalhaService:
     def _GarantirDiretorio():
         """Garante a existência do diretório temporário para processamento de arquivos."""
         if not os.path.exists(MalhaService.DIR_TEMP):
-            os.makedirs(MalhaService.DIR_TEMP)
+            try:
+                os.makedirs(MalhaService.DIR_TEMP)
+                LogService.Debug("MalhaService", f"Diretório temporário criado: {MalhaService.DIR_TEMP}")
+            except Exception as e:
+                LogService.Error("MalhaService", "Falha ao criar diretório temporário", e)
 
     # --- MÉTODOS DE GESTÃO (CRUD) ---
 
@@ -43,10 +48,14 @@ class MalhaService:
             if RemessaAlvo:
                 Sessao.delete(RemessaAlvo)
                 Sessao.commit()
+                LogService.Info("MalhaService", f"Remessa ID {id_remessa} excluída com sucesso.")
                 return True, "Remessa excluída com sucesso."
+            
+            LogService.Warning("MalhaService", f"Tentativa de excluir remessa inexistente ID {id_remessa}.")
             return False, "Remessa não encontrada."
         except Exception as e:
             Sessao.rollback()
+            LogService.Error("MalhaService", f"Erro técnico ao excluir remessa ID {id_remessa}", e)
             return False, f"Erro técnico ao excluir: {e}"
         finally:
             Sessao.close()
@@ -58,6 +67,7 @@ class MalhaService:
         Retorna metadados para confirmação do usuário.
         """
         try:
+            LogService.Info("MalhaService", f"Iniciando análise do arquivo: {file_storage.filename}")
             MalhaService._GarantirDiretorio()
             CaminhoTemp = os.path.join(MalhaService.DIR_TEMP, file_storage.filename)
             file_storage.save(CaminhoTemp)
@@ -67,10 +77,12 @@ class MalhaService:
             
             ColunaData = next((col for col in ['DIA', 'DATA'] if col in Df.columns), None)
             if not ColunaData:
+                LogService.Warning("MalhaService", "Arquivo rejeitado: Coluna de DATA não encontrada.")
                 return False, "Coluna de DATA não encontrada no arquivo."
 
             PrimeiraData = PadronizarData(Df[ColunaData].iloc[0])
             if not PrimeiraData:
+                LogService.Warning("MalhaService", "Arquivo rejeitado: Falha ao analisar formato de data.")
                 return False, "Falha ao analisar formato de data."
             
             # Define o primeiro dia do mês como referência
@@ -82,6 +94,7 @@ class MalhaService:
                 Anterior = Sessao.query(RemessaMalha).filter_by(MesReferencia=DataRef, Ativo=True).first()
                 if Anterior:
                     ExisteConflito = True
+                    LogService.Info("MalhaService", f"Conflito detectado para mês referência: {DataRef}")
             finally:
                 Sessao.close()
                 
@@ -92,6 +105,7 @@ class MalhaService:
                 'conflito': ExisteConflito
             }
         except Exception as e:
+            LogService.Error("MalhaService", "Exceção durante análise do arquivo", e)
             return False, f"Exceção durante análise do arquivo: {e}"
 
     @staticmethod
@@ -100,6 +114,7 @@ class MalhaService:
         Processa o arquivo validado e persiste os voos no banco de dados.
         Realiza a substituição de malha anterior caso necessário.
         """
+        LogService.Info("MalhaService", f"Iniciando processamento final ({tipo_acao}) para {data_ref}")
         Sessao = ObterSessaoPostgres()
         try:
             Df = pd.read_excel(caminho_arquivo, engine='openpyxl')
@@ -155,6 +170,8 @@ class MalhaService:
             Sessao.bulk_save_objects(ListaVoos)
             Sessao.commit()
             
+            LogService.Info("MalhaService", f"Malha processada com sucesso. {len(ListaVoos)} voos importados.")
+            
             if os.path.exists(caminho_arquivo):
                 os.remove(caminho_arquivo)
                 
@@ -162,6 +179,7 @@ class MalhaService:
 
         except Exception as e:
             Sessao.rollback()
+            LogService.Error("MalhaService", "Erro de persistência na Malha", e)
             return False, f"Erro de persistência: {e}"
         finally:
             Sessao.close()
@@ -182,7 +200,8 @@ class MalhaService:
                 
             return Total or 0
         except Exception as e:
-            print(f"[MalhaService] Erro ao obter total de voos: {e}")
+            # Substituído print por LogService
+            LogService.Error("MalhaService", "Erro ao obter total de voos", e)
             return 0
         finally:
             Sessao.close()
@@ -197,6 +216,8 @@ class MalhaService:
         """
         Sessao = ObterSessaoPostgres()
         try:
+            LogService.Debug("MalhaService", f"Buscando rotas: {data_inicio} até {data_fim} | {origem_iata}->{destino_iata} | Voo: {numero_voo}")
+            
             FiltroDataInicio = data_inicio.date() if isinstance(data_inicio, datetime) else data_inicio
             FiltroDataFim = data_fim.date() if isinstance(data_fim, datetime) else data_fim
 
@@ -248,6 +269,7 @@ class MalhaService:
 
             # Algoritmo de Busca de Caminhos
             if not G.has_node(origem_iata) or not G.has_node(destino_iata):
+                LogService.Debug("MalhaService", "Origem ou Destino não encontrados no grafo da malha.")
                 return []
                 
             try:
@@ -281,7 +303,8 @@ class MalhaService:
                 return MalhaService._FormatarListaRotas(MelhorRota, DadosAeroportos, Tipo)
                         
             except Exception as e:
-                print(f"[MalhaService] Erro no algoritmo de grafo: {e}")
+                # Substituído print por LogService
+                LogService.Error("MalhaService", "Erro no algoritmo de grafo", e)
                 return []
 
         finally:

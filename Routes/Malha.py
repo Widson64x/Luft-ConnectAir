@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, render_template, request, redirect, url_fo
 from flask_login import login_required, current_user
 from datetime import datetime
 from Services.MalhaService import MalhaService
+from Services.LogService import LogService # <--- Import Adicionado
 MalhaBp = Blueprint('Malha', __name__)
 
 @MalhaBp.route('/Malha/API/Rotas')
@@ -21,11 +22,14 @@ def ApiRotas():
         DataIni = datetime.strptime(Inicio, '%Y-%m-%d').date()
         DataFim = datetime.strptime(Fim, '%Y-%m-%d').date()
         
+        LogService.Info("Routes.Malha", f"API Rota Solicitada por {current_user.Nome}: {Origem}->{Destino} ({Inicio} a {Fim})")
+
         # Chama a busca inteligente passando o novo parâmetro
         Dados = MalhaService.BuscarRotasInteligentes(DataIni, DataFim, Origem, Destino, NumeroVoo)
         
         return jsonify(Dados)
     except Exception as e:
+        LogService.Error("Routes.Malha", "Erro na API de Rotas", e)
         return jsonify({'erro': str(e)}), 500
 
 @MalhaBp.route('/Malha/Gerenciar', methods=['GET', 'POST'])
@@ -42,13 +46,16 @@ def Gerenciar():
             if Arquivo.filename == '':
                 flash('Selecione um arquivo.', 'warning')
             else:
+                LogService.Info("Routes.Malha", f"Upload de Malha iniciado por {current_user.Nome}")
                 Sucesso, Info = MalhaService.AnalisarArquivo(Arquivo)
                 
                 if not Sucesso:
+                    LogService.Warning("Routes.Malha", f"Upload falhou na análise: {Info}")
                     flash(Info, 'danger')
                 else:
                     # Se detectou conflito (já existe malha ativa), abre o Modal
                     if Info['conflito']:
+                        LogService.Info("Routes.Malha", "Conflito de malha detectado. Aguardando confirmação do usuário.")
                         ModalConfirmacao = True
                         DadosConfirmacao = Info
                     else:
@@ -77,6 +84,7 @@ def Gerenciar():
                 MesStr = MesStr.split(' ')[0]
             
             try:
+                LogService.Info("Routes.Malha", f"Usuário {current_user.Nome} confirmou substituição de malha.")
                 # Converte string para objeto date
                 DataRef = datetime.strptime(MesStr, '%Y-%m-%d').date()
                 
@@ -91,6 +99,7 @@ def Gerenciar():
                 else: flash(Msg, 'danger')
                 
             except Exception as e:
+                LogService.Error("Routes.Malha", "Erro ao processar data na confirmação", e)
                 flash(f"Erro ao processar data: {e}", 'danger')
 
             return redirect(url_for('Malha.Gerenciar'))
@@ -105,6 +114,7 @@ def Gerenciar():
 @MalhaBp.route('/Malha/Excluir/<int:id_remessa>')
 @login_required
 def Excluir(id_remessa):
+    LogService.Warning("Routes.Malha", f"Solicitação de exclusão de remessa {id_remessa} por {current_user.Nome}")
     Sucesso, Mensagem = MalhaService.ExcluirRemessa(id_remessa)
     if Sucesso: flash(Mensagem, 'info')
     else: flash(Mensagem, 'danger')

@@ -4,6 +4,7 @@ from sqlalchemy import desc, func
 from Conexoes import ObterSessaoSqlServer, ObterSessaoPostgres
 from Models.SQL_SERVER.Ctc import CtcEsp, CtcEspCpl
 from Models.POSTGRES.Planejamento import PlanejamentoCabecalho, PlanejamentoItem, PlanejamentoTrecho
+from Services.LogService import LogService 
 
 class PlanejamentoService:
     """
@@ -37,7 +38,9 @@ class PlanejamentoService:
                     CtcEsp.filialctc == n.lstrip('0')
                 ).first()
 
-            if not c: return None
+            if not c: 
+                LogService.Warning("PlanejamentoService", f"ObterCtcCompleto: CTC não encontrado {f}-{s}-{n}")
+                return None
 
             # Serializa TODAS as colunas
             dados_completos = {}
@@ -50,8 +53,12 @@ class PlanejamentoService:
                 elif valor is None:
                     valor = ""
                 dados_completos[coluna.name] = valor
-                
+            
+            LogService.Debug("PlanejamentoService", f"Detalhes recuperados para {f}-{s}-{n}")
             return dados_completos
+        except Exception as e:
+            LogService.Error("PlanejamentoService", "Erro em ObterCtcCompleto", e)
+            return None
         finally:
             Sessao.close()
 
@@ -66,8 +73,10 @@ class PlanejamentoService:
         SessaoPG = ObterSessaoPostgres() 
         
         try:
+            LogService.Debug("PlanejamentoService", "Iniciando busca de CTCs Aéreos de Hoje/Ontem...")
+            
             # 1. BUSCA DADOS NO SQL SERVER (CTCs DO DIA) + JOIN COM CPL
-            Hoje = date.today() - timedelta(days=1) 
+            Hoje = date.today() - timedelta(days=0) 
             Inicio = datetime.combine(Hoje, time.min)
             Fim = datetime.combine(Hoje, time.max)
             
@@ -78,12 +87,15 @@ class PlanejamentoService:
                 CtcEsp.data >= Inicio,
                 CtcEsp.data <= Fim,
                 CtcEsp.tipodoc != 'COB',
-                CtcEsp.modal.like('AEREO%')
+                CtcEsp.modal.like('AEREO%'),
+                CtcEspCpl.StatusCTC != 'CTC CANCELADO' # Exclui CTCs cancelados
             ).order_by(
                 desc(CtcEsp.data),
                 desc(CtcEsp.hora)
             ).all()
 
+            LogService.Info("PlanejamentoService", f"Encontrados {len(Resultados)} CTCs no SQL Server.")
+            LogService.Debug("PlanejamentoService", f"Os CTCs de tipo 'COB' ou modal diferente de 'AÉREO' foram excluídos.")
             # 2. BUSCA CACHE DE PLANEJAMENTOS NO POSTGRES
             rows_pg = []
             if SessaoPG:
@@ -99,7 +111,7 @@ class PlanejamentoService:
                         PlanejamentoItem.IdPlanejamento == PlanejamentoCabecalho.IdPlanejamento
                     ).all()
                 except Exception as e:
-                    print(f"⚠️ Erro ao consultar Postgres (Cache Planejamento): {e}")
+                    LogService.Error("PlanejamentoService", "Erro ao consultar Cache Postgres (Planejamento)", e)
 
             mapa_planejamento = {}
             for row in rows_pg:
@@ -194,6 +206,9 @@ class PlanejamentoService:
             
             return ListaCtcs
 
+        except Exception as e:
+            LogService.Error("PlanejamentoService", "Falha crítica em BuscarCtcsAereoHoje", e)
+            return []
         finally:
             SessaoSQL.close()
             if SessaoPG: SessaoPG.close()
@@ -233,7 +248,9 @@ class PlanejamentoService:
                 )
                  Resultado = Query.first()
 
-            if not Resultado: return None
+            if not Resultado: 
+                LogService.Warning("PlanejamentoService", f"CTC Detalhado não encontrado: {f}-{s}-{n}")
+                return None
             
             # Desempacota os objetos
             CtcEncontrado, CplEncontrado = Resultado
@@ -273,10 +290,11 @@ class PlanejamentoService:
                 'valor': (CtcEncontrado.valmerc or 0),
                 'remetente': str(CtcEncontrado.remet_nome).strip(),
                 'destinatario': str(CtcEncontrado.dest_nome).strip(),
-                
-                # 3. CAMPO NOVO ESSENCIAL
                 'tipo_carga': TipoCargaValor 
             }
+        except Exception as e:
+            LogService.Error("PlanejamentoService", "Erro em ObterCtcDetalhado", e)
+            return None
         finally:
             Sessao.close()
 
@@ -287,11 +305,8 @@ class PlanejamentoService:
         """
         Sessao = ObterSessaoSqlServer()
         try:
-            print(f"🔎 INICIANDO BUSCA DE CONSOLIDAÇÃO")
-            print(f"   📅 Data Base: {data_base}")
-            print(f"   🏙️ CTC: {ctc_excluir}")
-            print(f"   🚩 Rota: {cidade_origem}/{uf_origem} -> {cidade_destino}/{uf_destino}")
-            print(f"   📦 Tipo Carga Exigido: [{tipo_carga}]")
+            # Logs substituindo prints
+            LogService.Debug("PlanejamentoService", f"Iniciando busca consolidação. Rota: {cidade_origem}/{uf_origem} -> {cidade_destino}/{uf_destino}, TipoCarga: {tipo_carga}")
 
             if isinstance(data_base, datetime): data_base = data_base.date()
             Inicio = datetime.combine(data_base, time.min)
@@ -324,17 +339,14 @@ class PlanejamentoService:
             
             Resultados = Query.order_by(desc(CtcEsp.data), desc(CtcEsp.hora)).all()
             
-            print(f"   🔢 Encontrados: {len(Resultados)} candidatos potenciais.")
+            LogService.Info("PlanejamentoService", f"Encontrados {len(Resultados)} candidatos para consolidação na rota {cidade_origem}-{cidade_destino}.")
 
             ListaConsolidados = []
             
-            # ALTERADO: Desempacota c (CtcEsp) e cpl (CtcEspCpl)
             for c, cpl in Resultados:
-                
-                # --- DEBUG: MOSTRA O QUE ESTÁ SENDO PROCESSADO ---
                 tipo_candidato = cpl.TipoCarga if cpl else "N/A"
-                print(f"      👉 Candidato: {c.filialctc} | Tipo: {tipo_candidato} | Status: {'✅ OK' if tipo_candidato == tipo_carga else '❌ ERRO (Não devia estar aqui)'}")
-                # --------------------------------------------------
+                # Log Debug opcional
+                # LogService.Debug("PlanejamentoService", f"Candidato: {c.filialctc} | Tipo: {tipo_candidato}")
 
                 def to_float(val): return float(val) if val else 0.0
                 def to_int(val): return int(val) if val else 0
@@ -359,10 +371,13 @@ class PlanejamentoService:
                     'hora_emissao': str_hora,
                     'origem_cidade': to_str(c.cidade_orig),
                     'destino_cidade': to_str(c.cidade_dest),
-                    'tipo_carga': tipo_candidato # Opcional: passar pro front se quiser ver lá
+                    'tipo_carga': tipo_candidato
                 })
             
             return ListaConsolidados
+        except Exception as e:
+            LogService.Error("PlanejamentoService", "Erro em BuscarCtcsConsolidaveis", e)
+            return []
         finally:
             Sessao.close()
 
@@ -372,58 +387,62 @@ class PlanejamentoService:
         Recebe o CTC Principal e a Lista de Candidatos.
         Retorna um objeto 'Virtual' (Lote) somando volumes, pesos e valores.
         """
-        if not lista_candidatos:
-            ctc_principal['is_consolidado'] = False
-            # CORREÇÃO: Use .copy() para quebrar a referência circular
-            ctc_principal['lista_docs'] = [ctc_principal.copy()] 
-            ctc_principal['qtd_docs'] = 1
-            return ctc_principal
+        try:
+            if not lista_candidatos:
+                ctc_principal['is_consolidado'] = False
+                ctc_principal['lista_docs'] = [ctc_principal.copy()] 
+                ctc_principal['qtd_docs'] = 1
+                return ctc_principal
 
-        unificado = ctc_principal.copy()
-        
-        docs = [{
-            'filial': ctc_principal['filial'],
-            'serie': ctc_principal['serie'],
-            'ctc': ctc_principal['ctc'],
-            'volumes': int(ctc_principal['volumes']),
-            'peso': float(ctc_principal['peso']),
-            'valor': float(ctc_principal['valor']),
-            'remetente': ctc_principal['remetente'],
-            'destinatario': ctc_principal['destinatario'],
-            'tipo_carga': ctc_principal['tipo_carga']
-        }]
-        
-        total_volumes = docs[0]['volumes']
-        total_peso = docs[0]['peso']
-        total_valor = docs[0]['valor']
+            unificado = ctc_principal.copy()
+            
+            docs = [{
+                'filial': ctc_principal['filial'],
+                'serie': ctc_principal['serie'],
+                'ctc': ctc_principal['ctc'],
+                'volumes': int(ctc_principal['volumes']),
+                'peso': float(ctc_principal['peso']),
+                'valor': float(ctc_principal['valor']),
+                'remetente': ctc_principal['remetente'],
+                'destinatario': ctc_principal['destinatario'],
+                'tipo_carga': ctc_principal['tipo_carga']
+            }]
+            
+            total_volumes = docs[0]['volumes']
+            total_peso = docs[0]['peso']
+            total_valor = docs[0]['valor']
 
-        for c in lista_candidatos:
-            c_doc = {
-                'filial': c['filial'],
-                'serie': c['serie'],
-                'ctc': c['ctc'],
-                'volumes': int(c['volumes']),
-                'peso': float(c['peso_taxado']),
-                'valor': float(c['val_mercadoria']),
-                'remetente': c['remetente'],
-                'destinatario': c['destinatario'],
-                'tipo_carga': c['tipo_carga']
-            }
-            docs.append(c_doc)
-            total_volumes += c_doc['volumes']
-            total_peso += c_doc['peso']
-            total_valor += c_doc['valor']
+            for c in lista_candidatos:
+                c_doc = {
+                    'filial': c['filial'],
+                    'serie': c['serie'],
+                    'ctc': c['ctc'],
+                    'volumes': int(c['volumes']),
+                    'peso': float(c['peso_taxado']),
+                    'valor': float(c['val_mercadoria']),
+                    'remetente': c['remetente'],
+                    'destinatario': c['destinatario'],
+                    'tipo_carga': c['tipo_carga']
+                }
+                docs.append(c_doc)
+                total_volumes += c_doc['volumes']
+                total_peso += c_doc['peso']
+                total_valor += c_doc['valor']
 
-        unificado['volumes'] = total_volumes
-        unificado['peso'] = total_peso
-        unificado['valor'] = total_valor
-        
-        unificado['is_consolidado'] = True
-        unificado['lista_docs'] = docs
-        unificado['qtd_docs'] = len(docs)
-        unificado['resumo_consol'] = f"Lote com {len(docs)} CTCs"
+            unificado['volumes'] = total_volumes
+            unificado['peso'] = total_peso
+            unificado['valor'] = total_valor
+            
+            unificado['is_consolidado'] = True
+            unificado['lista_docs'] = docs
+            unificado['qtd_docs'] = len(docs)
+            unificado['resumo_consol'] = f"Lote com {len(docs)} CTCs"
 
-        return unificado
+            LogService.Info("PlanejamentoService", f"Consolidação Unificada: {len(docs)} documentos, Total Peso: {total_peso}")
+            return unificado
+        except Exception as e:
+            LogService.Error("PlanejamentoService", "Erro em UnificarConsolidacao", e)
+            return ctc_principal # Retorna o original para não quebrar tudo
     
     @staticmethod
     def RegistrarPlanejamento(dados_ctc_principal, lista_consolidados=None, usuario="Sistema", status_inicial='Em Planejamento', 
@@ -432,9 +451,13 @@ class PlanejamentoService:
         Salva ou atualiza o Planejamento, Itens e TRECHOS DE VOO.
         """
         SessaoPG = ObterSessaoPostgres()
-        if not SessaoPG: return None
+        if not SessaoPG: 
+            LogService.Error("PlanejamentoService", "Falha de conexão com Postgres ao tentar RegistrarPlanejamento.")
+            return None
 
         try:
+            LogService.Info("PlanejamentoService", f"Iniciando Gravação de Planejamento. Usuário: {usuario}")
+
             def parse_dt(dt_str):
                 if not dt_str: return None
                 try: return datetime.fromisoformat(str(dt_str).replace('Z', ''))
@@ -450,15 +473,16 @@ class PlanejamentoService:
             Cabecalho = None
 
             if item_existente:
-                print(f"⚠️ Atualizando Planejamento ID: {item_existente.Cabecalho.IdPlanejamento}")
+                LogService.Info("PlanejamentoService", f"Atualizando Planejamento Existente ID: {item_existente.Cabecalho.IdPlanejamento}")
                 Cabecalho = item_existente.Cabecalho
                 if aero_origem: Cabecalho.AeroportoOrigem = aero_origem
                 if aero_destino: Cabecalho.AeroportoDestino = aero_destino
                 
+                # Limpa trechos antigos para regravar
                 SessaoPG.query(PlanejamentoTrecho).filter(PlanejamentoTrecho.IdPlanejamento == Cabecalho.IdPlanejamento).delete()
             
             else:
-                print("🆕 Criando Planejamento Completo...")
+                LogService.Info("PlanejamentoService", "Criando novo registro de Planejamento Cabecalho/Itens.")
                 def get_val(key): return float(dados_ctc_principal.get(key, 0) or 0)
                 
                 Cabecalho = PlanejamentoCabecalho(
@@ -483,7 +507,7 @@ class PlanejamentoService:
                     Serie=str(dados_ctc_principal['serie']),
                     Ctc=str(dados_ctc_principal['ctc']),
                     DataEmissao=dados_ctc_principal.get('data_emissao_real'),
-                    Hora=dados_ctc_principal.get('hora_formatada'), # <--- HORA DO PRINCIPAL
+                    Hora=dados_ctc_principal.get('hora_formatada'), 
                     Remetente=str(dados_ctc_principal.get('remetente',''))[:100],
                     Destinatario=str(dados_ctc_principal.get('destinatario',''))[:100],
                     OrigemCidade=str(dados_ctc_principal.get('origem_cidade',''))[:50],
@@ -504,18 +528,16 @@ class PlanejamentoService:
                             Volumes=int(c.get('volumes',0)), PesoTaxado=float(c.get('peso_taxado',0)),
                             ValMercadoria=float(c.get('val_mercadoria',0)),
                             Remetente=str(c.get('remetente',''))[:100], Destinatario=str(c.get('destinatario',''))[:100],
-                            
                             DataEmissao=c.get('data_emissao'),
-                            Hora=c.get('hora_emissao'), # <--- HORA DO CONSOLIDADO (RESOLVIDO)
+                            Hora=c.get('hora_emissao'), 
                             OrigemCidade=str(c.get('origem_cidade', ''))[:50],
                             DestinoCidade=str(c.get('destino_cidade', ''))[:50],
-                            
                             IndConsolidado=True
                         ))
 
             # 3. GRAVA OS TRECHOS
             if lista_trechos and len(lista_trechos) > 0:
-                print(f"✈️ Gravando {len(lista_trechos)} trechos de voo...")
+                LogService.Debug("PlanejamentoService", f"Gravando {len(lista_trechos)} trechos de voo.")
                 for idx, trecho in enumerate(lista_trechos):
                     NovoTrecho = PlanejamentoTrecho(
                         IdPlanejamento=Cabecalho.IdPlanejamento,
@@ -530,13 +552,12 @@ class PlanejamentoService:
                     SessaoPG.add(NovoTrecho)
 
             SessaoPG.commit()
-            print(f"✅ Sucesso! ID: {Cabecalho.IdPlanejamento}")
+            LogService.Info("PlanejamentoService", f"Planejamento gravado com sucesso! ID: {Cabecalho.IdPlanejamento}")
             return Cabecalho.IdPlanejamento
 
         except Exception as e:
             SessaoPG.rollback()
-            print(f"❌ Erro ao gravar: {e}")
-            import traceback; traceback.print_exc()
+            LogService.Error("PlanejamentoService", "Erro crítico ao gravar planejamento", e)
             return None
         finally:
             SessaoPG.close()
