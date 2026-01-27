@@ -32,8 +32,8 @@ def Login():
             
             flash(f'Bem-vindo(a) a bordo, {DadosUsuario["nome"]}! ✈️', 'success')
             
-            ProximaPagina = request.args.get('next')
-            return redirect(ProximaPagina or '/')
+            ProximaPagina = url_for('Dashboard')
+            return redirect(ProximaPagina or '/T-FlightOps')
         
         else:
             LogService.Warning("Routes.Auth", f"Login recusado para {Username} (IP: {IpCliente}).")
