@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 # --- MODELS SQL SERVER (LEGADO) ---
 # Certifique-se de que o arquivo Models/SQL_SERVER/Awb.py foi atualizado com as novas colunas
 from Models.SQL_SERVER.Awb import Awb, AwbStatus, AwbNota
-from Models.SQL_SERVER.Ctc import Ctc
+from Models.SQL_SERVER.Ctc import CtcEsp
 from Models.SQL_SERVER.Cadastros import CompanhiaAerea
 from Conexoes import ObterEngineSqlServer
 

@@ -4,318 +4,50 @@
 
 {% block conteudo %}
 {% include "Components/_ModalCtc.html" %}
-
+<link rel="stylesheet" href="{{ url_for('static', filename='CSS/Planejamento/Editor.css') }}">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/@phosphor-icons/web"></script>
-
-<style>
-    /* --- 1. CONFIGURAÇÃO TELA CHEIA (FULLSCREEN MAP) --- */
-    
-    /* Remove padding do container pai (Base.html) */
-    .conteudo-pagina {
-        padding: 0 !important;
-        overflow: hidden !important;
-        display: flex !important;
-        flex-direction: column !important;
-        height: 100% !important;
-    }
-
-    /* Container do Mapa */
-    .map-wrapper {
-        position: relative;
-        flex: 1;
-        width: 100%;
-        height: 100%; 
-        background: var(--cor-fundo-principal);
-        overflow: hidden;
-    }
-
-    #map { width: 100%; height: 100%; z-index: 1; outline: none; }
-
-    /* Tema Dark para o Mapa (Inversão Inteligente) */
-    [data-theme="dark"] .leaflet-layer {
-        filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
-    }
-
-    /* --- 2. SIDEBAR DE VIDRO (GLASSMORPHISM) --- */
-    .glass-sidebar {
-        position: absolute; 
-        top: 20px; 
-        left: 20px; 
-        bottom: 20px; 
-        width: 420px; /* Largura fixa ideal */
-        
-        background: rgba(255, 255, 255, 0.90); /* Mais opaco para leitura */
-        backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-        
-        border: 1px solid var(--cor-borda);
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12); 
-        border-radius: 24px;
-        
-        z-index: 1000; 
-        display: flex; flex-direction: column; overflow: hidden;
-        transition: transform 0.3s ease;
-    }
-    
-    [data-theme="dark"] .glass-sidebar {
-        background: rgba(30, 41, 59, 0.90);
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-    }
-
-    /* --- 3. HEADER DA SIDEBAR (ORGANIZADO) --- */
-    .slide-header {
-        padding: 24px;
-        background: rgba(var(--cor-fundo-painel-rgb), 0.5);
-        border-bottom: 1px solid var(--cor-borda);
-        display: flex;
-        flex-direction: column;
-        gap: 16px; /* Espaçamento vertical uniforme */
-        flex-shrink: 0;
-    }
-
-    /* Linha 1: Badge e Botão */
-    .header-top-bar {
-        display: flex; 
-        justify-content: space-between; 
-        align-items: center;
-        width: 100%;
-    }
-
-    .badge-serie {
-        display: inline-flex; align-items: center; gap: 8px; 
-        background: var(--cor-texto-principal); 
-        color: var(--cor-fundo-principal);
-        padding: 6px 12px; 
-        border-radius: 8px; 
-        font-size: 0.75rem; 
-        font-weight: 700; 
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-
-    .btn-open-doc {
-        width: 36px; height: 36px; 
-        border-radius: 8px;
-        background: transparent;
-        border: 1px solid var(--cor-borda); 
-        color: var(--cor-texto-secundario); 
-        display: flex; align-items: center; justify-content: center; 
-        cursor: pointer; 
-        transition: all 0.2s;
-        font-size: 1.2rem;
-    }
-    .btn-open-doc:hover { 
-        background: white; 
-        border-color: var(--cor-primaria); 
-        color: var(--cor-primaria); 
-        transform: translateY(-2px);
-        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-    }
-
-    /* Linha 2: Título e Datas */
-    .ctc-info-block {
-        display: flex; flex-direction: column; gap: 4px;
-    }
-
-    .ctc-title {
-        font-size: 2.2rem; 
-        font-weight: 800; 
-        color: var(--cor-texto-principal);
-        margin: 0; 
-        line-height: 1;
-        letter-spacing: -1px;
-    }
-    
-    .ctc-meta { 
-        display: flex; gap: 16px; align-items: center; 
-        font-size: 0.85rem; color: var(--cor-texto-secundario); 
-        font-weight: 500; margin-top: 4px;
-    }
-    .ctc-meta div { display: flex; align-items: center; gap: 6px; }
-
-    /* Linha 3: KPI Grid */
-    .kpi-row { 
-        display: grid; 
-        grid-template-columns: 1fr 1fr 1fr; 
-        gap: 12px; 
-        margin-top: 8px;
-    }
-    
-    .kpi-box {
-        background: var(--cor-fundo-principal); /* Fundo sólido para contraste */
-        border: 1px solid var(--cor-borda);
-        border-radius: 12px; 
-        padding: 10px 4px; 
-        display: flex; flex-direction: column; 
-        align-items: center; justify-content: center;
-        transition: transform 0.2s;
-    }
-    .kpi-box:hover {
-        transform: translateY(-2px); border-color: var(--cor-primaria);
-    }
-
-    .kpi-lbl { 
-        font-size: 0.65rem; color: var(--cor-texto-secundario); 
-        text-transform: uppercase; font-weight: 700; 
-        letter-spacing: 0.5px; margin-bottom: 2px;
-    }
-    .kpi-val { 
-        font-size: 1.1rem; font-weight: 800; 
-        color: var(--cor-texto-principal); white-space: nowrap;
-    }
-    .kpi-val.money { color: #10b981; }
-
-    /* --- 4. TIMELINE DE EVENTOS --- */
-    .timeline-content { 
-        flex: 1; overflow-y: auto; 
-        padding: 24px; position: relative;
-        /* Scroll suave */
-        scrollbar-width: thin;
-        scrollbar-color: var(--cor-borda) transparent;
-    }
-    
-    /* Eixo Vertical */
-    .timeline-axis-wrapper {
-        position: absolute; top: 0; bottom: 0; left: 49px; /* Centralizado no ícone */
-        width: 2px; z-index: 0;
-    }
-    .timeline-line-bg { 
-        width: 100%; height: 100%; background: var(--cor-borda); opacity: 0.5;
-    }
-    .timeline-line-active {
-        position: absolute; top: 0; left: 0; width: 100%; height: 0%; 
-        background: var(--cor-primaria);
-        transition: height 0.5s ease;
-        box-shadow: 0 0 8px rgba(var(--cor-primaria-rgb), 0.6);
-    }
-
-    /* Item da Timeline */
-    .step-item { 
-        position: relative; z-index: 1; 
-        display: flex; gap: 16px; margin-bottom: 32px; 
-        opacity: 0.5; transition: opacity 0.4s ease;
-    }
-    .step-item:last-child { margin-bottom: 0; }
-    .step-item.active { opacity: 1; }
-
-    /* Ícone Circular */
-    .step-marker-wrapper { 
-        position: relative; 
-        width: 52px; /* Largura fixa para manter alinhamento */
-        display: flex; justify-content: center;
-        flex-shrink: 0;
-    }
-    
-    .step-marker {
-        width: 44px; height: 44px; 
-        background: var(--cor-fundo-painel); 
-        border: 2px solid var(--cor-borda); border-radius: 14px;
-        display: flex; align-items: center; justify-content: center; 
-        font-size: 1.4rem; color: var(--cor-texto-secundario);
-        box-shadow: 0 4px 10px rgba(0,0,0,0.05); transition: 0.3s; z-index: 2;
-    }
-    
-    .step-item.active .step-marker {
-        border-color: var(--cor-primaria); color: var(--cor-primaria);
-        transform: scale(1.1); box-shadow: 0 8px 20px rgba(var(--cor-primaria-rgb), 0.25);
-    }
-
-    /* Onda de Radar (Animação) */
-    .radar-wave {
-        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-        width: 100%; height: 100%; border-radius: 14px; border: 2px solid var(--cor-primaria); opacity: 0; z-index: 1;
-    }
-    .step-item.active .radar-wave { animation: radar-pulse 2s infinite ease-out; }
-    @keyframes radar-pulse { 0% { width: 100%; height: 100%; opacity: 0.8; border-width: 2px; } 100% { width: 180%; height: 180%; opacity: 0; border-width: 0px; } }
-
-    .step-details { flex: 1; padding-top: 4px; }
-    .step-title { font-size: 0.95rem; font-weight: 700; color: var(--cor-texto-principal); margin-bottom: 4px; }
-    .step-desc { font-size: 0.8rem; color: var(--cor-texto-secundario); line-height: 1.4; }
-
-    /* CARD DE VOO (Interativo) */
-    .flight-segment {
-        background: rgba(var(--cor-fundo-principal-rgb), 0.5); 
-        border-radius: 12px; padding: 12px; margin-top: 12px;
-        border: 1px solid var(--cor-borda); position: relative; 
-        transition: 0.3s;
-    }
-    .flight-segment.active-flight { 
-        background: var(--cor-fundo-painel); border-color: var(--cor-primaria);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08); transform: translateX(5px);
-    }
-
-    /* Cores das Cias Aéreas */
-    .flight-segment.azul { border-left: 4px solid #0055a4; }
-    .flight-segment.latam { border-left: 4px solid #e60000; }
-    .flight-segment.gol { border-left: 4px solid #ff6600; }
-
-    .fs-header { display: flex; justify-content: space-between; font-weight: 700; margin-bottom: 8px; font-size: 0.85rem; color: var(--cor-texto-principal); }
-    
-    .route-visual {
-        display: flex; align-items: center; justify-content: space-between;
-        background: rgba(0,0,0,0.03); border-radius: 8px; padding: 8px 12px;
-    }
-    .point-code { font-size: 1.1rem; font-weight: 800; color: var(--cor-texto-principal); }
-    .point-time { font-size: 0.7rem; color: var(--cor-texto-secundario); font-weight: 600; }
-
-    /* Track do Avião Animado */
-    .flight-track-container { flex: 1; margin: 0 12px; position: relative; height: 2px; background: var(--cor-borda); }
-    .flight-icon-controlled {
-        position: absolute; top: 50%; left: 0%; transform: translate(-50%, -50%) rotate(90deg);
-        font-size: 1rem; color: var(--cor-primaria); transition: left 0.1s linear;
-    }
-
-    /* --- 5. MARKERS DO MAPA --- */
-    .custom-div-icon { background: transparent; border: none; }
-    .marker-pin {
-        width: 42px; height: 42px; border-radius: 50% 50% 50% 0;
-        background: var(--cor-primaria); transform: rotate(-45deg);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.3); border: 2px solid #fff;
-        display: flex; align-items: center; justify-content: center;
-        transition: transform 0.2s;
-    }
-    .marker-pin i { transform: rotate(45deg); color: #fff; font-size: 1.3rem; }
-    .marker-pin:hover { transform: scale(1.1) rotate(-45deg); cursor: pointer; z-index: 999; }
-    
-    /* Cores dos Pinos */
-    .pin-origem { background: #0d6efd; }
-    .pin-destino { background: #198754; }
-    .pin-truck { background: #64748b; }
-    .pin-plane { background: var(--cor-primaria); }
-
-    /* Popups Estilizados */
-    .leaflet-popup-content-wrapper { 
-        background: var(--cor-fundo-painel); color: var(--cor-texto-principal); 
-        border-radius: 12px; padding: 0; overflow: hidden;
-        border: 1px solid var(--cor-borda);
-    }
-    .leaflet-popup-content { margin: 0; width: 220px !important; }
-    .pop-header { padding: 10px 14px; background: rgba(0,0,0,0.03); font-weight: 700; border-bottom: 1px solid var(--cor-borda); display: flex; justify-content: space-between; align-items: center; }
-    .pop-body { padding: 12px 14px; font-size: 0.85rem; }
-    .pop-row { display: flex; justify-content: space-between; margin-bottom: 6px; border-bottom: 1px dashed var(--cor-borda); padding-bottom: 4px; }
-    .pop-row:last-child { border:none; margin:0; padding:0; }
-</style>
 
 <div class="map-wrapper">
     <div class="glass-sidebar">
         <div class="slide-header">
             <div class="header-top-bar">
-                <div class="badge-serie">
-                    <i class="ph-bold ph-barcode"></i> 
-                    <span>Filial {{ Ctc.filial }} / Série {{ Ctc.serie }}</span>
-                </div>
-                
-                <button class="btn-open-doc" 
-                        onclick="AbrirModalGlobal('{{Ctc.filial}}', '{{Ctc.serie}}', '{{Ctc.ctc}}')" 
-                        title="Ver Documento Original">
-                    <i class="ph-bold ph-file-text"></i>
+                <button class="btn-action-primary" onclick="ConfirmarPlanejamento()">
+                    <i class="ph-bold ph-floppy-disk"></i>
+                    <span>Realizar Planejamento</span>
                 </button>
+
+                <div class="right-actions">
+                    <div class="badge-serie {{ 'is-lote' if Ctc.is_consolidado else '' }}" 
+                         title="{{ 'Lote Consolidado' if Ctc.is_consolidado else 'Documento Individual' }}">
+                        {% if Ctc.is_consolidado %}
+                            <i class="ph-bold ph-stack"></i> 
+                            <span>{{ Ctc.qtd_docs }}</span>
+                        {% else %}
+                            <i class="ph-bold ph-barcode"></i> 
+                            <span>{{ Ctc.filial }} / {{ Ctc.serie }}</span>
+                        {% endif %}
+                    </div>
+                    
+                    {% if Ctc.is_consolidado %}
+                    <button class="btn-toggle-mini" onclick="toggleListaConsolidada()" title="Ver Detalhes do Lote">
+                        <i class="ph-bold ph-caret-down"></i>
+                    </button>
+                    {% endif %}
+                </div>
             </div>
 
             <div class="ctc-info-block">
-                <h1 class="ctc-title">CTC {{ Ctc.ctc }}</h1>
+                {% if Ctc.is_consolidado %}
+                    <h1 class="ctc-title" style="font-size: 1.8rem;">Lote de Embarque</h1>
+                    <div class="ctc-meta">
+                        <div><i class="ph-fill ph-ticket"></i> Ref: {{ Ctc.ctc }} (Principal)</div>
+                    </div>
+                {% else %}
+                    <h1 class="ctc-title">CTC {{ Ctc.ctc }}</h1>
+                {% endif %}
+
                 <div class="ctc-meta">
                     <div><i class="ph-fill ph-calendar-blank"></i> {{ Ctc.data_emissao_real.strftime('%d/%m/%Y') }}</div>
                     <div><i class="ph-fill ph-clock"></i> {{ Ctc.data_emissao_real.strftime('%H:%M') }}</div>
@@ -323,58 +55,69 @@
             </div>
 
             <div class="kpi-row">
-                <div class="kpi-box">
-                    <span class="kpi-lbl">Volumes</span>
+                <div class="kpi-box" style="{{ 'border-color: #7c3aed; background: rgba(124, 58, 237, 0.05);' if Ctc.is_consolidado else '' }}">
+                    <span class="kpi-lbl">Total Volumes</span>
                     <span class="kpi-val">{{ Ctc.volumes }}</span>
                 </div>
-                <div class="kpi-box">
-                    <span class="kpi-lbl">Peso Taxado</span>
-                    <span class="kpi-val">{{ Ctc.peso }} kg</span>
+                <div class="kpi-box" style="{{ 'border-color: #7c3aed; background: rgba(124, 58, 237, 0.05);' if Ctc.is_consolidado else '' }}">
+                    <span class="kpi-lbl">Peso Total</span>
+                    <span class="kpi-val">{{ "{:.0f}".format(Ctc.peso) }} kg</span>
                 </div>
-                <div class="kpi-box">
-                    <span class="kpi-lbl">Valor</span>
+                <div class="kpi-box" style="{{ 'border-color: #7c3aed; background: rgba(124, 58, 237, 0.05);' if Ctc.is_consolidado else '' }}">
+                    <span class="kpi-lbl">Valor Carga</span>
                     <span class="kpi-val money">
                         {% if Ctc.valor >= 1000000 %}
-                            {# Formata para Milhões (Ex: 1,5M) #}
                             R$ {{ "{:.1f}".format(Ctc.valor / 1000000).replace('.', ',') }}M
                         {% elif Ctc.valor >= 1000 %}
-                            {# Formata para Milhares (Ex: 499k) #}
                             R$ {{ "{:.0f}".format(Ctc.valor / 1000) }}k
                         {% else %}
-                            {# Valor normal sem sufixo #}
                             R$ {{ "{:,.0f}".format(Ctc.valor) }}
                         {% endif %}
                     </span>
                 </div>
             </div>
             
-            {% if CtcsConsolidados and CtcsConsolidados|length > 0 %}
-            <div style="margin-top: 16px; padding: 12px; background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.1)); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 12px;">
-                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                    <i class="ph-fill ph-stack" style="color: #3b82f6; font-size: 1.2rem;"></i>
-                    <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--cor-texto-principal);">Consolidação Disponível</span>
+            {% if Ctc.is_consolidado %}
+            <div id="lista-docs-consolidacao" class="consolidation-wrapper" style="display:none;">
+                <div class="consolidation-header-row">
+                    <span class="consolidation-title">Composição do Lote Agrupado</span>
+                    <span class="consolidation-badge">{{ Ctc.lista_docs|length }} Itens</span>
                 </div>
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-size: 0.7rem;">
-                    <div style="text-align: center;">
-                        <div style="color: var(--cor-texto-secundario); font-weight: 600;">CTCs</div>
-                        <div style="font-size: 1rem; font-weight: 800; color: #3b82f6;">{{ TotaisConsolidados.qtd_ctcs }}</div>
-                    </div>
-                    <div style="text-align: center;">
-                        <div style="color: var(--cor-texto-secundario); font-weight: 600;">Vols</div>
-                        <div style="font-size: 1rem; font-weight: 800; color: var(--cor-texto-principal);">{{ TotaisConsolidados.volumes_total }}</div>
-                    </div>
-                    <div style="text-align: center;">
-                        <div style="color: var(--cor-texto-secundario); font-weight: 600;">Peso</div>
-                        <div style="font-size: 1rem; font-weight: 800; color: var(--cor-texto-principal);">{{ "{:.0f}".format(TotaisConsolidados.peso_total) }}</div>
-                    </div>
-                    <div style="text-align: center;">
-                        <div style="color: var(--cor-texto-secundario); font-weight: 600;">Notas</div>
-                        <div style="font-size: 1rem; font-weight: 800; color: var(--cor-texto-principal);">{{ TotaisConsolidados.notas_total }}</div>
-                    </div>
+                
+                <div class="table-scroll-container">
+                    <table class="modern-table">
+                        <thead>
+                            <tr>
+                                <th style="text-align: left;">CTC / Destino</th>
+                                <th style="text-align: center;">Vol</th>
+                                <th style="text-align: right;">Peso</th>
+                                <th style="text-align: right;">Tipo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for doc in Ctc.lista_docs %}
+                            <tr>
+                                <td>
+                                    <div class="doc-cod">{{ doc.ctc }}</div>
+                                    <div class="doc-dest" title="{{ doc.destinatario }}">
+                                        {{ doc.destinatario[:12] }}...
+                                    </div>
+                                </td>
+                                <td class="text-center strong-val">{{ doc.volumes }}</td>
+                                <td class="text-right strong-val">{{ "{:.0f}".format(doc.peso) }}</td>
+                                <td class="text-right">
+                                    {# Define cor da badge baseado no tipo #}
+                                    {% set tipo_clean = doc.tipo_carga|default('N/A')|upper %}
+                                    {% set badge_class = 'badge-red' if 'PERECIVEL' in tipo_clean else ('badge-blue' if 'SECA' in tipo_clean else 'badge-gray') %}
+                                    
+                                    <span class="type-badge {{ badge_class }}">
+                                        {{ tipo_clean[:4] }} </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
-                <button onclick="toggleConsolidacao()" style="margin-top: 10px; width: 100%; padding: 8px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 8px; color: #3b82f6; font-weight: 700; font-size: 0.75rem; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(59, 130, 246, 0.25)'" onmouseout="this.style.background='rgba(59, 130, 246, 0.15)'">
-                    <i class="ph-bold ph-caret-down" id="consolidacao-icon"></i> Ver {{ CtcsConsolidados|length }} CTCs Consolidados
-                </button>
             </div>
             {% endif %}
         </div>
@@ -391,28 +134,51 @@
             </div>
 
             <div class="step-item" id="step-aereo">
-                <div class="step-marker-wrapper"><div class="radar-wave"></div><div class="step-marker"><i class="ph-fill ph-airplane-tilt"></i></div></div>
+                <div class="step-marker-wrapper">
+                    <div class="radar-wave"></div>
+                    <div class="step-marker">
+                        <i class="ph-fill ph-airplane-tilt"></i>
+                    </div>
+                </div>
+                
                 <div class="step-details">
                     <div class="step-title">Transferência Aérea</div>
+                    
                     {% if Rotas %}
                         {% for voo in Rotas %}
-                        {% set cia_cls = 'latam' if 'LA' in voo.cia or 'LATAM' in voo.cia else ('azul' if 'AD' in voo.cia or 'AZUL' in voo.cia else 'gol') %}
-                        
-                        <div class="flight-segment {{ cia_cls }}" id="card-flight-{{ loop.index0 }}">
-                            <div class="fs-header"><span>{{ voo.cia }} {{ voo.voo }}</span><span style="font-weight: 400; opacity:0.7;">{{ voo.data }}</span></div>
-                            <div class="route-visual">
-                                <div><div class="point-code">{{ voo.origem.iata }}</div><div class="point-time">{{ voo.horario_saida }}</div></div>
+                            {# Lógica para definir a cor da companhia aérea #}
+                            {% set cia_cls = 'latam' if 'LA' in voo.cia or 'LATAM' in voo.cia else ('azul' if 'AD' in voo.cia or 'AZUL' in voo.cia else 'gol') %}
+                            
+                            <div class="flight-segment {{ cia_cls }}" 
+                                 id="card-flight-{{ loop.index0 }}"
+                                 onclick='SelecionarVoo({{ loop.index0 }}, {{ voo | tojson | safe }})'>
                                 
-                                <div class="flight-track-container">
-                                    <i id="plane-icon-{{ loop.index0 }}" class="ph-fill ph-airplane-tilt flight-icon-controlled"></i>
+                                <div class="fs-header">
+                                    <span>{{ voo.cia }} {{ voo.voo }}</span>
+                                    <span style="font-weight: 400; opacity:0.7;">{{ voo.data }}</span>
                                 </div>
+                                
+                                <div class="route-visual">
+                                    <div>
+                                        <div class="point-code">{{ voo.origem.iata }}</div>
+                                        <div class="point-time">{{ voo.horario_saida }}</div>
+                                    </div>
+                                    
+                                    <div class="flight-track-container">
+                                        <i id="plane-icon-{{ loop.index0 }}" class="ph-fill ph-airplane-tilt flight-icon-controlled"></i>
+                                    </div>
 
-                                <div style="text-align: right;"><div class="point-code">{{ voo.destino.iata }}</div><div class="point-time">{{ voo.horario_chegada }}</div></div>
+                                    <div style="text-align: right;">
+                                        <div class="point-code">{{ voo.destino.iata }}</div>
+                                        <div class="point-time">{{ voo.horario_chegada }}</div>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
                         {% endfor %}
                     {% else %}
-                        <div class="flight-segment" style="border-left: 3px solid var(--cor-borda); color: var(--cor-texto-secundario); padding: 15px;"><em>Nenhum voo alocado.</em></div>
+                        <div class="flight-segment" style="border-left: 3px solid var(--cor-borda); color: var(--cor-texto-secundario); padding: 15px;">
+                            <em>Nenhum voo alocado.</em>
+                        </div>
                     {% endif %}
                 </div>
             </div>
@@ -427,302 +193,24 @@
     <div id="map"></div>
 </div>
 
-<!-- Modal de Consolidação -->
-{% if CtcsConsolidados and CtcsConsolidados|length > 0 %}
-<div id="modal-consolidacao" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; align-items: center; justify-content: center;">
-    <div style="background: var(--cor-fundo-principal); border-radius: 20px; width: 90%; max-width: 1200px; max-height: 85vh; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3); display: flex; flex-direction: column;">
-        <!-- Header -->
-        <div style="padding: 24px; border-bottom: 1px solid var(--cor-borda); display: flex; justify-content: space-between; align-items: center; background: var(--cor-fundo-painel);">
-            <div>
-                <h2 style="margin: 0; font-size: 1.5rem; font-weight: 800; color: var(--cor-texto-principal); display: flex; align-items: center; gap: 12px;">
-                    <i class="ph-fill ph-stack" style="color: #3b82f6;"></i>
-                    CTCs Consolidados - Mesma Origem/Destino
-                </h2>
-                <p style="margin: 8px 0 0 0; color: var(--cor-texto-secundario); font-size: 0.9rem;">{{ CtcsConsolidados|length }} CTCs adicionais podem ser consolidados neste voo</p>
-            </div>
-            <button onclick="fecharModalConsolidacao()" style="width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--cor-borda); background: transparent; color: var(--cor-texto-secundario); cursor: pointer; font-size: 1.5rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" onmouseover="this.style.background='var(--cor-fundo-painel)'; this.style.color='var(--cor-texto-principal)'" onmouseout="this.style.background='transparent'; this.style.color='var(--cor-texto-secundario)'">
-                <i class="ph-bold ph-x"></i>
-            </button>
-        </div>
-        
-        <!-- Totais -->
-        <div style="padding: 20px 24px; background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(147, 51, 234, 0.08)); border-bottom: 1px solid var(--cor-borda);">
-            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px;">
-                <div style="text-align: center;">
-                    <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--cor-texto-secundario); font-weight: 700; margin-bottom: 6px;">Total CTCs</div>
-                    <div style="font-size: 2rem; font-weight: 800; color: #3b82f6;">{{ TotaisConsolidados.qtd_ctcs }}</div>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--cor-texto-secundario); font-weight: 700; margin-bottom: 6px;">Volumes</div>
-                    <div style="font-size: 2rem; font-weight: 800; color: var(--cor-texto-principal);">{{ TotaisConsolidados.volumes_total }}</div>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--cor-texto-secundario); font-weight: 700; margin-bottom: 6px;">Peso Total</div>
-                    <div style="font-size: 2rem; font-weight: 800; color: var(--cor-texto-principal);">{{ "{:.0f}".format(TotaisConsolidados.peso_total) }} kg</div>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--cor-texto-secundario); font-weight: 700; margin-bottom: 6px;">Valor Total</div>
-                    <div style="font-size: 2rem; font-weight: 800; color: #10b981;">R$ {{ "{:,.0f}".format(TotaisConsolidados.valor_total) }}</div>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--cor-texto-secundario); font-weight: 700; margin-bottom: 6px;">Notas</div>
-                    <div style="font-size: 2rem; font-weight: 800; color: var(--cor-texto-principal);">{{ TotaisConsolidados.notas_total }}</div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Lista de CTCs -->
-        <div style="flex: 1; overflow-y: auto; padding: 24px;">
-            <div style="display: grid; gap: 16px;">
-                {% for ctc_cons in CtcsConsolidados %}
-                <div style="background: var(--cor-fundo-painel); border: 1px solid var(--cor-borda); border-radius: 12px; padding: 16px; transition: all 0.2s; cursor: pointer;" onmouseover="this.style.borderColor='var(--cor-primaria)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'" onmouseout="this.style.borderColor='var(--cor-borda)'; this.style.transform='translateY(0)'; this.style.boxShadow='none'" onclick="AbrirModalGlobal('{{ ctc_cons.filial }}', '{{ ctc_cons.serie }}', '{{ ctc_cons.ctc }}')">
-                    <div style="display: grid; grid-template-columns: auto 1fr auto; gap: 16px; align-items: center;">
-                        <!-- Badge CTC -->
-                        <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
-                            <div style="background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; padding: 8px 16px; border-radius: 10px; font-weight: 800; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);">{{ ctc_cons.ctc }}</div>
-                            <div style="font-size: 0.65rem; color: var(--cor-texto-secundario); font-weight: 600;">Filial {{ ctc_cons.filial }}</div>
-                        </div>
-                        
-                        <!-- Informações -->
-                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
-                            <div>
-                                <div style="font-size: 0.7rem; color: var(--cor-texto-secundario); text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Remetente</div>
-                                <div style="font-size: 0.85rem; font-weight: 600; color: var(--cor-texto-principal);">{{ ctc_cons.remetente[:30] }}...</div>
-                            </div>
-                            <div>
-                                <div style="font-size: 0.7rem; color: var(--cor-texto-secundario); text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Destinatário</div>
-                                <div style="font-size: 0.85rem; font-weight: 600; color: var(--cor-texto-principal);">{{ ctc_cons.destinatario[:30] }}...</div>
-                            </div>
-                            <div>
-                                <div style="font-size: 0.7rem; color: var(--cor-texto-secundario); text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Emissão</div>
-                                <div style="font-size: 0.85rem; font-weight: 600; color: var(--cor-texto-principal);">{{ ctc_cons.data_emissao }} {{ ctc_cons.hora_emissao }}</div>
-                            </div>
-                        </div>
-                        
-                        <!-- KPIs -->
-                        <div style="display: flex; gap: 20px; padding-left: 20px; border-left: 1px solid var(--cor-borda);">
-                            <div style="text-align: center;">
-                                <div style="font-size: 0.65rem; color: var(--cor-texto-secundario); font-weight: 700;">Vols</div>
-                                <div style="font-size: 1.2rem; font-weight: 800; color: var(--cor-texto-principal);">{{ ctc_cons.volumes }}</div>
-                            </div>
-                            <div style="text-align: center;">
-                                <div style="font-size: 0.65rem; color: var(--cor-texto-secundario); font-weight: 700;">Peso</div>
-                                <div style="font-size: 1.2rem; font-weight: 800; color: var(--cor-texto-principal);">{{ "{:.0f}".format(ctc_cons.peso_taxado) }}</div>
-                            </div>
-                            <div style="text-align: center;">
-                                <div style="font-size: 0.65rem; color: var(--cor-texto-secundario); font-weight: 700;">Notas</div>
-                                <div style="font-size: 1.2rem; font-weight: 800; color: var(--cor-texto-principal);">{{ ctc_cons.qtd_notas }}</div>
-                            </div>
-                            <div style="text-align: center;">
-                                <div style="font-size: 0.65rem; color: var(--cor-texto-secundario); font-weight: 700;">Valor</div>
-                                <div style="font-size: 1.2rem; font-weight: 800; color: #10b981;">{{ "{:.0f}".format(ctc_cons.val_mercadoria/1000) }}k</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Campos Futuros (Ocultos por enquanto, preparados para expansão) -->
-                    <div style="display: none;" data-tipo-produto="{{ ctc_cons.tipo_produto }}" data-valor-tarifa="{{ ctc_cons.valor_tarifa }}" data-tabela-frete="{{ ctc_cons.tabela_frete }}" data-natureza="{{ ctc_cons.natureza }}" data-especie="{{ ctc_cons.especie }}"></div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        
-        <!-- Footer -->
-        <div style="padding: 20px 24px; border-top: 1px solid var(--cor-borda); background: var(--cor-fundo-painel); display: flex; justify-content: space-between; align-items: center;">
-            <div style="color: var(--cor-texto-secundario); font-size: 0.85rem;">
-                <i class="ph-fill ph-info" style="color: #3b82f6;"></i> Clique em um CTC para ver detalhes completos
-            </div>
-            <button onclick="fecharModalConsolidacao()" style="padding: 10px 24px; background: var(--cor-primaria); color: white; border: none; border-radius: 10px; font-weight: 700; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.2)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
-                Fechar
-            </button>
-        </div>
-    </div>
-</div>
-{% endif %}
-
 <script>
-    // --- LÓGICA DO MAPA E ANIMAÇÃO ---
+    // --- VARIÁVEIS DE DADOS (Jinja -> JS) ---
+    // Estas variáveis precisam ficar aqui pois são renderizadas pelo servidor
+    const URL_GRAVAR_PLANEJAMENTO = "{{ url_for('Planejamento.SalvarPlanejamento') }}";
     
-    // Plugin de Interpolação (Leaflet.MovingMarker simplificado)
-    L.interpolatePosition=function(t,i,n,o){var e=o/n;e=e>0?e:0,e=e>1?1:e;return L.latLng(t.lat+e*(i.lat-t.lat),t.lng+e*(i.lng-t.lng))};L.Marker.MovingMarker=L.Marker.extend({initialize:function(t,i,n){L.Marker.prototype.initialize.call(this,t[0],n),this._latlngs=t.map(t=>L.latLng(t)),this._durations=i,this._currentDuration=0,this._currentIndex=0,this._state=null,this._startTime=0,this._startTimeStamp=0,this._pauseStartTime=0,this._animId=0,this._animRequested=!1,this._currentLine=[]},isRunning:function(){return"run"===this._state},isPaused:function(){return"paused"===this._state},isEnded:function(){return"ended"===this._state},start:function(){this.isRunning()||(this.isPaused()?this.resume():(this._loadLine(0),this._startAnimation(),this.fire("start")))},resume:function(){this.isPaused()&&(this._currentLine[0]=this.getLatLng(),this._currentDuration-=this._pauseStartTime-this._startTime,this._startAnimation())},pause:function(){this.isRunning()&&(this._pauseStartTime=Date.now(),this._state="paused",this._stopAnimation(),this._updatePosition())},stop:function(t){this.isEnded()||(this._stopAnimation(),void 0===t&&(t=0,this._updatePosition()),this._state="ended",this.fire("end",{elapsedTime:t}))},_startAnimation:function(){this._state="run",this._animId=L.Util.requestAnimFrame(function(t){this._startTime=Date.now(),this._startTimeStamp=t,this._animate(t)},this),this._animRequested=!0},_stopAnimation:function(){this._animRequested&&(L.Util.cancelAnimFrame(this._animId),this._animRequested=!1)},_loadLine:function(t){this._currentIndex=t,this._currentDuration=this._durations[t],this._currentLine=[this._latlngs[t],this._latlngs[t+1]]},_updatePosition:function(){var t=Date.now()-this._startTime;this._animate(this._startTimeStamp+t,!0)},_animate:function(t,i){this._animRequested=!1;var n=Date.now()-this._startTime,o=this._currentDuration;if(n<o){var e=L.interpolatePosition(this._currentLine[0],this._currentLine[1],o,n);this.setLatLng(e),i||(this._animId=L.Util.requestAnimFrame(this._animate,this),this._animRequested=!0)}else this.setLatLng(this._currentLine[1]),this._currentIndex<this._latlngs.length-2?(this._loadLine(this._currentIndex+1),this._startAnimation()):(this._state="ended",this.fire("end",{elapsedTime:n}))},addLatLng:function(t,i){this._latlngs.push(L.latLng(t)),this._durations.push(i)},moveTo:function(t,i){this._stopAnimation(),this._latlngs=[this.getLatLng(),L.latLng(t)],this._durations=[i],this.start()}});L.Marker.movingMarker=function(t,i,n){return new L.Marker.MovingMarker(t,i,n)};
+    // Tornamos as variáveis globais (window) para que o arquivo JS externo possa acessá-las
+    window.ctc = {{ Ctc | tojson | safe }};
+    window.rotas = {{ Rotas | tojson | safe }};
+    window.origem = { lat: {{ Origem.lat | default(0) }}, lon: {{ Origem.lon | default(0) }} };
+    window.destino = { lat: {{ Destino.lat | default(0) }}, lon: {{ Destino.lon | default(0) }} };
 
-    const ctc = {{ Ctc | tojson | safe }};
-    const rotas = {{ Rotas | tojson | safe }};
-    const origem = { lat: {{ Origem.lat | default(0) }}, lon: {{ Origem.lon | default(0) }} };
-    const destino = { lat: {{ Destino.lat | default(0) }}, lon: {{ Destino.lon | default(0) }} };
-
-    // --- TEMPLATES POPUP ---
-    function GetPopupCtc() { 
-        return `
-            <div class="pop-header"><span>CTC ${ctc.ctc}</span><i class="ph-fill ph-truck"></i></div>
-            <div class="pop-body">
-                <div class="pop-row"><span style="color:var(--cor-texto-secundario)">Volumes:</span> <strong>${ctc.volumes}</strong></div>
-                <div class="pop-row"><span style="color:var(--cor-texto-secundario)">Peso:</span> <strong>${ctc.peso}kg</strong></div>
-                <div style="margin-top:10px; text-align:center;">
-                    <button onclick="AbrirModalGlobal('${ctc.filial}', '${ctc.serie}', '${ctc.ctc}')" style="background:var(--cor-primaria); color:white; border:none; padding:6px 14px; border-radius:6px; cursor:pointer; font-size:0.8rem; font-weight:600;">Ver Detalhes</button>
-                </div>
-            </div>
-        `; 
-    }  
-    function GetPopupLocal(t,n,u) { return `<div class="pop-header"><span>${t}</span><i class="ph-fill ph-map-pin"></i></div><div class="pop-body"><div style="font-weight:700; margin-bottom:4px;">${n}</div><div style="color:var(--cor-texto-secundario);">${u}</div></div>`; }
-    function GetPopupAero(i,n) { return `<div class="pop-header"><span>${i}</span><i class="ph-fill ph-airplane"></i></div><div class="pop-body">${n}</div>`; }
-
-    function criarIcone(tipo) {
-        let cls='pin-truck', ico='ph-truck';
-        if(tipo==='origem'){cls='pin-origem';ico='ph-package';}
-        if(tipo==='destino'){cls='pin-destino';ico='ph-flag-checkered';}
-        if(tipo==='plane'){cls='pin-plane';ico='ph-airplane-tilt';}
-        return L.divIcon({className:'custom-div-icon',html:`<div class="marker-pin ${cls}"><i class="ph-fill ${ico}"></i></div>`,iconSize:[40,50],iconAnchor:[20,50],popupAnchor:[0,-50]});
-    }
-
-    let map, markerAnim;
-
-    document.addEventListener("DOMContentLoaded", function() {
-        // Inicializa Mapa (Zoom Control na direita)
-        map = L.map('map', {zoomControl: false}).setView([-14.2, -51.9], 4);
-        L.control.zoom({ position: 'topright' }).addTo(map);
-
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {maxZoom: 18}).addTo(map);
-
-        // Marcadores Origem/Destino
-        if(origem.lat) L.marker([origem.lat, origem.lon], {icon: criarIcone('origem')}).addTo(map).bindPopup(GetPopupLocal('Origem','{{ Origem.nome }}','{{ Origem.uf }}'));
-        if(destino.lat) L.marker([destino.lat, destino.lon], {icon: criarIcone('destino')}).addTo(map).bindPopup(GetPopupLocal('Destino','{{ Destino.nome }}','{{ Destino.uf }}'));
-
-        // Traçar Rotas
-        if(rotas && rotas.length > 0) {
-            const layers = L.featureGroup();
-            let pontosAnimacao = []; 
-            let pontoAtual = [origem.lat, origem.lon];
-            
-            pontosAnimacao.push({loc: pontoAtual, duracao: 0, tipo: 'inicio'});
-
-            rotas.forEach((voo, i) => {
-                const pO = [voo.origem.lat, voo.origem.lon], pD = [voo.destino.lat, voo.destino.lon];
-                let cor = '#333';
-                if(voo.cia.includes('AZUL')||voo.cia.includes('AD')) cor='#0055a4';
-                else if(voo.cia.includes('LATAM')||voo.cia.includes('LA')) cor='#e60000';
-                else if(voo.cia.includes('GOL')||voo.cia.includes('G3')) cor='#ff6600';
-
-                // Rodoviário até o Aeroporto
-                if(i===0) {
-                    L.polyline([pontoAtual, pO], {color:'#999', dashArray:'8,12', weight:3}).addTo(layers);
-                    pontosAnimacao.push({loc: pO, duracao: 3000, tipo: 'road'}); 
-                }
-
-                // Trecho Aéreo
-                L.polyline([pO, pD], {color:cor, weight:4}).addTo(layers);
-                L.circleMarker(pO, {radius:5, color:cor, fillColor:'#fff', fillOpacity:1}).addTo(layers).bindPopup(GetPopupAero(voo.origem.iata, voo.origem.nome));
-                L.circleMarker(pD, {radius:5, color:cor, fillColor:'#fff', fillOpacity:1}).addTo(layers).bindPopup(GetPopupAero(voo.destino.iata, voo.destino.nome));
-
-                pontosAnimacao.push({loc: pD, duracao: 8000, tipo: 'air', cor: cor, flightIndex: i}); 
-                pontoAtual = pD;
-            });
-
-            // Rodoviário até o Cliente
-            const pFinal = [destino.lat, destino.lon];
-            L.polyline([pontoAtual, pFinal], {color:'#999', dashArray:'8,12', weight:3}).addTo(layers);
-            pontosAnimacao.push({loc: pFinal, duracao: 3000, tipo: 'road'});
-
-            layers.addTo(map);
-            // FitBounds com Padding na esquerda para a sidebar não cobrir o conteúdo
-            setTimeout(() => map.fitBounds(layers.getBounds(), {paddingTopLeft: [450, 50], paddingBottomRight: [50, 50]}), 500);
-
-            window.dadosAnimacao = pontosAnimacao;
-            window.iconTruck = criarIcone('truck'); window.iconPlane = criarIcone('plane');
-            setTimeout(IniciarLoop, 1500);
-        }
-    });
-
-    function IniciarLoop() {
-        if(!window.dadosAnimacao) return;
-        const pontos = window.dadosAnimacao;
-        let index = 0;
-        
-        ResetarIcones();
-
-        if (markerAnim) markerAnim.remove();
-
-        markerAnim = L.Marker.movingMarker([pontos[0].loc], [1000], {icon: window.iconTruck, zIndexOffset: 2000}).addTo(map);
-        markerAnim.bindPopup(GetPopupCtc());
-
-        function AnimarProximo() {
-            if (index >= pontos.length - 1) {
-                setTimeout(() => { AtualizarUI('coleta', 0); IniciarLoop(); }, 4000);
-                return;
-            }
-            const pProx = pontos[index+1];
-            
-            if (pProx.tipo === 'air') {
-                markerAnim.setIcon(window.iconPlane);
-                AtualizarUI('aereo', 50);
-                SincronizarAviaoSidebar(pProx.duracao, pProx.flightIndex);
-                HighlightCardVoo(pProx.flightIndex);
-            } else {
-                markerAnim.setIcon(window.iconTruck);
-                RemoverHighlightVoo();
-                if(index === 0) AtualizarUI('coleta', 10);
-                else AtualizarUI('entrega', 100);
-            }
-
-            markerAnim.moveTo(pProx.loc, pProx.duracao);
-            markerAnim.once('end', function() {
-                setTimeout(() => { index++; AnimarProximo(); }, 500);
-            });
-        }
-        AnimarProximo();
-    }
-
-    function SincronizarAviaoSidebar(duracaoTotal, flightIndex) {
-        const icon = document.getElementById('plane-icon-' + flightIndex);
-        if(!icon) return;
-        let startTime = null;
-        function step(timestamp) {
-            if (!startTime) startTime = timestamp;
-            const progress = timestamp - startTime;
-            const percent = Math.min(progress / duracaoTotal, 1);
-            icon.style.left = (percent * 100) + '%';
-            if (progress < duracaoTotal) { window.requestAnimationFrame(step); }
-        }
-        window.requestAnimationFrame(step);
-    }
-
-    function ResetarIcones() {
-        document.querySelectorAll('.flight-icon-controlled').forEach(el => { el.style.left = '0%'; });
-        RemoverHighlightVoo();
-    }
-
-    function HighlightCardVoo(idx) {
-        RemoverHighlightVoo();
-        const card = document.getElementById('card-flight-' + idx);
-        if(card) {
-            card.classList.add('active-flight');
-            card.scrollIntoView({behavior: 'smooth', block: 'center'});
-        }
-    }
-
-    function RemoverHighlightVoo() {
-        document.querySelectorAll('.flight-segment').forEach(c => c.classList.remove('active-flight'));
-    }
-
-    function AtualizarUI(stepId, progresso) {
-        document.querySelectorAll('.step-item').forEach(s => s.classList.remove('active'));
-        const el = document.getElementById('step-' + stepId);
-        if(el) { el.classList.add('active'); }
-        const line = document.getElementById('progress-line');
-        if(line) line.style.height = progresso + '%';
-    }
-    
-    // --- CONSOLIDAÇÃO ---
-    function toggleConsolidacao() {
-        const modal = document.getElementById('modal-consolidacao');
-        if (modal) {
-            modal.style.display = modal.style.display === 'none' ? 'flex' : 'none';
-        }
-    }
-    
-    function fecharModalConsolidacao() {
-        const modal = document.getElementById('modal-consolidacao');
-        if (modal) modal.style.display = 'none';
-    }
+    // Strings simples para uso nos Popups
+    window.GLOBAL_ORIGEM_NOME = "{{ Origem.nome }}";
+    window.GLOBAL_ORIGEM_UF = "{{ Origem.uf }}";
+    window.GLOBAL_DESTINO_NOME = "{{ Destino.nome }}";
+    window.GLOBAL_DESTINO_UF = "{{ Destino.uf }}";
 </script>
+
+<script src="{{ url_for('static', filename='JS/Planejamento/Editor.js') }}"></script>
+
 {% endblock %}
