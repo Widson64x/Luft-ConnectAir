@@ -4,7 +4,8 @@ from .Base import BasePostgres
 
 class VersaoSistema(BasePostgres):
     __tablename__ = 'Tb_VersaoSistema'
-
+    __table_args__ = {'schema': 'MalhaAerea'} 
+ 
     Id = Column(Integer, primary_key=True)
     NumeroVersao = Column(String(50), nullable=False)  # Ex: 1.0.2
     Estagio = Column(String(20), nullable=False)       # Alpha, Beta, Release Candidate, Stable

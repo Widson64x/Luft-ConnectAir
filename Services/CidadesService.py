@@ -5,6 +5,7 @@ from sqlalchemy import desc
 from Conexoes import ObterSessaoPostgres
 from Configuracoes import ConfiguracaoBase
 from Models.POSTGRES.Cidade import RemessaCidade, Cidade
+from Services.LogService import LogService  # <--- Import do Log
 
 DIR_TEMP = ConfiguracaoBase.DIR_TEMP
 
@@ -22,6 +23,7 @@ class CidadesService:
         """Garante que a pasta temporária existe antes de tentar salvar algo."""
         if not os.path.exists(CidadesService.DIR_TEMP):
             os.makedirs(CidadesService.DIR_TEMP)
+            LogService.Debug("CidadesService", f"Diretório temporário criado: {CidadesService.DIR_TEMP}")
 
     @staticmethod
     def ListarRemessas():
@@ -31,6 +33,9 @@ class CidadesService:
         Sessao = ObterSessaoPostgres()
         try:
             return Sessao.query(RemessaCidade).order_by(desc(RemessaCidade.DataUpload)).all()
+        except Exception as e:
+            LogService.Error("CidadesService", "Erro ao listar remessas.", e)
+            return []
         finally:
             Sessao.close()
 
@@ -41,14 +46,19 @@ class CidadesService:
         """
         Sessao = ObterSessaoPostgres()
         try:
+            LogService.Info("CidadesService", f"Tentativa de excluir remessa ID: {id_remessa}")
             Remessa = Sessao.query(RemessaCidade).get(id_remessa)
             if Remessa:
                 Sessao.delete(Remessa)
                 Sessao.commit()
+                LogService.Info("CidadesService", f"Remessa {id_remessa} excluída com sucesso.")
                 return True, "Base de cidades excluída com sucesso."
+            
+            LogService.Warning("CidadesService", f"Remessa {id_remessa} não encontrada para exclusão.")
             return False, "Remessa não encontrada."
         except Exception as e:
             Sessao.rollback()
+            LogService.Error("CidadesService", f"Erro ao excluir remessa {id_remessa}", e)
             return False, f"Erro ao excluir: {e}"
         finally:
             Sessao.close()
@@ -60,6 +70,7 @@ class CidadesService:
         Não processa ainda, só dá uma olhadinha. 👀
         """
         try:
+            LogService.Info("CidadesService", f"Iniciando análise do arquivo: {file_storage.filename}")
             CidadesService._GarantirDiretorio()
             
             CaminhoTemp = os.path.join(CidadesService.DIR_TEMP, file_storage.filename)
@@ -76,6 +87,7 @@ class CidadesService:
                 Anterior = Sessao.query(RemessaCidade).filter_by(MesReferencia=DataRef, Ativo=True).first()
                 if Anterior:
                     ExisteConflito = True
+                    LogService.Warning("CidadesService", f"Conflito detectado: Já existe remessa para {DataRef}")
             finally:
                 Sessao.close()
 
@@ -86,6 +98,7 @@ class CidadesService:
                 'conflito': ExisteConflito
             }
         except Exception as e:
+            LogService.Error("CidadesService", "Erro na análise do arquivo de cidades.", e)
             return False, f"Erro na análise do arquivo: {e}"
 
     @staticmethod
@@ -98,6 +111,7 @@ class CidadesService:
         4. Faz o parsing manual linha a linha.
         5. Bulk Insert no banco.
         """
+        LogService.Info("CidadesService", f"Iniciando processamento final (Ação: {tipo_acao}) - Arquivo: {nome_original}")
         Sessao = ObterSessaoPostgres()
         try:
             # 1. Ler Excel (engine openpyxl para .xlsx)
@@ -106,11 +120,13 @@ class CidadesService:
             
             # Pega a primeira coluna (índice 0) que contém o texto concatenado
             SerieDados = DfRaw.iloc[:, 0].astype(str)
+            LogService.Debug("CidadesService", f"Arquivo lido. Total de linhas brutas: {len(SerieDados)}")
 
             # 2. Desativar remessa anterior (se houver)
             Anterior = Sessao.query(RemessaCidade).filter_by(MesReferencia=data_ref, Ativo=True).first()
             if Anterior:
                 Anterior.Ativo = False
+                LogService.Info("CidadesService", f"Remessa anterior (ID: {Anterior.Id}) desativada.")
 
             # 3. Criar Cabeçalho da Nova Remessa
             NovaRemessa = RemessaCidade(
@@ -162,6 +178,8 @@ class CidadesService:
             # 5. Bulk Insert (Performance Extrema)
             Sessao.bulk_save_objects(ListaCidades)
             Sessao.commit()
+            
+            LogService.Info("CidadesService", f"Processamento concluído. {len(ListaCidades)} cidades importadas na Remessa {NovaRemessa.Id}.")
 
             # Limpa o arquivo temporário
             if os.path.exists(caminho_arquivo): 
@@ -171,6 +189,7 @@ class CidadesService:
 
         except Exception as e:
             Sessao.rollback()
+            LogService.Error("CidadesService", "Falha crítica no processamento de cidades.", e)
             return False, f"Falha crítica no processamento: {e}"
         finally:
             Sessao.close()

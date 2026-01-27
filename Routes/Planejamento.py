@@ -6,6 +6,7 @@ from datetime import timedelta, datetime, date
 from Services.PlanejamentoService import PlanejamentoService
 from Services.Shared.GeoService import BuscarCoordenadasCidade, BuscarAeroportoMaisProximo
 from Services.MalhaService import MalhaService
+from Services.LogService import LogService  # <--- Import Adicionado
 
 PlanejamentoBp = Blueprint('Planejamento', __name__)
 
@@ -29,11 +30,14 @@ COORDENADAS_UFS = {
 @PlanejamentoBp.route('/Dashboard')
 @login_required
 def Dashboard():
+    LogService.Info("Routes.Planejamento", f"Usuário {current_user.id} acessou Dashboard Planejamento.")
     return render_template('Planejamento/Index.html')
 
 @PlanejamentoBp.route('/API/Listar')
 @login_required
 def ApiCtcsHoje():
+    # Log de Debug para não poluir o histórico principal com chamadas de API frequentes
+    LogService.Debug("Routes.Planejamento", "API Listar CTCs requisitada.")
     Dados = PlanejamentoService.BuscarCtcsAereoHoje()
     return jsonify(Dados)
 
@@ -42,22 +46,27 @@ def ApiCtcsHoje():
 def ApiCtcDetalhes(filial, serie, ctc):
     Dados = PlanejamentoService.ObterCtcCompleto(filial, serie, ctc)
     if not Dados:
+        LogService.Warning("Routes.Planejamento", f"API Detalhes: CTC não encontrado {filial}-{serie}-{ctc}")
         return jsonify({'erro': 'CTC não encontrado'}), 404
     return jsonify(Dados)
 
 @PlanejamentoBp.route('/Montar/<string:filial>/<string:serie>/<string:ctc>')
 @login_required
 def MontarPlanejamento(filial, serie, ctc):
+    LogService.Info("Routes.Planejamento", f"Iniciando Montagem Planejamento: {filial}-{serie}-{ctc}")
     
     # 1. Busca Dados do CTC Principal
     DadosCtc = PlanejamentoService.ObterCtcDetalhado(filial, serie, ctc)
-    if not DadosCtc: return "Não encontrado", 404
+    if not DadosCtc: 
+        LogService.Error("Routes.Planejamento", f"Erro ao montar: CTC Base não encontrado {filial}-{serie}-{ctc}")
+        return "Não encontrado", 404
 
     # 2. Geografia
     CoordOrigem = BuscarCoordenadasCidade(DadosCtc['origem_cidade'], DadosCtc['origem_uf'])
     CoordDestino = BuscarCoordenadasCidade(DadosCtc['destino_cidade'], DadosCtc['destino_uf'])
     
     if not CoordOrigem or not CoordDestino:
+        LogService.Warning("Routes.Planejamento", f"Falha de Geolocalização para {DadosCtc['origem_cidade']} ou {DadosCtc['destino_cidade']}")
         return render_template('Planejamento/Editor.html', Erro="Erro Geo", Ctc=DadosCtc)
 
     # 3. Consolidação
@@ -74,8 +83,6 @@ def MontarPlanejamento(filial, serie, ctc):
     
     # Unifica (Apenas memória, NÃO GRAVA AINDA)
     DadosUnificados = PlanejamentoService.UnificarConsolidacao(DadosCtc, CtcsCandidatos)
-
-    # --- REMOVIDO O BLOCO DE PERSISTÊNCIA AUTOMÁTICA DAQUI ---
 
     # 4. Aeroportos
     AeroOrigem = BuscarAeroportoMaisProximo(CoordOrigem['lat'], CoordOrigem['lon'])
@@ -109,6 +116,8 @@ def SalvarPlanejamento():
         serie = dados_front.get('serie')
         ctc = dados_front.get('ctc')
         
+        LogService.Info("Routes.Planejamento", f"Recebendo requisição de salvamento para {filial}-{serie}-{ctc}")
+
         # Recebe a lista completa de voos (rota)
         rota_completa = dados_front.get('rota_completa', []) 
 
@@ -135,60 +144,67 @@ def SalvarPlanejamento():
             status_inicial='Em Planejamento',
             aero_origem=AeroOrigem['iata'] if AeroOrigem else None,
             aero_destino=AeroDestino['iata'] if AeroDestino else None,
-            lista_trechos=rota_completa # <--- Passa a lista
+            lista_trechos=rota_completa
         )
         
-        if Id: return jsonify({'sucesso': True, 'id_planejamento': Id})
+        if Id: 
+            LogService.Info("Routes.Planejamento", f"Planejamento salvo com sucesso. ID Retornado: {Id}")
+            return jsonify({'sucesso': True, 'id_planejamento': Id})
+        
+        LogService.Error("Routes.Planejamento", "Service retornou None ao salvar.")
         return jsonify({'sucesso': False, 'msg': 'Erro ao gravar'}), 500
 
     except Exception as e:
-        print(f"Erro: {e}")
+        LogService.Error("Routes.Planejamento", "Exceção não tratada ao salvar planejamento", e)
         return jsonify({'sucesso': False, 'msg': str(e)}), 500
     
 @PlanejamentoBp.route('/Mapa-Global')
 @login_required
 def MapaGlobal():
-    ListaCtcs = PlanejamentoService.BuscarCtcsAereoHoje()
-    Agrupamento = {}
+    try:
+        LogService.Debug("Routes.Planejamento", "Gerando Mapa Global...")
+        ListaCtcs = PlanejamentoService.BuscarCtcsAereoHoje()
+        Agrupamento = {}
 
-    print(f"🌍 Gerando Mapa Agrupado para {len(ListaCtcs)} CTCs...")
+        for c in ListaCtcs:
+            try:
+                _, UfOrig = c['origem'].split('/')
+                UfOrig = UfOrig.strip().upper()
+                
+                if UfOrig not in Agrupamento:
+                    Agrupamento[UfOrig] = {
+                        'uf': UfOrig,
+                        'coords': COORDENADAS_UFS.get(UfOrig, {'lat': -15, 'lon': -47}),
+                        'qtd_docs': 0,
+                        'qtd_vols': 0,
+                        'valor_total': 0.0,
+                        'tem_urgencia': False,
+                        'lista_ctcs': []
+                    }
+                
+                # Atualiza Totais
+                Agrupamento[UfOrig]['qtd_docs'] += 1
+                Agrupamento[UfOrig]['qtd_vols'] += int(c['volumes'])
+                
+                # --- CORREÇÃO AQUI ---
+                # Usa o valor bruto direto (float), sem converter string
+                Agrupamento[UfOrig]['valor_total'] += c['raw_val_mercadoria']
+                # ---------------------
+                
+                if 'URGENTE' in str(c['prioridade']).upper():
+                    Agrupamento[UfOrig]['tem_urgencia'] = True
+                    c['eh_urgente'] = True 
+                else:
+                    c['eh_urgente'] = False
 
-    for c in ListaCtcs:
-        try:
-            _, UfOrig = c['origem'].split('/')
-            UfOrig = UfOrig.strip().upper()
-            
-            if UfOrig not in Agrupamento:
-                Agrupamento[UfOrig] = {
-                    'uf': UfOrig,
-                    'coords': COORDENADAS_UFS.get(UfOrig, {'lat': -15, 'lon': -47}),
-                    'qtd_docs': 0,
-                    'qtd_vols': 0,
-                    'valor_total': 0.0,
-                    'tem_urgencia': False,
-                    'lista_ctcs': []
-                }
-            
-            # Atualiza Totais
-            Agrupamento[UfOrig]['qtd_docs'] += 1
-            Agrupamento[UfOrig]['qtd_vols'] += int(c['volumes'])
-            
-            # --- CORREÇÃO AQUI ---
-            # Usa o valor bruto direto (float), sem converter string
-            Agrupamento[UfOrig]['valor_total'] += c['raw_val_mercadoria']
-            # ---------------------
-            
-            if 'URGENTE' in str(c['prioridade']).upper():
-                Agrupamento[UfOrig]['tem_urgencia'] = True
-                c['eh_urgente'] = True 
-            else:
-                c['eh_urgente'] = False
+                Agrupamento[UfOrig]['lista_ctcs'].append(c)
 
-            Agrupamento[UfOrig]['lista_ctcs'].append(c)
-
-        except Exception as e:
-            print(f"Erro ao agrupar CTC {c.get('ctc')}: {e}")
-            continue
-    
-    DadosMapa = list(Agrupamento.values())
-    return render_template('Planejamento/Map.html', Dados=DadosMapa)
+            except Exception as e:
+                LogService.Warning("Routes.Planejamento", f"Erro ao agrupar item no mapa: {e}")
+                continue
+        
+        DadosMapa = list(Agrupamento.values())
+        return render_template('Planejamento/Map.html', Dados=DadosMapa)
+    except Exception as e:
+        LogService.Error("Routes.Planejamento", "Erro fatal ao renderizar Mapa Global", e)
+        return "Erro interno", 500

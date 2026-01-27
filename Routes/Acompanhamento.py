@@ -1,11 +1,13 @@
 from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify
 from Services.AcompanhamentoService import AcompanhamentoService
+from Services.LogService import LogService
 
 AcompanhamentoBP = Blueprint('Acompanhamento', __name__, url_prefix='/Acompanhamento')
 
 @AcompanhamentoBP.route('/Painel', methods=['GET'])
 def Painel():
+    LogService.Info("AcompanhamentoRoute", "Acessando rota /Painel.")
     try:
         resumo = AcompanhamentoService.BuscarResumoPainel()
         
@@ -18,7 +20,8 @@ def Painel():
             data_inicio=hoje, 
             data_fim=hoje
         )
-    except:
+    except Exception as e:
+        LogService.Error("AcompanhamentoRoute", "Erro ao renderizar Painel.", e)
         hoje = datetime.now().strftime('%Y-%m-%d')
         return render_template('Acompanhamento/Index.html', resumo={}, data_inicio=hoje, data_fim=hoje)
 
@@ -28,21 +31,24 @@ def ApiListarAwbs():
         'DataInicio': request.args.get('dataInicio'),
         'DataFim': request.args.get('dataFim'),
         'NumeroAwb': request.args.get('numeroAwb'),
-        'FilialCtc': request.args.get('filialCtc') # <--- Captura o novo filtro
+        'FilialCtc': request.args.get('filialCtc') 
     }
+    LogService.Debug("AcompanhamentoRoute", f"API /ListarAwbs chamada. Parametros: {filtros}")
     dados = AcompanhamentoService.ListarAwbs(filtros)
     return jsonify(dados)
 
 @AcompanhamentoBP.route('/Api/Historico/<path:numero_awb>', methods=['GET'])
 def ApiHistorico(numero_awb):
+    LogService.Debug("AcompanhamentoRoute", f"API /Historico chamada para {numero_awb}")
     historico = AcompanhamentoService.ObterHistoricoAwb(numero_awb)
     return jsonify(historico)
 
 @AcompanhamentoBP.route('/Api/DetalhesVooModal', methods=['GET'])
 def ApiDetalhesVooModal():
     numero = request.args.get('numeroVoo')
-    data = request.args.get('dataRef') # Espera formato dd/mm/yyyy HH:MM ou yyyy-mm-dd
+    data = request.args.get('dataRef') 
     
+    LogService.Debug("AcompanhamentoRoute", f"API /DetalhesVooModal chamada para voo {numero} em {data}")
     detalhes = AcompanhamentoService.BuscarDetalhesVooModal(numero, data)
     
     if detalhes:
@@ -53,7 +59,10 @@ def ApiDetalhesVooModal():
 @AcompanhamentoBP.route('/Api/DetalhesAwbModal', methods=['GET'])
 def ApiDetalhesAwbModal():
     cod_awb = request.args.get('codAwb')
+    LogService.Debug("AcompanhamentoRoute", f"API /DetalhesAwbModal chamada. ID: {cod_awb}")
+    
     if not cod_awb:
+        LogService.Warning("AcompanhamentoRoute", "API /DetalhesAwbModal chamada sem codAwb.")
         return jsonify({'sucesso': False, 'msg': 'Código AWB não informado.'})
         
     dados = AcompanhamentoService.BuscarDetalhesAwbCompleto(cod_awb)
@@ -61,5 +70,4 @@ def ApiDetalhesAwbModal():
     if dados:
         return jsonify({'sucesso': True, 'dados': dados})
     else:
-        return jsonify({'sucesso': False, 'msg': 'AWB não encontrada.'}) 
-    
+        return jsonify({'sucesso': False, 'msg': 'AWB não encontrada.'})
