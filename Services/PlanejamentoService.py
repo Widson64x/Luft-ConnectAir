@@ -16,46 +16,68 @@ class PlanejamentoService:
     @staticmethod
     def ObterCtcCompleto(filial, serie, ctc_num):
         """
-        Busca um CTC específico e retorna um dicionário com TODAS as colunas.
-        Usado para modais de detalhe e inspeção profunda.
+        Busca um CTC específico + DADOS COMPLEMENTARES (CPL)
+        Retorna um dicionário unificado com TODAS as colunas de ambas as tabelas.
         """
         Sessao = ObterSessaoSqlServer()
         try:
             # Busca flexível (remove zeros a esquerda se precisar)
             f, s, n = str(filial).strip(), str(serie).strip(), str(ctc_num).strip()
             
-            c = Sessao.query(CtcEsp).filter(
+            # Query com Outer Join para garantir que traga o CTC mesmo sem CPL
+            Query = Sessao.query(CtcEsp, CtcEspCpl).outerjoin(
+                CtcEspCpl, 
+                CtcEsp.filialctc == CtcEspCpl.filialctc
+            ).filter(
                 CtcEsp.filial == f,
                 CtcEsp.seriectc == s,
                 CtcEsp.filialctc == n
-            ).first()
+            )
 
-            # Tenta achar sem zeros se falhar
-            if not c:
-                c = Sessao.query(CtcEsp).filter(
-                    CtcEsp.filial == f, 
-                    CtcEsp.seriectc == s, 
-                    CtcEsp.filialctc == n.lstrip('0')
-                ).first()
+            Resultado = Query.first()
 
-            if not c: 
+            # Tenta achar sem zeros se falhar (Lógica de fallback existente)
+            if not Resultado:
+                Query = Sessao.query(CtcEsp, CtcEspCpl).outerjoin(CtcEspCpl, CtcEsp.filialctc == CtcEspCpl.filialctc).filter(
+                    CtcEsp.filial == f, CtcEsp.seriectc == s, CtcEsp.filialctc == n.lstrip('0')
+                )
+                Resultado = Query.first()
+
+            if not Resultado: 
                 LogService.Warning("PlanejamentoService", f"ObterCtcCompleto: CTC não encontrado {f}-{s}-{n}")
                 return None
 
-            # Serializa TODAS as colunas
+            # Desempacota
+            Ctc, Cpl = Resultado
             dados_completos = {}
-            for coluna in c.__table__.columns:
-                valor = getattr(c, coluna.name)
-                if isinstance(valor, (datetime, date, time)):
-                    valor = str(valor)
-                elif isinstance(valor, Decimal):
-                    valor = float(valor)
-                elif valor is None:
-                    valor = ""
+
+            # 1. Serializa CTC Principal
+            for coluna in Ctc.__table__.columns:
+                valor = getattr(Ctc, coluna.name)
+                if isinstance(valor, (datetime, date, time)): valor = str(valor)
+                elif isinstance(valor, Decimal): valor = float(valor)
+                elif valor is None: valor = ""
                 dados_completos[coluna.name] = valor
             
-            LogService.Debug("PlanejamentoService", f"Detalhes recuperados para {f}-{s}-{n}")
+            # 2. Serializa CPL (se existir) e mescla no mesmo dict
+            if Cpl:
+                for coluna in Cpl.__table__.columns:
+                    valor = getattr(Cpl, coluna.name)
+                    if isinstance(valor, (datetime, date, time)): valor = str(valor)
+                    elif isinstance(valor, Decimal): valor = float(valor)
+                    elif valor is None: valor = ""
+                    
+                    # Evita sobrescrever chaves importantes se nomes forem idênticos (exceto se for intencional)
+                    # O CPL geralmente tem prefixos unicos (Fatura_, CTE_, etc), então é seguro.
+                    dados_completos[coluna.name] = valor
+            else:
+                # Preenche campos vitais do CPL com vazio para não quebrar o front
+                dados_completos['StatusCTC'] = 'N/A'
+                dados_completos['TipoCarga'] = 'N/A'
+
+            LogService.Debug("PlanejamentoService", f"Detalhes recuperados (Base+Cpl) para {f}-{s}-{n}")
             return dados_completos
+
         except Exception as e:
             LogService.Error("PlanejamentoService", "Erro em ObterCtcCompleto", e)
             return None
@@ -76,7 +98,7 @@ class PlanejamentoService:
             LogService.Debug("PlanejamentoService", "Iniciando busca de CTCs Aéreos de Hoje/Ontem...")
             
             # 1. BUSCA DADOS NO SQL SERVER (CTCs DO DIA) + JOIN COM CPL
-            Hoje = date.today() - timedelta(days=0) 
+            Hoje = date.today() - timedelta(days=29) 
             Inicio = datetime.combine(Hoje, time.min)
             Fim = datetime.combine(Hoje, time.max)
             
@@ -186,6 +208,7 @@ class PlanejamentoService:
                     'data_emissao': c.data.strftime('%d/%m/%Y') if c.data else '',
                     'hora_emissao': HoraFormatada,
                     'prioridade': to_str(c.prioridade),
+                    'status_ctc': to_str(cpl.StatusCTC) if cpl else '',
                     'origem': f"{to_str(c.cidade_orig)}/{to_str(c.uf_orig)}",
                     'destino': f"{to_str(c.cidade_dest)}/{to_str(c.uf_dest)}",
                     'unid_lastmile': to_str(c.rotafilialdest),

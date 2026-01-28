@@ -1,16 +1,15 @@
 <style>
     /* =========================================
-       CSS: SYSTEM UI & GRID (Foco em Alinhamento)
+       CSS: SYSTEM UI & GRID
        ========================================= */
     :root {
-        --c-bg-app: #f1f5f9;       /* Fundo da janela */
-        --c-bg-card: #ffffff;      /* Fundo dos cards */
-        --c-border: #e2e8f0;       /* Bordas sutis */
-        --c-text-main: #334155;    /* Texto Principal */
-        --c-text-muted: #94a3b8;   /* Rótulos */
-        --c-accent: #0f172a;       /* Destaques Escuros */
-        --c-primary: #2563eb;      /* Azul Institucional */
-        
+        --c-bg-app: #f1f5f9;       
+        --c-bg-card: #ffffff;      
+        --c-border: #e2e8f0;       
+        --c-text-main: #334155;    
+        --c-text-muted: #94a3b8;   
+        --c-accent: #0f172a;       
+        --c-primary: #2563eb;      
         --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
         --radius: 8px;
     }
@@ -18,7 +17,7 @@
     /* Reset e Base */
     .md-overlay {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(6px);
+        background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px);
         z-index: 10000; display: none; align-items: center; justify-content: center;
         opacity: 0; transition: opacity 0.2s ease-out;
     }
@@ -34,7 +33,7 @@
     }
     .md-overlay.show .md-box { transform: scale(1); }
 
-    /* --- HEADER (Barra de Título) --- */
+    /* --- HEADER --- */
     .md-header {
         background: var(--c-bg-card); padding: 16px 24px;
         border-bottom: 1px solid var(--c-border);
@@ -51,22 +50,34 @@
     }
     .md-close:hover { color: #ef4444; }
 
+    /* --- NAVEGAÇÃO DE ABAS (Estilo AWB) --- */
+    .md-tabs-nav {
+        display: flex; padding: 0 24px; gap: 24px; background: #fff;
+        border-bottom: 1px solid var(--c-border); flex-shrink: 0;
+    }
+    .md-tab-btn {
+        padding: 16px 4px; background: none; border: none;
+        font-size: 0.9rem; font-weight: 600; color: #64748b;
+        border-bottom: 3px solid transparent; cursor: pointer; transition: 0.2s;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .md-tab-btn:hover { color: var(--c-primary); }
+    .md-tab-btn.active { color: var(--c-primary); border-bottom-color: var(--c-primary); }
+
     /* --- CORPO (Scroll) --- */
     .md-body {
         flex: 1; overflow-y: auto; padding: 24px;
-        display: flex; flex-direction: column; gap: 24px;
+        display: flex; flex-direction: column; background: var(--c-bg-app);
     }
     
-    /* Scrollbar Estilizada */
     .md-body::-webkit-scrollbar { width: 8px; }
     .md-body::-webkit-scrollbar-track { background: transparent; }
     .md-body::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
 
-    /* --- SISTEMA DE GRID (12 Colunas) --- */
+    /* --- SISTEMA DE GRID --- */
     .grid-container {
         display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; width: 100%;
     }
-    /* Classes de Colunas (Span) */
     .col-12 { grid-column: span 12; }
     .col-9  { grid-column: span 9; }
     .col-8  { grid-column: span 8; }
@@ -75,7 +86,6 @@
     .col-3  { grid-column: span 3; }
     .col-2  { grid-column: span 2; }
 
-    /* Responsividade */
     @media (max-width: 1024px) {
         .col-3, .col-4 { grid-column: span 6; }
         .col-8, .col-9 { grid-column: span 12; }
@@ -84,9 +94,7 @@
         .col-2, .col-3, .col-4, .col-6 { grid-column: span 12; }
     }
 
-    /* --- COMPONENTES VISUAIS --- */
-    
-    /* 1. Cards (Container de Grupo) */
+    /* --- CARDS & CAMPOS --- */
     .box-card {
         background: var(--c-bg-card); border: 1px solid var(--c-border);
         border-radius: var(--radius); box-shadow: var(--shadow-sm);
@@ -99,11 +107,10 @@
     }
     .box-body { padding: 16px; }
 
-    /* 2. Pares Label-Valor (Alinhamento Vertical) */
     .field-row { display: flex; gap: 16px; margin-bottom: 12px; }
     .field-row:last-child { margin-bottom: 0; }
     
-    .kv { display: flex; flex-direction: column; flex: 1; min-width: 0; } /* min-width 0 evita estourar grid */
+    .kv { display: flex; flex-direction: column; flex: 1; min-width: 0; }
     
     .lb {
         font-size: 0.65rem; color: var(--c-text-muted); font-weight: 600; 
@@ -112,26 +119,26 @@
     .vl {
         font-size: 0.9rem; color: var(--c-text-main); font-weight: 500;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        min-height: 1.2em; /* Garante altura mesmo vazio */
+        min-height: 1.2em;
     }
     
-    /* Variações de Valor */
+    /* Variações */
     .vl.lg { font-size: 1.1rem; font-weight: 700; color: var(--c-accent); }
     .vl.mono { font-family: 'Roboto Mono', monospace; font-size: 0.85rem; letter-spacing: -0.5px; }
     .vl.money { font-family: 'Roboto Mono', monospace; font-weight: 700; color: #059669; }
     .vl.status-ok { color: #16a34a; font-weight: 700; }
     .vl.status-err { color: #dc2626; font-weight: 700; }
 
-    /* 3. Tabelas Internas (Financeiro) */
+    /* Tabela Interna */
     .table-clean { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
     .table-clean td { padding: 6px 0; border-bottom: 1px dashed var(--c-border); }
     .table-clean tr:last-child td { border-bottom: none; }
     .td-lb { color: var(--c-text-muted); }
     .td-vl { text-align: right; font-weight: 600; color: var(--c-text-main); font-family: 'Roboto Mono', monospace;}
 
-    /* 4. Loader */
+    /* Loader */
     .loader-overlay {
-        position: absolute; inset: 0; background: rgba(255,255,255,0.9); z-index: 50;
+        position: absolute; inset: 0; background: rgba(255,255,255,0.95); z-index: 50;
         display: flex; flex-direction: column; align-items: center; justify-content: center;
         color: var(--c-primary); gap: 10px; font-weight: 600;
     }
@@ -147,39 +154,70 @@
                 </div>
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <span id="mdg-filial" style="font-weight:700; font-size:1rem; color:var(--c-accent); line-height:1.1;">--</span>
-                    <span style="font-size:0.75rem; color:var(--c-text-muted);">Visualização Completa do Documento</span>
+                    <span style="font-size:0.75rem; color:var(--c-text-muted);">Detalhes do Conhecimento de Transporte</span>
                 </div>
             </div>
             <button class="md-close" onclick="FecharModalGlobal(null)">&times;</button>
+        </div>
+
+        <div class="md-tabs-nav">
+            <button class="md-tab-btn active" onclick="MudarAbaCtc('geral')">
+                <i class="bi bi-grid-1x2"></i> Visão Geral
+            </button>
+            <button class="md-tab-btn" onclick="MudarAbaCtc('cpl')">
+                <i class="bi bi-layers"></i> Dados Complementares (CPL)
+            </button>
         </div>
 
         <div class="md-body" style="position: relative;">
             
             <div id="mdg-loader" class="loader-overlay">
                 <div class="spinner-border text-primary" role="status"></div>
-                <div style="font-size:0.85rem; color:#64748b;">Carregando dados...</div>
+                <div>Carregando dados completos...</div>
             </div>
 
-            <div id="mdg-content" class="grid-container"></div>
+            <div id="tab-geral" class="grid-container" style="display:grid;">
+                </div>
+
+            <div id="tab-cpl" class="grid-container" style="display:none;">
+                </div>
             
         </div>
     </div>
 </div>
 
 <script>
-    // --- FUNÇÕES DE CONTROLE ---
+    // --- CONTROLE DE ABAS ---
+    function MudarAbaCtc(abaNome) {
+        // Atualiza botões
+        document.querySelectorAll('.md-tab-btn').forEach(b => b.classList.remove('active'));
+        const btn = event.currentTarget || document.querySelector(`.md-tab-btn[onclick*="'${abaNome}'"]`);
+        if(btn) btn.classList.add('active');
+
+        // Atualiza conteudos
+        document.getElementById('tab-geral').style.display = 'none';
+        document.getElementById('tab-cpl').style.display = 'none';
+
+        if (abaNome === 'geral') document.getElementById('tab-geral').style.display = 'grid';
+        if (abaNome === 'cpl')   document.getElementById('tab-cpl').style.display = 'grid';
+    }
+
+    // --- FUNÇÕES PRINCIPAIS ---
     
     async function AbrirModalGlobal(filial, serie, ctc) {
         const modal = document.getElementById('modal-global-ctc');
         const loader = document.getElementById('mdg-loader');
-        const content = document.getElementById('mdg-content');
         
-        // Setup Visual
+        // Reset Visual
         document.getElementById('mdg-ctc-num').innerText = `${ctc}-${serie}`;
         document.getElementById('mdg-filial').innerText = `FILIAL: ${filial}`;
-        content.innerHTML = ''; 
+        document.getElementById('tab-geral').innerHTML = ''; 
+        document.getElementById('tab-cpl').innerHTML = ''; 
+        
+        // Reset da Aba para 'Geral'
+        MudarAbaCtc('geral');
 
-        // Abre
+        // Abre Modal
         modal.style.display = 'flex';
         requestAnimationFrame(() => modal.classList.add('show'));
         loader.style.display = 'flex';
@@ -196,10 +234,10 @@
 
         } catch (error) {
             console.error(error);
-            content.innerHTML = `
+            document.getElementById('tab-geral').innerHTML = `
                 <div class="col-12" style="text-align:center; padding:40px;">
                     <i class="bi bi-x-circle" style="font-size:3rem; color:#ef4444;"></i>
-                    <h3 style="color:#334155; margin-top:10px;">Falha ao carregar</h3>
+                    <h3 style="color:#334155;">Falha ao carregar</h3>
                     <p style="color:#94a3b8;">${error.message || error}</p>
                 </div>
             `;
@@ -216,30 +254,25 @@
         }
     }
 
-    // --- HELPERS DE FORMATAÇÃO (BLINDADOS) ---
-    
-    // Formata Moeda (checa se é numérico)
+    // --- HELPERS (Formatação) ---
     const fmtM = (v) => {
         if (v === undefined || v === null || String(v).includes('NULL')) return '-';
         return parseFloat(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     };
 
-    // Formata Data (converte tudo pra string antes de checar)
     const fmtD = (v) => {
         if (!v) return '-';
-        const s = String(v); // Converte número/objeto para texto à força
+        const s = String(v); 
         if (s === 'None' || s.includes('NULL')) return '-';
         try { return s.split(' ')[0].split('-').reverse().join('/'); } catch { return s; }
     };
 
-    // Checa valor genérico
     const ck = (v) => {
         if (v === undefined || v === null) return '&nbsp;';
         const s = String(v);
         return (s !== 'None' && s !== 'null' && s !== '[NULL]') ? s : '&nbsp;';
     };
     
-    // Cria o HTML do campo
     const kv = (label, val, cls='') => `
         <div class="kv">
             <span class="lb">${label}</span>
@@ -248,15 +281,15 @@
 
     // --- RENDERIZADOR ---
     function RenderizarGrid(d) {
-        const c = document.getElementById('mdg-content');
+        const cGeral = document.getElementById('tab-geral');
+        const cCpl = document.getElementById('tab-cpl');
         
-        // Verifica se entrega foi realizada (Lógica segura)
         const temEntrega = d.entrega_data && !String(d.entrega_data).includes('NULL');
 
-        let html = ``;
-
-        // 1. LINHA DE STATUS (KPIs)
-        html += `
+        // ==========================================
+        // ABA 1: VISÃO GERAL (Mantida Original)
+        // ==========================================
+        let htmlGeral = `
         <div class="col-12 grid-container" style="gap:16px;">
             <div class="col-2 box-card">
                 <div class="box-body">
@@ -278,7 +311,7 @@
             </div>
             <div class="col-6 box-card">
                 <div class="box-body" style="display:flex; justify-content:space-between;">
-                    ${kv('Motivo DOC', d.motivodoc)}
+                    ${kv('Motivo', d.motivodoc)}
                     ${kv('Natureza', d.natureza)}
                     ${kv('Modal', d.modal)}
                     ${kv('Volumes', d.volumes, 'lg')}
@@ -286,89 +319,49 @@
                     ${kv('Valor Merc.', fmtM(d.valmerc), 'money')}
                 </div>
             </div>
-        </div>`;
+        </div>
 
-        // 2. ATORES
-        html += `
         <div class="col-4 box-card">
             <div class="box-header"><i class="bi bi-box-arrow-up"></i> Remetente</div>
             <div class="box-body">
-                <div class="field-row">
-                    ${kv('Razão Social', d.remet_nome, 'lg')}
-                </div>
-                <div class="field-row">
-                    ${kv('CNPJ', d.remet_cgc, 'mono')}
-                    ${kv('IE', d.remet_ie, 'mono')}
-                </div>
-                 <div class="field-row">
-                    ${kv('Endereço', d.remet_end)}
-                    ${kv('CEP', d.remet_cep, 'mono')}
-                </div>
-                 <div class="field-row">
-                    ${kv('Cidade / UF', `${ck(d.remet_cidade)} - ${ck(d.remet_uf)}`)}
-                </div>
+                <div class="field-row">${kv('Razão Social', d.remet_nome, 'lg')}</div>
+                <div class="field-row">${kv('CNPJ', d.remet_cgc, 'mono')} ${kv('IE', d.remet_ie, 'mono')}</div>
+                 <div class="field-row">${kv('Cidade / UF', `${ck(d.remet_cidade)} - ${ck(d.remet_uf)}`)}</div>
             </div>
         </div>
 
         <div class="col-4 box-card">
             <div class="box-header"><i class="bi bi-box-arrow-in-down"></i> Destinatário</div>
             <div class="box-body">
-                <div class="field-row">
-                    ${kv('Razão Social', d.dest_nome, 'lg')}
-                </div>
-                <div class="field-row">
-                    ${kv('CNPJ', d.dest_cgc, 'mono')}
-                    ${kv('IE', d.dest_ie, 'mono')}
-                </div>
-                 <div class="field-row">
-                    ${kv('Endereço', d.dest_end)}
-                    ${kv('CEP', d.dest_cep, 'mono')}
-                </div>
-                 <div class="field-row">
-                    ${kv('Cidade / UF', `${ck(d.dest_cidade)} - ${ck(d.dest_uf)}`)}
-                </div>
+                <div class="field-row">${kv('Razão Social', d.dest_nome, 'lg')}</div>
+                <div class="field-row">${kv('CNPJ', d.dest_cgc, 'mono')} ${kv('IE', d.dest_ie, 'mono')}</div>
+                 <div class="field-row">${kv('Cidade / UF', `${ck(d.dest_cidade)} - ${ck(d.dest_uf)}`)}</div>
             </div>
         </div>
 
         <div class="col-4 box-card">
             <div class="box-header"><i class="bi bi-person-badge"></i> Tomador / Outros</div>
             <div class="box-body">
-                <div class="field-row">
-                    ${kv('Pagador', d.respons_nome)}
-                </div>
-                <div class="field-row">
-                    ${kv('CNPJ Pagador', d.respons_cgc, 'mono')}
-                </div>
+                <div class="field-row">${kv('Pagador', d.respons_nome)}</div>
+                <div class="field-row">${kv('CNPJ Pagador', d.respons_cgc, 'mono')}</div>
                 <hr style="margin:10px 0; border:0; border-top:1px dashed #e2e8f0;">
-                <div class="field-row">
-                    ${kv('Redespacho', d.redesp_nome)}
-                </div>
-                 <div class="field-row">
-                    ${kv('Cidade Coleta', ck(d.cid_coleta) + ' - ' + ck(d.uf_coleta))}
-                </div>
+                <div class="field-row">${kv('Redespacho', d.redesp_nome)}</div>
             </div>
         </div>
-        `;
 
-        // 3. LOGÍSTICA
-        html += `
         <div class="col-8 box-card">
             <div class="box-header"><i class="bi bi-map"></i> Dados Operacionais</div>
             <div class="box-body">
                 <div class="field-row">
-                    ${kv('Origem Doc', d.origem)}
-                    ${kv('Cidade Origem', d.cidade_orig + '/' + d.uf_orig)}
-                    <i class="bi bi-arrow-right" style="align-self:center; color:#ccc;"></i>
-                    ${kv('Cidade Destino', d.cidade_dest + '/' + d.uf_dest)}
+                    ${kv('Rota', `${d.cidade_orig}/${d.uf_orig} <i class="bi bi-arrow-right"></i> ${d.cidade_dest}/${d.uf_dest}`)}
                     ${kv('Unid. LASTMILE', d.rotafilialdest)}
-                    ${kv('Unid. Descr LASTMILE', d.descr_rotafilial)}
+                    ${kv('Desc. Rota', d.descr_rotafilial)}
                 </div>
                 <div class="field-row" style="margin-top:16px;">
                     ${kv('Espécie', d.especie)}
                     ${kv('Peso Taxado', d.pesotax, 'mono')}
-                    ${kv('Data Limite Embarque', fmtD(d.datalimiteembarque))}
+                    ${kv('Data Limite', fmtD(d.datalimiteembarque))}
                     ${kv('CFOP', d.cfop, 'mono')}
-                    ${kv('Tributação', d.tribut)}
                 </div>
                 <div class="field-row" style="margin-top:16px;">
                     <div class="kv" style="flex:3;">
@@ -377,82 +370,172 @@
                             ${ck(d.nfs)}
                          </div>
                     </div>
-                    ${kv('Qtd NFs', d.qtdenfs)}
                 </div>
             </div>
         </div>
-        `;
 
-        // 4. FINANCEIRO
-        html += `
         <div class="col-4 box-card">
             <div class="box-header"><i class="bi bi-currency-dollar"></i> Custos & Frete</div>
             <div class="box-body" style="background:#fcfcfc;">
                 <table class="table-clean">
                     <tr><td class="td-lb">Frete Peso</td><td class="td-vl">${fmtM(d.fretepeso)}</td></tr>
                     <tr><td class="td-lb">Frete Valor</td><td class="td-vl">${fmtM(d.fretevalor)}</td></tr>
-                    <tr><td class="td-lb">GRIS</td><td class="td-vl">${fmtM(d.gris)}</td></tr>
-                    <tr><td class="td-lb">Pedágio</td><td class="td-vl">${fmtM(d.pedagio)}</td></tr>
-                    <tr><td class="td-lb">Taxas (Coleta/Entr)</td><td class="td-vl">${fmtM(parseFloat(d.txcoleta||0) + parseFloat(d.txentregared||0))}</td></tr>
-                    <tr><td class="td-lb">Outros (${ck(d.descrtxoutros)})</td><td class="td-vl">${fmtM(d.txoutros)}</td></tr>
+                    <tr><td class="td-lb">GRIS/Pedágio</td><td class="td-vl">${fmtM(parseFloat(d.gris)+parseFloat(d.pedagio))}</td></tr>
+                    <tr><td class="td-lb">Taxas</td><td class="td-vl">${fmtM(parseFloat(d.txcoleta||0) + parseFloat(d.txentregared||0))}</td></tr>
                     <tr style="border-top:2px solid #e2e8f0;">
                         <td class="td-lb" style="padding-top:10px; font-weight:700;">TOTAL FRETE</td>
                         <td class="td-vl" style="padding-top:10px; font-size:1.2rem; color:#2563eb;">${fmtM(d.fretetotalbruto)}</td>
                     </tr>
                 </table>
-                 <div style="margin-top:10px; text-align:right; font-size:0.7rem; color:#94a3b8;">
-                    Tab: ${ck(d.tabfrete)} | ICMS: ${fmtM(d.ValorICMS)} | Tab. Descr: ${ck(d.tabfretedescr)}
-                </div>
+            </div>
+        </div>
+
+        <div class="col-12 box-card">
+            <div class="box-header"><i class="bi bi-chat-text"></i> Observações</div>
+            <div class="box-body">
+                <p style="background:#fffbeb; padding:8px; border-radius:4px; font-size:0.85rem; color:#92400e; margin:0;">
+                    ${ck(d.obs_emissao)}
+                </p>
             </div>
         </div>
         `;
 
-        // 5. OBSERVAÇÕES
-        html += `
-        <div class="col-6 box-card">
-            <div class="box-header"><i class="bi bi-chat-text"></i> Observações</div>
-            <div class="box-body">
-                <div style="margin-bottom:10px;">
-                    <span class="lb" style="color:#b45309;">Emissão</span>
-                    <p style="background:#fffbeb; padding:8px; border-radius:4px; font-size:0.85rem; color:#92400e; margin:0;">
-                        ${ck(d.obs_emissao)}
-                    </p>
-                </div>
-                ${d.obs_ocorr ? `
-                <div>
-                    <span class="lb" style="color:#b91c1c;">Ocorrências</span>
-                    <p style="background:#fef2f2; padding:8px; border-radius:4px; font-size:0.85rem; color:#991b1b; margin:0;">
-                        ${ck(d.obs_ocorr)}
-                    </p>
-                </div>` : ''}
-            </div>
-        </div>
+        cGeral.innerHTML = htmlGeral;
 
+
+        // ==========================================
+        // ABA 2: DADOS COMPLEMENTARES (CPL)
+        // ==========================================
+        let htmlCpl = ``;
+        
+        // GRUPO 1: FISCAL & CTE
+        htmlCpl += `
         <div class="col-6 box-card">
-            <div class="box-header"><i class="bi bi-laptop"></i> Sistema & Rastreio</div>
+            <div class="box-header"><i class="bi bi-qr-code"></i> Fiscal & Sefaz (CTE)</div>
             <div class="box-body">
-                 <div class="field-row">
-                    ${kv('Controle RU', d.controleRU)}
-                    ${kv('Num. Serviço', d.nservico + '/' + d.nserviconum)}
-                    ${kv('Fatura', d.faturanum)}
+                <div class="field-row">
+                    ${kv('CTE Número', d.CTE, 'lg')}
+                    ${kv('Série', d.CTE_Serie)}
+                    ${kv('Status', d.CTE_Status_Retorno, d.CTE_Status_Retorno=='100'?'status-ok':'')}
                 </div>
                 <div class="field-row">
-                    ${kv('Disp. Cliente?', d.at_cliente)}
-                    ${kv('Enviado EDI?', d.at_edi)}
-                    ${kv('Cancelado?', d.cancelado, d.cancelado === 'S' ? 'status-err' : '')}
-                </div>
-                 <div class="field-row">
                      <div class="kv col-12">
-                        <span class="lb">Log de Rastreio</span>
-                        <span class="vl mono" style="white-space:normal; font-size:0.75rem; color:#64748b;">
-                            Criado por: ${ck(d.emissor)} | Impresso: ${ck(d.impresso_usu)} | Versão: ${ck(d.VersaoSistema)}
-                        </span>
+                        <span class="lb">Chave de Acesso</span>
+                        <span class="vl mono" style="font-size:0.75rem; word-break:break-all;">${ck(d.CTE_Chave)}</span>
+                     </div>
+                </div>
+                <div class="field-row">
+                    ${kv('Data Retorno', fmtD(d.CTE_Data_Retorno))}
+                    ${kv('Manifesto Vinc.', d.ManifestoQtdManifestos)}
+                    ${kv('Tipo Carga', d.TipoCarga)}
+                </div>
+            </div>
+        </div>`;
+
+        // GRUPO 2: FINANCEIRO
+        htmlCpl += `
+        <div class="col-6 box-card">
+            <div class="box-header"><i class="bi bi-wallet2"></i> Faturamento</div>
+            <div class="box-body">
+                <div class="field-row">
+                    ${kv('Fatura Nº', d.Fatura_Numero, 'lg')}
+                    ${kv('Vencimento', fmtD(d.Fatura_Vencimento))}
+                    ${kv('Status Fat.', d.Fatura_Status)}
+                </div>
+                <div class="field-row" style="background:#f8fafc; padding:8px; border-radius:6px;">
+                    ${kv('Valor Bruto', fmtM(d.Fatura_Valor_Bruto))}
+                    ${kv('Descontos', fmtM(d.Fatura_Desconto))}
+                    ${kv('Valor Líquido', fmtM(d.Fatura_Valor_Liquido), 'money')}
+                </div>
+                <div class="field-row">
+                    ${kv('Gerada em', fmtD(d.Fatura_dt))}
+                    ${kv('Emissor', d.Fatura_Emissor)}
+                </div>
+            </div>
+        </div>`;
+
+        // GRUPO 3: TRANSPORTE / LAST MILE (Os campos UltDocEntrega)
+        htmlCpl += `
+        <div class="col-12 box-card">
+            <div class="box-header"><i class="bi bi-truck-flatbed"></i> Execução de Transporte (Última Milha)</div>
+            <div class="box-body">
+                <div class="grid-container">
+                    <div class="col-4">
+                         <div class="field-row">${kv('Transportadora', d.UltDocEntregaTransportadora)}</div>
+                         <div class="field-row">${kv('CNPJ Transp.', d.UltDocEntregaTransportadoraCNPJ, 'mono')}</div>
+                         <div class="field-row">${kv('Motorista', d.UltDocEntregaMotoristaNome)}</div>
+                         <div class="field-row">${kv('CPF Motorista', d.UltDocEntregaMotoristaCpf, 'mono')}</div>
+                    </div>
+                    <div class="col-4">
+                         <div class="field-row">${kv('Doc. Entrega', d.UltDocEntregaNumero, 'lg')}</div>
+                         <div class="field-row">${kv('Placa Veículo', d.UltDocEntregaPlaca, 'lg')}</div>
+                         <div class="field-row">${kv('Data Geração', fmtD(d.UltDocEntregaData))}</div>
+                         <div class="field-row">${kv('Origem Doc', d.UltDocEntregaOrigem)}</div>
+                    </div>
+                    <div class="col-4">
+                         <div class="field-row">${kv('Resp. Unidade', d.UnidadeResponsavelNome)}</div>
+                         <div class="field-row">${kv('Resp. Fantasia', d.UltDocEntregaResponsavelFantasia)}</div>
+                         <div class="field-row">${kv('Resp. CNPJ', d.UltDocEntregaResponsavelCNPJ, 'mono')}</div>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+
+        // GRUPO 4: OCORRÊNCIAS & IMAGENS
+        const temImg = d.ImagemTemImagem || d.ImagemUrl;
+        
+        htmlCpl += `
+        <div class="col-6 box-card">
+            <div class="box-header"><i class="bi bi-exclamation-triangle"></i> Última Ocorrência</div>
+            <div class="box-body">
+                <div class="field-row">
+                    ${kv('Data Ocorr.', fmtD(d.UltimaOcorrCTCData))}
+                    ${kv('Código Última Ocorr.', d.UltimaOcorrCTCCodigo)}
+                </div>
+                <div class="field-row">
+                     <div class="kv col-12">
+                        <span class="lb">Descrição</span>
+                        <p style="background:#fef2f2; padding:8px; border-radius:4px; font-size:0.85rem; color:#991b1b; margin:0;">
+                            ${ck(d.UltimaOcorrCTCDescricao) || 'Nenhuma ocorrência recente.'}
+                        </p>
                      </div>
                 </div>
             </div>
         </div>
+
+        <div class="col-6 box-card" style="${temImg ? 'border-color:#2563eb;' : ''}">
+            <div class="box-header"><i class="bi bi-images"></i> Comprovantes / Canhoto</div>
+            <div class="box-body">
+                <div style="display:flex; gap:16px; align-items:center;">
+                    <div style="font-size:2.5rem; color:${temImg ? '#2563eb' : '#cbd5e1'};">
+                        <i class="bi ${temImg ? 'bi-file-earmark-check' : 'bi-file-earmark-x'}"></i>
+                    </div>
+                    <div style="flex:1;">
+                         <div class="field-row">${kv('Status Imagem', d.AnaliseStatusImagem)}</div>
+                         <div class="field-row">${kv('Link URL', d.ImagemUrl ? '<a href="'+d.ImagemUrl+'" target="_blank" style="font-weight:700;">ABRIR COMPROVANTE</a>' : 'Indisponível')}</div>
+                         <div class="field-row">
+                            ${kv('Protocolo', d.ImagemNroProtocolo)}
+                            ${kv('Data Rec.', fmtD(d.ImagemDataRecepcao))}
+                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-12 box-card">
+            <div class="box-header"><i class="bi bi-info-circle"></i> Outras Infos. Sistema</div>
+            <div class="box-body">
+                 <div class="field-row">
+                    ${kv('Cotação Nº', d.CotacaoNumero)}
+                    ${kv('Tipo Cotação', d.CotacaoTipo)}
+                    ${kv('Qtd Agendamentos', d.QtdAgendamento)}
+                    ${kv('Prazo Entrega', d.PrazoEntrega + ' dias')}
+                    ${kv('Troca Gelo?', d.Cliente_PermiteTrocarGelo === 'S' ? 'SIM' : 'NÃO')}
+                </div>
+            </div>
+        </div>
         `;
 
-        c.innerHTML = html;
+        cCpl.innerHTML = htmlCpl;
     }
 </script>

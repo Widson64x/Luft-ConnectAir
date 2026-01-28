@@ -6,6 +6,16 @@ let ORDEM_ATUAL = { col: 'data_raw', dir: 'desc' };
 const opts = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
 document.getElementById('data-extenso').innerText = new Date().toLocaleDateString('pt-BR', opts);
 
+// Função para receber datas de emissão dos CTCs, e descobrir o dd/mm/yyyy, para
+// Colocar na variável data-extenso para ordenação correta.
+function AtualizarDataExtenso(dataStr) {
+    const partes = dataStr.split('/');
+    const dataObj = new Date(Number(partes[2]), Number(partes[1]) - 1, Number(partes[0]));
+    document.getElementById('data-extenso').innerText = dataObj.toLocaleDateString('pt-BR', opts);
+}
+
+
+
 BuscarDados();
 setInterval(BuscarDados, 10000);
 
@@ -18,7 +28,7 @@ async function BuscarDados() {
             const partes = d.data_emissao.split('/');
             const horaLimpa = d.hora_emissao.replace(':', '');
             d.data_raw = Number(`${partes[2]}${partes[1]}${partes[0]}${horaLimpa}`);
-            
+            AtualizarDataExtenso(d.data_emissao);
             // Texto de busca expandido
             d.busca_texto = `${d.ctc} ${d.remetente} ${d.destinatario} ${d.origem} ${d.destino} ${d.filial} ${d.tipo_carga}`.toLowerCase();
         });
@@ -131,6 +141,7 @@ function Renderizar() {
                 <div style="font-size: 0.75rem; color: var(--text-muted);">${r.data_emissao.substring(0,5)}</div>
             </td>
             <td style="text-align:center;"><span class="badge-prio ${badgeClass}">${r.prioridade || 'NOR'}</span></td>
+            <td style="text-align:center;">${r.status_ctc}</td>
             <td style="text-align:center; font-weight:600; color:#555;">${r.unid_lastmile}</td>
             <td>
                 <div class="col-route">${r.origem} <i class="ph-bold ph-arrow-right"></i> ${r.destino}</div>
