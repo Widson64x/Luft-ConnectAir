@@ -1,13 +1,13 @@
 from sqlalchemy import distinct
-from Conexoes import ObterSessaoPostgres
-from Models.POSTGRES.Cidade import Cidade, RemessaCidade
-from Models.POSTGRES.Aeroporto import Aeroporto, RemessaAeroportos
-from Models.POSTGRES.MalhaAerea import VooMalha, RemessaMalha 
+from Conexoes import ObterSessaoSqlServer
+from Models.SQL_SERVER.Cidade import Cidade, RemessaCidade
+from Models.SQL_SERVER.Aeroporto import Aeroporto, RemessaAeroportos
+from Models.SQL_SERVER.MalhaAerea import VooMalha, RemessaMalha 
 from Utils.Geometria import Haversine
 from Utils.Texto import NormalizarTexto
 
 def BuscarCoordenadasCidade(NomeCidade, Uf):
-    Sessao = ObterSessaoPostgres()
+    Sessao = ObterSessaoSqlServer()
     try:
         if not NomeCidade or not Uf: return None
         
@@ -36,7 +36,7 @@ def BuscarAeroportoMaisProximo(Lat, Lon):
     """
     Busca o aeroporto mais próximo que TENHA VOOS NA MALHA ATIVA.
     """
-    Sessao = ObterSessaoPostgres()
+    Sessao = ObterSessaoSqlServer()
     try:
         # 1. Lista de aeroportos que realmente operam (têm voos saindo) NA MALHA ATIVA
         AeroportosAtivos = Sessao.query(distinct(VooMalha.AeroportoOrigem))\

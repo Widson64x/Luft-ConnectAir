@@ -1,5 +1,5 @@
-from Conexoes import ObterSessaoPostgres
-from Models.POSTGRES.VersaoSistema import VersaoSistema
+from Conexoes import ObterSessaoSqlServer
+from Models.SQL_SERVER.VersaoSistema import VersaoSistema
 from sqlalchemy import desc
 from datetime import datetime
 
@@ -8,7 +8,7 @@ class VersaoService:
     @staticmethod
     def ObterVersaoAtual():
         """Retorna a versão mais recente registrada no banco."""
-        with ObterSessaoPostgres() as sessao:
+        with ObterSessaoSqlServer() as sessao:
             versao = sessao.query(VersaoSistema).order_by(desc(VersaoSistema.DataLancamento)).first()
             if not versao:
                 return {
@@ -28,7 +28,7 @@ class VersaoService:
     @staticmethod
     def RegistrarNovaVersao(numero, estagio, notas, responsavel, hash_commit=None):
         """Cria um novo registro de versão (Usado no Merge)."""
-        with ObterSessaoPostgres() as sessao:
+        with ObterSessaoSqlServer() as sessao:
             nova_versao = VersaoSistema(
                 NumeroVersao=numero,
                 Estagio=estagio,
@@ -44,7 +44,7 @@ class VersaoService:
     @staticmethod
     def PromoverEstagio(novo_estagio):
         """Atualiza o estágio da versão atual (Ex: Alpha -> Beta)."""
-        with ObterSessaoPostgres() as sessao:
+        with ObterSessaoSqlServer() as sessao:
             ultima_versao = sessao.query(VersaoSistema).order_by(desc(VersaoSistema.DataLancamento)).first()
             
             if ultima_versao:

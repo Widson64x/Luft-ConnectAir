@@ -2,9 +2,9 @@ import os
 import pandas as pd
 from datetime import datetime, timedelta, date, time
 from sqlalchemy import desc, func
-from Conexoes import ObterSessaoPostgres
-from Models.POSTGRES.Aeroporto import Aeroporto
-from Models.POSTGRES.MalhaAerea import RemessaMalha, VooMalha
+from Conexoes import ObterSessaoSqlServer
+from Models.SQL_SERVER.Aeroporto import Aeroporto
+from Models.SQL_SERVER.MalhaAerea import RemessaMalha, VooMalha
 from Utils.Formatadores import PadronizarData
 from Configuracoes import ConfiguracaoBase
 from Services.LogService import LogService  # <--- Import Adicionado
@@ -18,22 +18,20 @@ class MalhaService:
     Contém lógica de importação de arquivos, persistência de dados e algoritmos de roteamento (Graph Theory).
     """
 
+    DIR_TEMP = os.path.join(os.getcwd(), 'DATA', 'Temp_Malhas')
+    
     @staticmethod
     def _GarantirDiretorio():
-        """Garante a existência do diretório temporário para processamento de arquivos."""
+        """Garante que a pasta temporária exista antes de processar arquivos."""
         if not os.path.exists(MalhaService.DIR_TEMP):
-            try:
-                os.makedirs(MalhaService.DIR_TEMP)
-                LogService.Debug("MalhaService", f"Diretório temporário criado: {MalhaService.DIR_TEMP}")
-            except Exception as e:
-                LogService.Error("MalhaService", "Falha ao criar diretório temporário", e)
+            os.makedirs(MalhaService.DIR_TEMP)
 
     # --- MÉTODOS DE GESTÃO (CRUD) ---
 
     @staticmethod
     def ListarRemessas():
         """Lista histórico de importações de malha."""
-        Sessao = ObterSessaoPostgres()
+        Sessao = ObterSessaoSqlServer()
         try:
             return Sessao.query(RemessaMalha).order_by(desc(RemessaMalha.DataUpload)).all()
         finally:
@@ -42,7 +40,7 @@ class MalhaService:
     @staticmethod
     def ExcluirRemessa(id_remessa):
         """Realiza a exclusão lógica ou física de uma remessa e seus voos associados."""
-        Sessao = ObterSessaoPostgres()
+        Sessao = ObterSessaoSqlServer()
         try:
             RemessaAlvo = Sessao.query(RemessaMalha).get(id_remessa)
             if RemessaAlvo:
@@ -88,7 +86,7 @@ class MalhaService:
             # Define o primeiro dia do mês como referência
             DataRef = PrimeiraData.replace(day=1) 
             
-            Sessao = ObterSessaoPostgres()
+            Sessao = ObterSessaoSqlServer()
             ExisteConflito = False
             try:
                 Anterior = Sessao.query(RemessaMalha).filter_by(MesReferencia=DataRef, Ativo=True).first()
@@ -115,7 +113,7 @@ class MalhaService:
         Realiza a substituição de malha anterior caso necessário.
         """
         LogService.Info("MalhaService", f"Iniciando processamento final ({tipo_acao}) para {data_ref}")
-        Sessao = ObterSessaoPostgres()
+        Sessao = ObterSessaoSqlServer()
         try:
             Df = pd.read_excel(caminho_arquivo, engine='openpyxl')
             Df.columns = [c.strip().upper() for c in Df.columns]
@@ -187,7 +185,7 @@ class MalhaService:
     @staticmethod
     def ObterTotalVoosData(data_ref):
         """Retorna count de voos ativos para uma data específica."""
-        Sessao = ObterSessaoPostgres()
+        Sessao = ObterSessaoSqlServer()
         try:
             DataFiltro = data_ref.date() if isinstance(data_ref, datetime) else data_ref
             
@@ -214,7 +212,7 @@ class MalhaService:
         Executa busca de voos ou cálculo de rotas (Dijkstra/DFS limitado).
         Suporta busca direta por número de voo ou busca de rotas origem->destino.
         """
-        Sessao = ObterSessaoPostgres()
+        Sessao = ObterSessaoSqlServer()
         try:
             LogService.Debug("MalhaService", f"Buscando rotas: {data_inicio} até {data_fim} | {origem_iata}->{destino_iata} | Voo: {numero_voo}")
             

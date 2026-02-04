@@ -1,9 +1,9 @@
 from datetime import datetime, date, time, timedelta
 from decimal import Decimal
 from sqlalchemy import desc, func
-from Conexoes import ObterSessaoSqlServer, ObterSessaoPostgres
+from Conexoes import ObterSessaoSqlServer, ObterSessaoSqlServer
 from Models.SQL_SERVER.Ctc import CtcEsp, CtcEspCpl
-from Models.POSTGRES.Planejamento import PlanejamentoCabecalho, PlanejamentoItem, PlanejamentoTrecho
+from Models.SQL_SERVER.Planejamento import PlanejamentoCabecalho, PlanejamentoItem, PlanejamentoTrecho
 from Services.LogService import LogService 
 
 class PlanejamentoService:
@@ -92,7 +92,7 @@ class PlanejamentoService:
         Postgres para saber o Status do Planejamento.
         """
         SessaoSQL = ObterSessaoSqlServer()
-        SessaoPG = ObterSessaoPostgres() 
+        SessaoPG = ObterSessaoSqlServer() 
         
         try:
             LogService.Debug("PlanejamentoService", "Iniciando busca de CTCs Aéreos de Hoje/Ontem...")
@@ -473,7 +473,7 @@ class PlanejamentoService:
         """
         Salva ou atualiza o Planejamento, Itens e TRECHOS DE VOO.
         """
-        SessaoPG = ObterSessaoPostgres()
+        SessaoPG = ObterSessaoSqlServer()
         if not SessaoPG: 
             LogService.Error("PlanejamentoService", "Falha de conexão com Postgres ao tentar RegistrarPlanejamento.")
             return None

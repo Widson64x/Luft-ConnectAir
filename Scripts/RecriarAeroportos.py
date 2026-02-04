@@ -7,8 +7,8 @@ CaminhoBase = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(CaminhoBase)
 
 from Conexoes import ObterEnginePostgres
-from Models.POSTGRES.Aeroporto import RemessaAeroportos, Aeroporto
-from Models.POSTGRES.Base import BasePostgres
+from Models.SQL_SERVER.Aeroporto import RemessaAeroportos, Aeroporto
+from Models.SQL_SERVER.Base import BasePostgres
 
 def Recriar():
     print("🔨 Recriando tabelas de Aeroportos com nova estrutura...")
