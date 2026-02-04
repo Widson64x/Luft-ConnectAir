@@ -16,6 +16,7 @@ from Routes.Cidades import CidadeBp
 from Routes.Escalas import EscalasBp
 from Routes.Planejamento import PlanejamentoBp
 from Routes.Acompanhamento import AcompanhamentoBP
+from Routes.TabelasFrete import FreteBp
 
 
 # --- REGISTRO DE ROTAS (BLUEPRINTS) ---
@@ -89,6 +90,7 @@ app.register_blueprint(CidadeBp, url_prefix=Prefix)
 app.register_blueprint(PlanejamentoBp, url_prefix=f'{Prefix}/Planejamento')
 app.register_blueprint(EscalasBp, url_prefix=f'{Prefix}/Escalas')
 app.register_blueprint(AcompanhamentoBP, url_prefix=f'{Prefix}/Acompanhamento')
+app.register_blueprint(FreteBp, url_prefix=f'{Prefix}/Fretes')
 
 # Rota principal do Dashboard com o prefixo
 @app.route(f'{Prefix}/')
