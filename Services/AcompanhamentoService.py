@@ -12,9 +12,9 @@ from Models.SQL_SERVER.Cadastros import CompanhiaAerea
 from Conexoes import ObterEngineSqlServer
 
 # --- MODELS POSTGRES (NOVO - MALHA) ---
-from Models.POSTGRES.MalhaAerea import VooMalha, RemessaMalha
-from Models.POSTGRES.Aeroporto import Aeroporto
-from Conexoes import ObterSessaoPostgres
+from Models.SQL_SERVER.MalhaAerea import VooMalha, RemessaMalha
+from Models.SQL_SERVER.Aeroporto import Aeroporto
+from Conexoes import ObterSessaoSqlServer
 
 # --- SERVICES ---
 from Services.AeroportosService import AeroportoService
@@ -300,7 +300,7 @@ class AcompanhamentoService:
     # --- MODAL VOO (MALHA PREVISTA) ---
     @staticmethod
     def BuscarDetalhesVooModal(numero_voo, data_ref_str):
-        session_pg = ObterSessaoPostgres()
+        session_pg = ObterSessaoSqlServer()
         try:
             voo_numerico = AcompanhamentoService._LimparNumeroVoo(numero_voo)
             if not voo_numerico: return None

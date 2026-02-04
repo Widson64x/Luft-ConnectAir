@@ -6,12 +6,12 @@ CaminhoBase = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(CaminhoBase)
 
 from Conexoes import ObterEnginePostgres
-from Models.POSTGRES.Base import BasePostgres
+from Models.SQL_SERVER.Base import BasePostgres
 
 # Importar os modelos para que o SQLAlchemy saiba o que criar
-from Models.POSTGRES.MalhaAerea import RemessaMalha, VooMalha
-from Models.POSTGRES.Aeroporto import RemessaAeroportos, Aeroporto
-from Models.POSTGRES.Cidade import RemessaCidade, Cidade 
+from Models.SQL_SERVER.MalhaAerea import RemessaMalha, VooMalha
+from Models.SQL_SERVER.Aeroporto import RemessaAeroportos, Aeroporto
+from Models.SQL_SERVER.Cidade import RemessaCidade, Cidade 
 def CriarTabelas():
     print("🚀 Iniciando setup do Banco de Dados...")
     

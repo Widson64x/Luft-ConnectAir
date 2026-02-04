@@ -1,11 +1,16 @@
 import os
 import pandas as pd
+import math # Importante para verificações numéricas se necessário
 from datetime import datetime, date
 from sqlalchemy import desc
-from Conexoes import ObterSessaoPostgres
-from Models.POSTGRES.Aeroporto import RemessaAeroportos, Aeroporto
+# AJUSTE 1: Importar a conexão correta (se você renomeou no Conexoes.py, ajuste aqui)
+# Se você manteve o nome da função mas mudou o conteúdo, pode manter. 
+# Recomendado: Usar a conexão do SQL Server explicitamente.
+from Conexoes import ObterSessaoSqlServer as ObterSessao 
+# AJUSTE 2: Importar os modelos da pasta SQL_SERVER
+from Models.SQL_SERVER.Aeroporto import RemessaAeroportos, Aeroporto
 from Configuracoes import ConfiguracaoBase
-from Services.LogService import LogService # <--- Import do Log
+from Services.LogService import LogService
 
 DIR_TEMP = ConfiguracaoBase.DIR_TEMP
 
@@ -15,16 +20,11 @@ class AeroportoService:
     def BuscarPorSigla(Sigla):
         """
         Busca um aeroporto pelo código IATA (ex: GRU, JFK).
-        Utilizado pelo serviço de acompanhamento para plotar o mapa.
         """
-        Sessao = ObterSessaoPostgres()
+        Sessao = ObterSessao()
         try:
-            # Garante que a sigla esteja em maiúscula e sem espaços
             if not Sigla: return None
-            
             Sigla = Sigla.upper().strip()
-            
-            # Retorna o objeto Aeroporto (que contém Latitude e Longitude)
             return Sessao.query(Aeroporto).filter(Aeroporto.CodigoIata == Sigla).first()
         except Exception as e:
             LogService.Error("AeroportoService", f"Erro ao buscar aeroporto {Sigla}", e)
@@ -34,7 +34,7 @@ class AeroportoService:
 
     @staticmethod
     def ListarRemessasAeroportos():
-        Sessao = ObterSessaoPostgres()
+        Sessao = ObterSessao()
         try:
             return Sessao.query(RemessaAeroportos).order_by(desc(RemessaAeroportos.DataUpload)).all()
         except Exception as e:
@@ -45,7 +45,7 @@ class AeroportoService:
 
     @staticmethod
     def ExcluirRemessaAeroporto(IdRemessa):
-        Sessao = ObterSessaoPostgres()
+        Sessao = ObterSessao()
         try:
             LogService.Info("AeroportoService", f"Tentativa de excluir remessa ID: {IdRemessa}")
             Remessa = Sessao.query(RemessaAeroportos).get(IdRemessa)
@@ -69,16 +69,13 @@ class AeroportoService:
         try:
             LogService.Info("AeroportoService", f"Iniciando análise do arquivo: {FileStorage.filename}")
             
-            # Salva Temp
             CaminhoTemp = os.path.join(DIR_TEMP, FileStorage.filename)
             FileStorage.save(CaminhoTemp)
             
-            # Mês Atual como referência
             Hoje = date.today()
             DataRef = date(Hoje.year, Hoje.month, 1)
 
-            # Verifica conflito
-            Sessao = ObterSessaoPostgres()
+            Sessao = ObterSessao()
             ExisteConflito = False
             try:
                 Anterior = Sessao.query(RemessaAeroportos).filter_by(MesReferencia=DataRef, Ativo=True).first()
@@ -101,7 +98,7 @@ class AeroportoService:
     @staticmethod
     def ProcessarAeroportosFinal(CaminhoArquivo, DataRef, NomeOriginal, Usuario, TipoAcao):
         LogService.Info("AeroportoService", f"Processando arquivo {NomeOriginal} (Ação: {TipoAcao})")
-        Sessao = ObterSessaoPostgres()
+        Sessao = ObterSessao()
         try:
             # 1. Ler CSV
             try:
@@ -110,20 +107,17 @@ class AeroportoService:
                 LogService.Warning("AeroportoService", "Falha com UTF-8, tentando Latin1.")
                 Df = pd.read_csv(CaminhoArquivo, sep=',', engine='python', encoding='latin1')
             except Exception as e:
-                # Última tentativa
                 LogService.Warning("AeroportoService", f"Falha na leitura padrão: {e}. Tentando sem aspas.")
                 import csv
                 Df = pd.read_csv(CaminhoArquivo, sep=',', quoting=csv.QUOTE_NONE, engine='python')
             
             if len(Df.columns) < 2:
-                 # Check extra se a leitura falhou silenciosamente gerando poucas colunas
                  import csv
                  Df = pd.read_csv(CaminhoArquivo, sep=',', quoting=csv.QUOTE_NONE, engine='python')
 
             # 2. Limpeza dos Nomes das Colunas
             Df.columns = [c.replace('"', '').replace("'", "").strip().lower() for c in Df.columns]
             
-            # Mapeamento CSV -> Banco
             Mapa = {
                 'country_code': 'CodigoPais',
                 'region_name': 'NomeRegiao',
@@ -141,6 +135,10 @@ class AeroportoService:
                 return False, f"Colunas não identificadas. Encontradas: {list(Df.columns)}"
 
             Df = Df[ColunasUteis].rename(columns=Mapa)
+            
+            # --- CORREÇÃO PRINCIPAL: Substituir NaN por None ---
+            # SQL Server não aceita float('nan'). Deve ser None (NULL no banco).
+            Df = Df.where(pd.notnull(Df), None)
 
             # 3. Gerenciar Histórico
             Anterior = Sessao.query(RemessaAeroportos).filter_by(MesReferencia=DataRef, Ativo=True).first()
@@ -165,15 +163,19 @@ class AeroportoService:
             for Aero in ListaAeroportos:
                 Aero['IdRemessa'] = NovaRemessa.Id
                 
+                # Limpeza extra de strings caso tenha sobrado aspas
                 for key, val in Aero.items():
                     if isinstance(val, str):
                         Aero[key] = val.replace('"', '').strip()
-
-                try: Aero['Latitude'] = float(Aero['Latitude'])
-                except: Aero['Latitude'] = None
                 
-                try: Aero['Longitude'] = float(Aero['Longitude'])
-                except: Aero['Longitude'] = None
+                # Garantia final de numéricos (redundante mas segura)
+                if Aero.get('Latitude') is not None:
+                     try: Aero['Latitude'] = float(Aero['Latitude'])
+                     except: Aero['Latitude'] = None
+                     
+                if Aero.get('Longitude') is not None:
+                     try: Aero['Longitude'] = float(Aero['Longitude'])
+                     except: Aero['Longitude'] = None
 
             Sessao.bulk_insert_mappings(Aeroporto, ListaAeroportos)
             Sessao.commit()
@@ -193,10 +195,7 @@ class AeroportoService:
             
     @staticmethod
     def ListarTodosParaSelect():
-        """
-        Retorna lista simplificada para preencher combobox/datalist no frontend.
-        """
-        Sessao = ObterSessaoPostgres()
+        Sessao = ObterSessao()
         try:
             Dados = Sessao.query(
                 Aeroporto.CodigoIata, 

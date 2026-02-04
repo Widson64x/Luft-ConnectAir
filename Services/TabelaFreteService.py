@@ -2,8 +2,8 @@ import os
 import pandas as pd
 from datetime import datetime
 from sqlalchemy import desc
-from Conexoes import ObterSessaoPostgres
-from Models.POSTGRES.TabelaFrete import RemessaFrete, TabelaFrete
+from Conexoes import ObterSessaoSqlServer
+from Models.SQL_SERVER.TabelaFrete import RemessaFrete, TabelaFrete
 from Configuracoes import ConfiguracaoBase
 from Services.LogService import LogService
 
@@ -36,7 +36,7 @@ class TabelaFreteService:
 
     @staticmethod
     def ListarRemessas():
-        Sessao = ObterSessaoPostgres()
+        Sessao = ObterSessaoSqlServer()
         try:
             return Sessao.query(RemessaFrete).order_by(desc(RemessaFrete.DataUpload)).all()
         finally:
@@ -44,7 +44,7 @@ class TabelaFreteService:
 
     @staticmethod
     def ExcluirRemessa(id_remessa):
-        Sessao = ObterSessaoPostgres()
+        Sessao = ObterSessaoSqlServer()
         try:
             Remessa = Sessao.query(RemessaFrete).get(id_remessa)
             if Remessa:
@@ -62,7 +62,7 @@ class TabelaFreteService:
     def ProcessarArquivo(arquivo, usuario):
         TabelaFreteService._GarantirDiretorio()
         Caminho = os.path.join(TabelaFreteService.DIR_TEMP, arquivo.filename)
-        Sessao = ObterSessaoPostgres()
+        Sessao = ObterSessaoSqlServer()
         
         try:
             arquivo.save(Caminho)

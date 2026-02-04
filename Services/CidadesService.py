@@ -2,9 +2,9 @@ import os
 import pandas as pd
 from datetime import date
 from sqlalchemy import desc
-from Conexoes import ObterSessaoPostgres
+from Conexoes import ObterSessaoSqlServer
 from Configuracoes import ConfiguracaoBase
-from Models.POSTGRES.Cidade import RemessaCidade, Cidade
+from Models.SQL_SERVER.Cidade import RemessaCidade, Cidade
 from Services.LogService import LogService  # <--- Import do Log
 
 DIR_TEMP = ConfiguracaoBase.DIR_TEMP
@@ -30,7 +30,7 @@ class CidadesService:
         """
         Lista o histórico de uploads (Quem subiu, quando e se está ativo).
         """
-        Sessao = ObterSessaoPostgres()
+        Sessao = ObterSessaoSqlServer()
         try:
             return Sessao.query(RemessaCidade).order_by(desc(RemessaCidade.DataUpload)).all()
         except Exception as e:
@@ -44,7 +44,7 @@ class CidadesService:
         """
         Apaga um lote de cidades inteiro. Thanos Snap. 🫰
         """
-        Sessao = ObterSessaoPostgres()
+        Sessao = ObterSessaoSqlServer()
         try:
             LogService.Info("CidadesService", f"Tentativa de excluir remessa ID: {id_remessa}")
             Remessa = Sessao.query(RemessaCidade).get(id_remessa)
@@ -80,7 +80,7 @@ class CidadesService:
             Hoje = date.today()
             DataRef = date(Hoje.year, Hoje.month, 1)
 
-            Sessao = ObterSessaoPostgres()
+            Sessao = ObterSessaoSqlServer()
             ExisteConflito = False
             try:
                 # Verifica se já tem uma remessa ativa para este mês
@@ -112,7 +112,7 @@ class CidadesService:
         5. Bulk Insert no banco.
         """
         LogService.Info("CidadesService", f"Iniciando processamento final (Ação: {tipo_acao}) - Arquivo: {nome_original}")
-        Sessao = ObterSessaoPostgres()
+        Sessao = ObterSessaoSqlServer()
         try:
             # 1. Ler Excel (engine openpyxl para .xlsx)
             # header=None pois o arquivo parece não ter cabeçalho padrão ou é processado bruto
