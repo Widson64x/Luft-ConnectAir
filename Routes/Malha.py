@@ -22,7 +22,7 @@ def ApiRotas():
         DataIni = datetime.strptime(Inicio, '%Y-%m-%d').date()
         DataFim = datetime.strptime(Fim, '%Y-%m-%d').date()
         
-        LogService.Info("Routes.Malha", f"API Rota Solicitada por {current_user.Nome}: {Origem}->{Destino} ({Inicio} a {Fim})")
+        LogService.Info("Routes.Malha", f"API Rota Solicitada por {current_user.Login}: {Origem}->{Destino} ({Inicio} a {Fim})")
 
         # Chama a busca inteligente passando o novo parâmetro
         Dados = MalhaService.BuscarRotasInteligentes(DataIni, DataFim, Origem, Destino, NumeroVoo)
@@ -46,7 +46,7 @@ def Gerenciar():
             if Arquivo.filename == '':
                 flash('Selecione um arquivo.', 'warning')
             else:
-                LogService.Info("Routes.Malha", f"Upload de Malha iniciado por {current_user.Nome}")
+                LogService.Info("Routes.Malha", f"Upload de Malha iniciado por {current_user.Login}")
                 Sucesso, Info = MalhaService.AnalisarArquivo(Arquivo)
                 
                 if not Sucesso:
@@ -64,7 +64,7 @@ def Gerenciar():
                             Info['caminho_temp'], 
                             Info['mes_ref'], 
                             Info['nome_arquivo'], 
-                            current_user.Nome, 
+                            current_user.Login, 
                             'Importacao'
                         )
                         if Ok: flash(Msg, 'success')
@@ -84,7 +84,7 @@ def Gerenciar():
                 MesStr = MesStr.split(' ')[0]
             
             try:
-                LogService.Info("Routes.Malha", f"Usuário {current_user.Nome} confirmou substituição de malha.")
+                LogService.Info("Routes.Malha", f"Usuário {current_user.Login} confirmou substituição de malha.")
                 # Converte string para objeto date
                 DataRef = datetime.strptime(MesStr, '%Y-%m-%d').date()
                 
@@ -92,7 +92,7 @@ def Gerenciar():
                     CaminhoTemp, 
                     DataRef, 
                     NomeOriginal, 
-                    current_user.Nome, 
+                    current_user.Login, 
                     'Substituicao'
                 )
                 if Ok: flash(Msg, 'success')
@@ -114,7 +114,7 @@ def Gerenciar():
 @MalhaBp.route('/Malha/Excluir/<int:id_remessa>')
 @login_required
 def Excluir(id_remessa):
-    LogService.Warning("Routes.Malha", f"Solicitação de exclusão de remessa {id_remessa} por {current_user.Nome}")
+    LogService.Warning("Routes.Malha", f"Solicitação de exclusão de remessa {id_remessa} por {current_user.Login}")
     Sucesso, Mensagem = MalhaService.ExcluirRemessa(id_remessa)
     if Sucesso: flash(Mensagem, 'info')
     else: flash(Mensagem, 'danger')

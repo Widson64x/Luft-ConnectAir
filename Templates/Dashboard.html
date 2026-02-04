@@ -204,7 +204,7 @@
             <div class="stat-icon-box icon-purple"><i class="ph-duotone ph-users"></i></div>
             <div class="stat-info">
                 <h4>Usuário</h4>
-                <span>{{ current_user.Nome.split()[0] if current_user.is_authenticated else 'Visitante' }}</span>
+                <span>{{ current_user.Login.split()[0] if current_user.is_authenticated else 'Visitante' }}</span>
             </div>
         </div>
     </div>

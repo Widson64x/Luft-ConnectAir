@@ -1,0 +1,532 @@
+{% extends "Base.html" %}
+
+{% block titulo %}Gestão de Reversa | FlightOps{% endblock %}
+
+{% block conteudo %}
+{% include "Components/_ModalCtc.html" %}
+
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+<style>
+    /* --- ESTRUTURA E LAYOUT --- */
+    .reversa-container {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        animation: fadeIn 0.4s ease-in-out;
+    }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* --- CARDS DE ESTATÍSTICA --- */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+    }
+
+    .stat-card {
+        background: var(--cor-fundo-painel, #fff);
+        border: 1px solid var(--cor-borda, #e5e7eb);
+        border-radius: 12px;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+
+    .stat-icon {
+        width: 48px; height: 48px;
+        border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.5rem;
+    }
+
+    .stat-info h3 { margin: 0; font-size: 1.5rem; font-weight: 700; color: var(--cor-texto-principal, #111); }
+    .stat-info p { margin: 0; font-size: 0.85rem; color: var(--cor-texto-secundario, #666); font-weight: 500; }
+
+    /* Cores dos Cards */
+    .card-total .stat-icon { background: rgba(var(--cor-primaria-rgb, 59, 130, 246), 0.1); color: var(--cor-primaria, #3b82f6); }
+    .card-pendente .stat-icon { background: #fff3cd; color: #b45309; }
+    .card-liberado .stat-icon { background: #dcfce7; color: #15803d; }
+
+    /* --- BARRA DE FILTROS --- */
+    .toolbar {
+        background: var(--cor-fundo-painel, #fff);
+        border: 1px solid var(--cor-borda, #e5e7eb);
+        border-radius: 12px;
+        padding: 16px 24px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    }
+
+    .search-box {
+        position: relative;
+        flex: 1;
+        min-width: 300px;
+    }
+    .search-box input {
+        width: 100%;
+        padding: 10px 16px 10px 42px;
+        border: 1px solid var(--cor-borda, #ccc);
+        border-radius: 8px;
+        font-size: 0.9rem;
+        transition: border 0.2s;
+    }
+    .search-box input:focus { border-color: var(--cor-primaria, #007bff); outline: none; }
+    .search-box i {
+        position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+        color: var(--cor-texto-secundario, #aaa);
+        font-size: 1.1rem;
+    }
+
+    .filter-group {
+        display: flex; gap: 8px;
+    }
+
+    .btn-filter {
+        padding: 8px 16px;
+        border: 1px solid var(--cor-borda, #e5e7eb);
+        background: transparent;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--cor-texto-secundario, #555);
+        cursor: pointer;
+        display: flex; align-items: center; gap: 6px;
+        transition: all 0.2s;
+    }
+    .btn-filter:hover { background: #f9fafb; color: var(--cor-texto-principal, #111); }
+    
+    .btn-filter.active {
+        background: var(--cor-primaria, #007bff);
+        color: #fff;
+        border-color: var(--cor-primaria, #007bff);
+    }
+
+    /* --- TABELA --- */
+    .painel-tabela {
+        background: var(--cor-fundo-painel, #fff);
+        border: 1px solid var(--cor-borda, #e5e7eb);
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    }
+
+    .table-custom { width: 100%; border-collapse: collapse; }
+    
+    .table-custom th {
+        background: var(--cor-fundo-painel); 
+        color: var(--cor-texto-secundario); 
+        border-bottom: 2px solid var(--cor-borda); 
+        padding: 16px;
+        text-align: left;
+        font-weight: 700; 
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .table-custom td {
+        padding: 16px;
+        border-bottom: 1px solid var(--cor-borda); 
+        color: var(--cor-texto-principal);
+        font-size: 0.9rem;
+        vertical-align: middle;
+    }
+
+    .table-custom tr:last-child td { border-bottom: none; }
+    .table-custom tr:hover { background-color: #f9fafb; cursor: pointer; } /* Cursor pointer para indicar clicável */
+
+    /* Componentes da Tabela */
+    .ctc-destaque { font-weight: 700; color: var(--cor-primaria, #2563eb); font-family: monospace; font-size: 0.95rem; }
+    
+    .rota-badge {
+        display: inline-flex; 
+        align-items: center; 
+        gap: 8px;
+        background: rgba(var(--cor-primaria-rgb), 0.08); 
+        color: var(--cor-primaria); 
+        border: 1px solid rgba(var(--cor-primaria-rgb), 0.2);
+        padding: 6px 12px; 
+        border-radius: 20px;
+        font-size: 0.75rem; 
+        font-weight: 700;
+    }
+
+    /* Checkbox Grande */
+    .checkbox-wrapper {
+        display: flex; justify-content: center; align-items: center;
+        height: 100%;
+    }
+    .custom-check {
+        appearance: none;
+        width: 24px; height: 24px;
+        border: 2px solid var(--cor-borda, #d1d5db);
+        border-radius: 6px;
+        cursor: pointer;
+        display: grid; place-content: center;
+        transition: all 0.2s ease-in-out;
+    }
+    .custom-check::before {
+        content: "";
+        width: 12px; height: 12px;
+        transform: scale(0);
+        transition: 0.2s transform ease-in-out;
+        box-shadow: inset 1em 1em white;
+        transform-origin: center;
+        clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+    }
+    .custom-check:checked {
+        background-color: var(--cor-primaria, #2563eb);
+        border-color: var(--cor-primaria, #2563eb);
+    }
+    .custom-check:checked::before { transform: scale(1); }
+
+    /* Status Badges */
+    .status-badge {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 4px 12px; border-radius: 6px;
+        font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+    }
+    .status-pendente { background: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
+    .status-liberado { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+
+    /* Estado Vazio */
+    .empty-state { text-align: center; padding: 60px 20px; }
+    .empty-state i { font-size: 4rem; color: var(--cor-borda, #e5e7eb); margin-bottom: 16px; display: block; }
+    
+    /* Responsividade */
+    @media (max-width: 768px) {
+        .toolbar { flex-direction: column; align-items: stretch; }
+        .filter-group { overflow-x: auto; padding-bottom: 5px; }
+        .table-custom td, .table-custom th { padding: 12px; }
+    }
+</style>
+
+<div class="reversa-container">
+    
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 15px;">
+        <div>
+            <h2 style="font-weight: 800; color: var(--cor-texto-principal); margin: 0; display: flex; align-items: center; gap: 10px;">
+                <i class="ph-duotone ph-airplane-landing" style="color: var(--cor-primaria);"></i> Controle de Reversa
+            </h2>
+            <p style="color: var(--cor-texto-secundario); margin-top: 5px; font-size: 0.9rem;">
+                Gerenciamento e liberação de CTCs de devolução aérea sem AWB.
+            </p>
+        </div>
+        <div style="font-size: 0.8rem; color: var(--cor-texto-secundario); text-align: right;">
+            <i class="ph-bold ph-clock"></i> Atualizado em: <strong id="last-update">--:--</strong>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card card-total">
+            <div class="stat-icon"><i class="ph-duotone ph-files"></i></div>
+            <div class="stat-info">
+                <h3 id="count-total">{{ Lista|length }}</h3>
+                <p>Total de Registros</p>
+            </div>
+        </div>
+        <div class="stat-card card-pendente">
+            <div class="stat-icon"><i class="ph-duotone ph-warning-circle"></i></div>
+            <div class="stat-info">
+                {% set pendentes = Lista | selectattr("is_liberado", "equalto", False) | list | length %}
+                <h3 id="count-pendente">{{ pendentes }}</h3>
+                <p>Aguardando Liberação</p>
+            </div>
+        </div>
+        <div class="stat-card card-liberado">
+            <div class="stat-icon"><i class="ph-duotone ph-check-circle"></i></div>
+            <div class="stat-info">
+                {% set liberados = Lista | selectattr("is_liberado", "equalto", True) | list | length %}
+                <h3 id="count-liberado">{{ liberados }}</h3>
+                <p>Prontos p/ Planejamento</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="toolbar">
+        <div class="search-box">
+            <i class="ph-bold ph-magnifying-glass"></i>
+            <input type="text" id="searchInput" placeholder="Pesquisar CTC, Cidade, Remetente..." onkeyup="filtrarTabela()">
+        </div>
+
+        <div class="filter-group">
+            <button class="btn-filter active" onclick="setFilter('todos', this)" id="btn-todos">
+                <i class="ph-bold ph-list"></i> Todos
+            </button>
+            <button class="btn-filter" onclick="setFilter('pendente', this)" id="btn-pendente">
+                <i class="ph-bold ph-hourglass"></i> Pendentes
+            </button>
+            <button class="btn-filter" onclick="setFilter('liberado', this)" id="btn-liberado">
+                <i class="ph-bold ph-check"></i> Liberados
+            </button>
+        </div>
+    </div>
+
+    <div class="painel-tabela">
+        <div style="overflow-x: auto;">
+            <table class="table-custom" id="mainTable">
+                <thead>
+                    <tr>
+                        <th class="text-center" style="width: 70px;">Liberar</th>
+                        <th>Detalhes do Documento</th>
+                        <th>Rota</th>
+                        <th>Remetente / Destinatário</th>
+                        <th class="text-center">Volumes</th>
+                        <th class="text-center">Peso</th>
+                        <th>Status / Responsável</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if Lista %}
+                        {% for item in Lista %}
+                        <tr class="data-row" 
+                            data-status="{{ 'liberado' if item.is_liberado else 'pendente' }}"
+                            data-search="{{ item.ctc }} {{ item.filial }} {{ item.remetente }} {{ item.destinatario }} {{ item.cidade_origem }} {{ item.cidade_destino }}"
+                            ondblclick="AbrirModalGlobal('{{ item.filial }}', '{{ item.serie }}', '{{ item.ctc }}')"
+                            title="Duplo clique para ver detalhes">
+                            
+                            <td class="text-center" onclick="event.stopPropagation()">
+                                <div class="checkbox-wrapper">
+                                    <input type="checkbox" class="custom-check chk-action"
+                                           id="chk-{{ item.filial }}-{{ item.ctc }}"
+                                           data-filial="{{ item.filial }}"
+                                           data-serie="{{ item.serie }}"
+                                           data-ctc="{{ item.ctc }}"
+                                           {% if item.is_liberado %}checked{% endif %}>
+                                </div>
+                            </td>
+
+                            <td>
+                                <div class="ctc-destaque">{{ item.ctc }}</div>
+                                <div style="font-size: 0.75rem; color: #666; margin-top: 2px;">
+                                    Filial: {{ item.filial }} | Série: {{ item.serie }}
+                                </div>
+                                <div style="font-size: 0.75rem; color: #888; margin-top: 2px;">
+                                    <i class="ph-bold ph-calendar-blank"></i> {{ item.data_emissao }}
+                                </div>
+                            </td>
+
+                            <td>
+                                <div class="rota-badge">
+                                    {{ item.cidade_origem }} 
+                                    <i class="ph-bold ph-arrow-right" style="font-size: 0.7rem; color: var(--cor-primaria);"></i> 
+                                    {{ item.cidade_destino }}
+                                </div>
+                            </td>
+
+                            <td style="max-width: 250px;">
+                                <div style="font-weight: 600; font-size: 0.85rem; color: var(--cor-texto-principal); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ item.remetente }}">
+                                    <i class="ph-bold ph-package" style="color: #aaa;"></i> {{ item.remetente }}
+                                </div>
+                                <div style="font-size: 0.8rem; color: var(--cor-texto-secundario); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ item.destinatario }}">
+                                    <i class="ph-bold ph-user" style="color: #aaa;"></i> {{ item.destinatario }}
+                                </div>
+                            </td>
+
+                            <td class="text-center">
+                                <span style="font-weight: 700; color: var(--cor-texto-principal);">{{ item.volumes }}</span>
+                            </td>
+
+                            <td class="text-center">
+                                <span style="font-weight: 600; color: #555;">{{ item.peso|round(1) }} Kg</span>
+                            </td>
+
+                            <td>
+                                <div id="status-display-{{ item.filial }}-{{ item.ctc }}">
+                                    {% if item.is_liberado %}
+                                        <div class="status-badge status-liberado">Liberado</div>
+                                        <div style="font-size: 0.7rem; color: #666; margin-top: 4px;">
+                                            Por: {{ item.responsavel }}
+                                        </div>
+                                    {% else %}
+                                        <div class="status-badge status-pendente">Pendente</div>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr id="no-data-row">
+                            <td colspan="7">
+                                <div class="empty-state">
+                                    <i class="ph-duotone ph-check-circle"></i>
+                                    <h3>Tudo Limpo!</h3>
+                                    <p>Nenhuma devolução pendente para o modal aéreo neste momento.</p>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endif %}
+                    
+                    <tr id="no-search-results" style="display: none;">
+                        <td colspan="7">
+                            <div class="empty-state">
+                                <i class="ph-duotone ph-magnifying-glass"></i>
+                                <h3>Nenhum resultado</h3>
+                                <p>Não encontramos nada com os filtros atuais.</p>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div style="padding: 12px 20px; background: #f9fafb; border-top: 1px solid var(--cor-borda); font-size: 0.8rem; color: #666; text-align: right;">
+            Exibindo <span id="visible-count">0</span> registros
+        </div>
+    </div>
+</div>
+
+<script>
+    // Variável global para o filtro atual
+    let currentFilter = 'todos'; 
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Atualiza hora
+        document.getElementById('last-update').innerText = new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+        
+        // Inicializa contadores
+        filtrarTabela();
+
+        // Adiciona listeners aos checkboxes
+        const checkboxes = document.querySelectorAll('.chk-action');
+        checkboxes.forEach(chk => {
+            chk.addEventListener('change', handleCheck);
+        });
+    });
+
+    // Função de filtro visual
+    function setFilter(filterType, btnElement) {
+        currentFilter = filterType;
+        
+        // Atualiza botões
+        document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
+        btnElement.classList.add('active');
+
+        filtrarTabela();
+    }
+
+    // Lógica principal de filtragem
+    function filtrarTabela() {
+        const searchText = document.getElementById('searchInput').value.toLowerCase();
+        const rows = document.querySelectorAll('.data-row');
+        let visibleCount = 0;
+        let hasData = false;
+
+        rows.forEach(row => {
+            const status = row.dataset.status; // 'pendente' ou 'liberado'
+            const textContent = row.dataset.search.toLowerCase();
+            
+            // Verifica Filtro de Status
+            let statusMatch = (currentFilter === 'todos') || (currentFilter === status);
+            
+            // Verifica Busca
+            let textMatch = textContent.includes(searchText);
+
+            if (statusMatch && textMatch) {
+                row.style.display = '';
+                visibleCount++;
+                hasData = true;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        // Controle de mensagens de "vazio"
+        const noSearchRow = document.getElementById('no-search-results');
+        const noDataRow = document.getElementById('no-data-row');
+
+        if (noSearchRow) noSearchRow.style.display = (!hasData && rows.length > 0) ? '' : 'none';
+        
+        // Atualiza contador de rodapé
+        document.getElementById('visible-count').innerText = visibleCount;
+    }
+
+    // Função Async para salvar no banco
+    async function handleCheck(e) {
+        const el = e.target;
+        const isChecked = el.checked;
+        const row = el.closest('tr');
+        
+        // Dados para envio
+        const payload = {
+            filial: el.dataset.filial,
+            serie: el.dataset.serie,
+            ctc: el.dataset.ctc,
+            liberado: isChecked
+        };
+
+        const statusDisplay = document.getElementById(`status-display-${payload.filial}-${payload.ctc}`);
+        const originalHtml = statusDisplay.innerHTML;
+
+        // Feedback Visual
+        statusDisplay.innerHTML = `<div style="color:var(--cor-primaria); font-size:0.75rem; font-weight:600;"><i class="ph-bold ph-spinner ph-spin"></i> Salvando...</div>`;
+        el.disabled = true;
+
+        try {
+            const response = await fetch('/T-FlightOps/Reversa/AtualizarStatus', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const json = await response.json();
+
+            if (json.sucesso) {
+                // Atualiza Dataset da linha para os filtros funcionarem
+                row.dataset.status = isChecked ? 'liberado' : 'pendente';
+                
+                // Atualiza HTML do status
+                if (isChecked) {
+                    statusDisplay.innerHTML = `
+                        <div class="status-badge status-liberado">Liberado</div>
+                        <div style="font-size: 0.7rem; color: #666; margin-top: 4px;">Agora</div>
+                    `;
+                } else {
+                    statusDisplay.innerHTML = `
+                        <div class="status-badge status-pendente">Pendente</div>
+                    `;
+                }
+
+                // Atualiza os contadores do topo (simulação simples baseada na ação)
+                updateStatsCounters();
+            } else {
+                throw new Error(json.msg);
+            }
+        } catch (error) {
+            console.error(error);
+            alert('Erro ao comunicar com o servidor: ' + error.message);
+            el.checked = !isChecked; // Reverte
+            statusDisplay.innerHTML = originalHtml; // Reverte visual
+        } finally {
+            el.disabled = false;
+            // Reaplica filtros caso o usuário esteja vendo "Só Pendentes" e acabou de liberar um
+            filtrarTabela(); 
+        }
+    }
+
+    function updateStatsCounters() {
+        // Recalcula os totais baseados no DOM atual
+        const allRows = document.querySelectorAll('.data-row');
+        let pendentes = 0;
+        let liberados = 0;
+
+        allRows.forEach(row => {
+            if (row.dataset.status === 'pendente') pendentes++;
+            else liberados++;
+        });
+
+        document.getElementById('count-pendente').innerText = pendentes;
+        document.getElementById('count-liberado').innerText = liberados;
+    }
+</script>
+{% endblock %}

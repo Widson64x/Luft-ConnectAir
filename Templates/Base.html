@@ -94,6 +94,14 @@
                        <span class="link-text">Acompanhamento</span>
                    </div>
                 </a>
+
+                <a href="{{ url_for('Reversa.Index') }}" 
+                   class="menu-link {{ 'ativo' if request.endpoint and 'Reversa' in request.endpoint else '' }}">
+                   <div class="link-content">
+                       <i class="ph-bold ph-arrow-u-down-left"></i>
+                       <span class="link-text">Devoluções (Reversa)</span>
+                    </div>
+                </a>
                 
                 <div class="menu-divider"></div>
 
@@ -113,7 +121,7 @@
                     <div class="user-info">
                         <span class="user-name">
                             {% if current_user.is_authenticated %}
-                                {{ current_user.Nome }}
+                                {{ current_user.Login }}
                             {% else %}
                                 Visitante
                             {% endif %}

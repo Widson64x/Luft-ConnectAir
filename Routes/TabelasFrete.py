@@ -14,8 +14,8 @@ def Gerenciar():
             if Arquivo.filename == '':
                 flash('Selecione um arquivo válido.', 'warning')
             else:
-                LogService.Info("Routes.Frete", f"Upload iniciado por {current_user.Nome}")
-                Sucesso, Msg = TabelaFreteService.ProcessarArquivo(Arquivo, current_user.Nome)
+                LogService.Info("Routes.Frete", f"Upload iniciado por {current_user.Login}")
+                Sucesso, Msg = TabelaFreteService.ProcessarArquivo(Arquivo, current_user.Login)
                 
                 if Sucesso: flash(Msg, 'success')
                 else: flash(Msg, 'danger')
