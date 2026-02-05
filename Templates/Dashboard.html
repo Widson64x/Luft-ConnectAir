@@ -214,7 +214,7 @@
     </div>
 
     <div class="modules-grid">
-
+        {% if current_user.TemPermissao('planejamento.visualizar') %}
         <a href="{{ url_for('Planejamento.Dashboard') }}" class="module-card">
             <div class="card-icon"><i class="ph-duotone ph-globe-hemisphere-west"></i></div>
             <div class="card-content">
@@ -223,7 +223,9 @@
             </div>
             <div class="card-action"><i class="ph-bold ph-arrow-right"></i></div>
         </a>
+        {% endif %}
 
+        {% if current_user.TemPermissao('acompanhamento.visualizar') %}
         <a href="{{ url_for('Acompanhamento.Painel') }}" class="module-card">
             <div class="card-icon"><i class="ph-bold ph-airplane-in-flight"></i></div>
             <div class="card-content">
@@ -232,7 +234,9 @@
             </div>
             <div class="card-action"><i class="ph-bold ph-arrow-right"></i></div>
         </a>
+        {% endif %}
 
+        {% if current_user.TemPermissao('cadastros.malha.visualizar') %}
         <a href="{{ url_for('Escalas.Mapa') }}" class="module-card">
             <div class="card-icon"><i class="ph-duotone ph-broadcast"></i></div>
             <div class="card-content">
@@ -241,16 +245,47 @@
             </div>
             <div class="card-action"><i class="ph-bold ph-arrow-right"></i></div>
         </a>
+        {% endif %}
+        
+        {# 1. Lógica para definir o destino com base na prioridade #}
+        {% set link_destino = '' %}
 
-        <a href="{{ url_for('Malha.Gerenciar') }}" class="module-card">
-            <div class="card-icon"><i class="ph-duotone ph-file-xls"></i></div>
+        {% if current_user.TemPermissao('cadastros.malha.editar') %}
+            {% set link_destino = url_for('Malha.Gerenciar') %}
+
+        {% elif current_user.TemPermissao('cadastros.aeroportos.editar') %}
+            {% set link_destino = url_for('Aeroporto.Gerenciar') %}
+
+        {% elif current_user.TemPermissao('cadastros.cidades.editar') %}
+            {% set link_destino = url_for('Cidade.Gerenciar') %}
+
+        {% elif current_user.TemPermissao('cadastros.tabelas.editar') %}
+            {% set link_destino = url_for('Frete.Gerenciar') %}
+        {% endif %}
+
+
+        {# 2. Renderiza o Card APENAS se alguma rota foi definida (ou seja, tem alguma permissão) #}
+        {% if link_destino %}
+            <a href="{{ link_destino }}" class="module-card">
+                <div class="card-icon"><i class="ph-duotone ph-file-xls"></i></div>
+                <div class="card-content">
+                    <div class="card-title">Cadastro</div>
+                    <div class="card-desc">Cadastro de malha aérea, aeroportos e cidades.</div>
+                </div>
+                <div class="card-action"><i class="ph-bold ph-arrow-right"></i></div>
+            </a>
+        {% endif %}
+
+        {% if current_user.TemPermissao('reversa.visualizar') %}
+        <a href="{{ url_for('Reversa.Index') }}" class="module-card">
+            <div class="card-icon"><i class="ph-bold ph-arrow-u-down-left"></i></div>
             <div class="card-content">
-                <div class="card-title">Cadastro</div>
-                <div class="card-desc">Cadastro de malha aérea, aeroportos e cidades.</div>
+                <div class="card-title">Devoluções e Reversas</div>
+                <div class="card-desc">Área de gerenciamento de devoluções e processos de reversão. Para liberar os CTCs, de Devoluções.</div>
             </div>
             <div class="card-action"><i class="ph-bold ph-arrow-right"></i></div>
         </a>
-
+        {% endif %}
     </div>
 </div>
 
@@ -266,7 +301,7 @@
     updateClock();
  
     // --- CARREGAR ESTATÍSTICAS REAIS ---
-    const API_STATS = "{{ url_for('Escalas.ApiVoosHoje') }}";
+    const API_STATS = "{{ url_for('Global.ApiVoosHoje') }}";
 
     async function carregarStats() {
         try {

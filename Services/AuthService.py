@@ -64,6 +64,7 @@ class AuthService:
                     "email": UsuarioEncontrado.Email_Usuario,
                     "login": UsuarioEncontrado.Login_Usuario,
                     "grupo": sigla_grupo,
+                    "id_grupo": UsuarioEncontrado.codigo_usuariogrupo,
                     "ativo": True 
                 }
                 LogService.Info("AuthService", f"Usuário '{login}' localizado no SQL. Grupo: {sigla_grupo}")

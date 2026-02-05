@@ -2,10 +2,12 @@ from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify
 from Services.AcompanhamentoService import AcompanhamentoService
 from Services.LogService import LogService
+from Services.PermissaoService import RequerPermissao
 
 AcompanhamentoBP = Blueprint('Acompanhamento', __name__, url_prefix='/Acompanhamento')
 
 @AcompanhamentoBP.route('/Painel', methods=['GET'])
+@RequerPermissao('acompanhamento.visualizar')
 def Painel():
     LogService.Info("AcompanhamentoRoute", "Acessando rota /Painel.")
     try:

@@ -1,8 +1,11 @@
+from datetime import datetime
 from flask import Blueprint, jsonify, request
 from flask_login import login_required
+from Services import MalhaService
 from Services.Shared.AwbService import AwbService
 from Services.Shared.CtcService import CtcService
 from Services.LogService import LogService
+from Services.Shared.VoosDataService import ObterTotalVoosData
 
 GlobalBp = Blueprint('Global', __name__)
 
@@ -36,3 +39,11 @@ def ApiDetalhesAwbModal():
         return jsonify({'sucesso': True, 'dados': dados})
     else:
         return jsonify({'sucesso': False, 'msg': 'AWB não encontrada.'})
+    
+@GlobalBp.route('/API/Voos-Hoje') 
+@login_required
+def ApiVoosHoje():
+    Hoje = datetime.now()
+    # Chama a função do Service que aceita a data
+    Quantidade = ObterTotalVoosData(Hoje)
+    return jsonify(Quantidade)  

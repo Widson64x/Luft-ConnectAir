@@ -1,0 +1,393 @@
+{% extends "Base.html" %}
+
+{% block titulo %}Controle de Acesso | FlightOps{% endblock %}
+
+{% block conteudo %}
+<style>
+    @import url("{{ url_for('static', filename='CSS/Configuracoes.css') }}");
+
+    /* Estilos Extras para Abas e Status */
+    .tabs-header {
+        display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--cor-borda); padding-bottom: 0;
+    }
+    .tab-btn {
+        padding: 10px 20px; background: transparent; border: none; border-bottom: 3px solid transparent;
+        font-weight: 600; color: var(--cor-texto-secundario); cursor: pointer; transition: 0.2s;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .tab-btn.ativo {
+        color: var(--cor-primaria); border-bottom-color: var(--cor-primaria);
+    }
+    .tab-btn:hover:not(.ativo) { color: var(--cor-texto-principal); background: rgba(0,0,0,0.02); }
+
+    /* Indicadores de Status (Overrides) */
+    .status-badge {
+        font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; font-weight: 700; text-transform: uppercase;
+        margin-right: 10px; display: none; /* Escondido por padrão */
+    }
+    .status-badge.herdado { display: inline-block; background: #e2e8f0; color: #64748b; }
+    .status-badge.forcado { display: inline-block; background: #dcfce7; color: #166534; }
+    .status-badge.bloqueado { display: inline-block; background: #fee2e2; color: #991b1b; }
+
+    .btn-reset {
+        font-size: 0.7rem; color: var(--cor-texto-secundario); text-decoration: underline; cursor: pointer;
+        background: none; border: none; margin-left: 8px; display: none;
+    }
+    .btn-reset:hover { color: var(--cor-erro); }
+</style>
+
+<div class="config-container" style="height: 100%; overflow: hidden;">
+    
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">Controle de Acesso</h1>
+            <p class="section-subtitle">Gerencie permissões por grupos ou exceções por usuário.</p>
+        </div>
+        {% if current_user.TemPermissao('sistema.configuracoes.criar') %}
+        <div class="actions">
+            <button class="btn btn-primary" onclick="AbrirModalPermissao()">
+                <i class="ph-bold ph-plus"></i> Nova Permissão
+            </button>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="tabs-header">
+        <button class="tab-btn ativo" onclick="MudarAba('grupo')">
+            <i class="ph-bold ph-users-three"></i> Por Grupos
+        </button>
+        <button class="tab-btn" onclick="MudarAba('usuario')">
+            <i class="ph-bold ph-user"></i> Por Usuários (Exceções)
+        </button>
+    </div>
+
+    <div class="split-view-container">
+        
+        <aside class="sidebar-grupos">
+            <div class="sidebar-header-search">
+                <div class="search-box" style="width: 100%;">
+                    <i class="ph-bold ph-magnifying-glass"></i>
+                    <input type="text" id="filtroLateral" placeholder="Buscar..." onkeyup="FiltrarLateral(this.value)">
+                </div>
+            </div>
+            
+            <div class="lista-lateral" id="listaGrupos">
+                {% for grupo in Grupos %}
+                <div class="grupo-item item-lista" data-nome="{{ grupo.Nome_UsuarioGrupo }}" onclick="CarregarGrupo(this, '{{ grupo.codigo_usuariogrupo }}', '{{ grupo.Sigla_UsuarioGrupo }}')">
+                    <span class="grupo-nome">{{ grupo.Sigla_UsuarioGrupo }}</span>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="lista-lateral" id="listaUsuarios" style="display: none;">
+                {% for user in Usuarios %}
+                <div class="grupo-item item-lista" data-nome="{{ user.Nome_Usuario }}" onclick="CarregarUsuario(this, '{{ user.Codigo_Usuario }}', '{{ user.Nome_Usuario }}')">
+                    <div style="display: flex; flex-direction: column;">
+                        <span class="grupo-nome">{{ user.Nome_Usuario }}</span>
+                        <span class="grupo-sigla" style="font-weight: normal; margin-top: 2px;">{{ user.Login_Usuario }} | {{ user.Nome_UsuarioGrupo }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </aside>
+
+        <main class="content-permissoes">
+            
+            <div id="estadoVazio" class="empty-state">
+                <i class="ph-duotone ph-hand-pointing"></i>
+                <h3 id="msgVazio">Selecione um grupo ao lado</h3>
+            </div>
+
+            <div id="painelPermissoes" style="display: none; height: 100%; flex-direction: column;">
+                
+                <div class="permissoes-header">
+                    <div class="grupo-selecionado-info">
+                        <h2 id="tituloSelecionado">...</h2>
+                        <p id="subtituloSelecionado">...</p>
+                    </div>
+                    <div class="search-box">
+                        <i class="ph-bold ph-funnel"></i>
+                        <input type="text" placeholder="Filtrar permissões..." onkeyup="FiltrarPermissoes(this.value)">
+                    </div>
+                </div>
+
+                <div class="permissoes-scroll">
+                    {% for Categoria, ListaPerms in PermissoesPorCategoria.items() %}
+                        <div class="categoria-block">
+                            <div class="categoria-header">
+                                <span class="categoria-titulo"><i class="ph-bold ph-squares-four"></i> {{ Categoria }}</span>
+                            </div>
+                            <div class="lista-itens-perm">
+                                {% for perm in ListaPerms %}
+                                <div class="item-permissao">
+                                    <div class="info-perm">
+                                        <h4>{{ perm.Descricao_Permissao }}</h4>
+                                        <span>{{ perm.Chave_Permissao }}</span>
+                                    </div>
+                                    
+                                    <div style="display: flex; align-items: center;">
+                                        <span class="status-badge herdado" id="badge-inherit-{{ perm.Id_Permissao }}">Herdado</span>
+                                        <span class="status-badge forcado" id="badge-allow-{{ perm.Id_Permissao }}">Permitido Manual</span>
+                                        <span class="status-badge bloqueado" id="badge-deny-{{ perm.Id_Permissao }}">Bloqueado Manual</span>
+
+                                        <label class="switch">
+                                            <input type="checkbox" 
+                                                class="check-perm" 
+                                                id="chk-{{ perm.Id_Permissao }}"
+                                                data-id="{{ perm.Id_Permissao }}"
+                                                onchange="ProcessarClick(this)"
+                                                {% if not current_user.TemPermissao('sistema.configuracoes.editar') %}disabled{% endif %}>
+                                            <span class="slider"></span>
+                                        </label>
+
+                                        <button class="btn-reset" id="btn-reset-{{ perm.Id_Permissao }}" onclick="ResetarPermissao('{{ perm.Id_Permissao }}')">
+                                            Restaurar Padrão
+                                        </button>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="modalPermissao">
+    <div class="modal-content">
+        <h3>Nova Permissão</h3>
+        <form action="{{ url_for('Configuracoes.CriarNovaPermissao') }}" method="POST">
+            <div class="form-group"><label>Chave</label><input type="text" name="chave" class="form-control" required></div>
+            <div class="form-group"><label>Descrição</label><input type="text" name="descricao" class="form-control" required></div>
+            <div class="form-group"><label>Categoria</label><input type="text" name="categoria" class="form-control" list="listaCats" required></div>
+            <datalist id="listaCats">{% for k in PermissoesPorCategoria.keys() %}<option value="{{ k }}">{% endfor %}</datalist>
+            <button type="submit" class="btn btn-primary" style="margin-top: 10px; width: 100%;">Salvar</button>
+            <button type="button" class="btn btn-outline" onclick="document.getElementById('modalPermissao').classList.remove('show')" style="margin-top: 5px; width: 100%;">Cancelar</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    const PODE_EDITAR = {{ 'true' if current_user.TemPermissao('sistema.configuracoes.visualizar') else 'false' }};
+
+    // ESTADO GLOBAL
+    let MODO = 'Grupo'; // 'Grupo' ou 'Usuario'
+    let ID_ATUAL = null;
+    let DADOS_ATUAIS = null; // Cache dos dados carregados (herança etc)
+    
+    function MudarAba(novaAba) {
+        // 1. Alterna Visual das Abas
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('ativo'));
+        event.currentTarget.classList.add('ativo');
+
+        // 2. Alterna Sidebar
+        document.getElementById('listaGrupos').style.display = (novaAba === 'grupo') ? 'block' : 'none';
+        document.getElementById('listaUsuarios').style.display = (novaAba === 'usuario') ? 'block' : 'none';
+        
+        // 3. Reseta Painel Central
+        document.getElementById('painelPermissoes').style.display = 'none';
+        document.getElementById('estadoVazio').style.display = 'flex';
+        document.getElementById('msgVazio').innerText = (novaAba === 'grupo') ? 'Selecione um grupo' : 'Selecione um usuário';
+        
+        // 4. Atualiza Estado
+        MODO = (novaAba === 'grupo') ? 'Grupo' : 'Usuario';
+        ID_ATUAL = null;
+
+        // 5. Limpa seleção visual
+        document.querySelectorAll('.item-lista').forEach(i => i.classList.remove('ativo'));
+    }
+
+    // --- CARREGAMENTO DE GRUPO ---
+    async function CarregarGrupo(el, id, nome) {
+        if(MODO !== 'Grupo') return;
+        ID_ATUAL = id;
+        AtivarItemLista(el);
+        PrepararPainel(nome, 'Editando permissões gerais do grupo');
+
+        try {
+            const resp = await fetch("{{ url_for('Configuracoes.BuscarAcessosGrupo') }}?idGrupo=" + id);
+            const dados = await resp.json();
+            
+            const ativos = new Set(dados.ids_ativos);
+            
+            document.querySelectorAll('.check-perm').forEach(chk => {
+                const idPerm = parseInt(chk.dataset.id);
+                chk.checked = ativos.has(idPerm);
+                
+                // ALTERAÇÃO AQUI: Só habilita se tiver permissão
+                chk.disabled = !PODE_EDITAR; 
+                
+                ConfigurarVisualUsuario(idPerm, null, null, null); 
+            });
+
+        } catch (e) { alert('Erro ao carregar grupo.'); console.error(e); }
+    }
+
+    // --- CARREGAMENTO DE USUÁRIO ---
+    async function CarregarUsuario(el, id, nome) {
+        if(MODO !== 'Usuario') return;
+        ID_ATUAL = id;
+        AtivarItemLista(el);
+        PrepararPainel(nome, 'Editando exceções e heranças');
+
+        try {
+            const resp = await fetch("{{ url_for('Configuracoes.BuscarAcessosUsuario') }}?idUsuario=" + id);
+            DADOS_ATUAIS = await resp.json();
+            
+            const heranca = new Set(DADOS_ATUAIS.heranca_grupo);
+            const permitidos = new Set(DADOS_ATUAIS.usuario_permitidos);
+            const bloqueados = new Set(DADOS_ATUAIS.usuario_bloqueados);
+
+            document.querySelectorAll('.check-perm').forEach(chk => {
+                const idPerm = parseInt(chk.dataset.id);
+                
+                let isChecked = false;
+                let tipoStatus = 'herdado';
+
+                if (permitidos.has(idPerm)) {
+                    isChecked = true;
+                    tipoStatus = 'forcado';
+                } else if (bloqueados.has(idPerm)) {
+                    isChecked = false;
+                    tipoStatus = 'bloqueado';
+                } else {
+                    isChecked = heranca.has(idPerm);
+                    tipoStatus = 'herdado';
+                }
+
+                chk.checked = isChecked;
+                
+                // ALTERAÇÃO AQUI: Só habilita se tiver permissão
+                chk.disabled = !PODE_EDITAR;
+
+                ConfigurarVisualUsuario(idPerm, tipoStatus, isChecked, heranca.has(idPerm));
+            });
+
+        } catch (e) { alert('Erro ao carregar usuário.'); console.error(e); }
+    }
+
+    // --- INTERAÇÃO DO SWITCH ---
+    async function ProcessarClick(chk) {
+        // SEGURANÇA EXTRA: Se tentar burlar o HTML via inspecionar elemento
+        if (!PODE_EDITAR) {
+            chk.checked = !chk.checked; // Reverte visualmente
+            alert('Você não tem permissão para editar.');
+            return;
+        }
+
+        if (!ID_ATUAL) return;
+        const idPerm = chk.dataset.id;
+        const novoEstado = chk.checked; // True (Ativar) ou False (Desativar)
+
+        // LÓGICA GRUPO: Simples Add/Remove
+        if (MODO === 'Grupo') {
+            await EnviarAPI('Grupo', ID_ATUAL, idPerm, novoEstado ? 'Adicionar' : 'Remover');
+            return;
+        }
+
+        // LÓGICA USUÁRIO: Criar Exceção
+        if (MODO === 'Usuario') {
+            // Se o usuário clicou para LIGAR: 'Permitir'
+            // Se o usuário clicou para DESLIGAR: 'Bloquear'
+            const acao = novoEstado ? 'Permitir' : 'Bloquear';
+            await EnviarAPI('Usuario', ID_ATUAL, idPerm, acao);
+            
+            // Atualiza visual localmente para feedback instantâneo
+            ConfigurarVisualUsuario(idPerm, novoEstado ? 'forcado' : 'bloqueado', novoEstado, null);
+        }
+    }
+
+    async function ResetarPermissao(idPerm) {
+        if (!confirm('Voltar a herdar do grupo?')) return;
+        
+        await EnviarAPI('Usuario', ID_ATUAL, idPerm, 'Resetar');
+        
+        // Recarrega lógica local para saber como fica o switch (on ou off dependendo do grupo)
+        // Usamos DADOS_ATUAIS.heranca_grupo que já temos em cache
+        const heranca = new Set(DADOS_ATUAIS.heranca_grupo);
+        const herdaAtivo = heranca.has(parseInt(idPerm));
+        
+        const chk = document.getElementById('chk-' + idPerm);
+        chk.checked = herdaAtivo;
+        
+        ConfigurarVisualUsuario(idPerm, 'herdado', herdaAtivo, null);
+    }
+
+    // --- AUXILIARES VISUAIS ---
+    function ConfigurarVisualUsuario(idPerm, tipoStatus, isChecked, herancaValor) {
+        const badgeInherit = document.getElementById(`badge-inherit-${idPerm}`);
+        const badgeAllow = document.getElementById(`badge-allow-${idPerm}`);
+        const badgeDeny = document.getElementById(`badge-deny-${idPerm}`);
+        const btnReset = document.getElementById(`btn-reset-${idPerm}`);
+
+        // Reseta tudo primeiro
+        if(badgeInherit) badgeInherit.style.display = 'none';
+        if(badgeAllow) badgeAllow.style.display = 'none';
+        if(badgeDeny) badgeDeny.style.display = 'none';
+        if(btnReset) btnReset.style.display = 'none';
+
+        if (MODO === 'Grupo') return; // Não mostra nada em modo grupo
+
+        // Mostra o badge correto
+        if (tipoStatus === 'herdado') {
+            badgeInherit.style.display = 'inline-block';
+        } else if (tipoStatus === 'forcado') {
+            badgeAllow.style.display = 'inline-block';
+            btnReset.style.display = 'inline-block';
+        } else if (tipoStatus === 'bloqueado') {
+            badgeDeny.style.display = 'inline-block';
+            btnReset.style.display = 'inline-block';
+        }
+    }
+
+    async function EnviarAPI(tipo, alvo, perm, acao) {
+        try {
+            const resp = await fetch("{{ url_for('Configuracoes.SalvarVinculo') }}", {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ Tipo: tipo, IdAlvo: alvo, IdPermissao: perm, Acao: acao })
+            });
+            const d = await resp.json();
+            if(!d.sucesso) alert('Erro: ' + d.erro);
+        } catch(e) { console.error(e); alert('Erro de conexão'); }
+    }
+
+    // --- AUXILIARES GENÉRICOS ---
+    function AtivarItemLista(el) {
+        document.querySelectorAll('.item-lista').forEach(i => i.classList.remove('ativo'));
+        el.classList.add('ativo');
+    }
+    
+    function PrepararPainel(titulo, subtitulo) {
+        document.getElementById('estadoVazio').style.display = 'none';
+        document.getElementById('painelPermissoes').style.display = 'flex';
+        document.getElementById('tituloSelecionado').innerText = titulo;
+        document.getElementById('subtituloSelecionado').innerText = subtitulo;
+        // Reseta Scroll
+        document.querySelector('.permissoes-scroll').scrollTop = 0;
+    }
+
+    function FiltrarLateral(val) {
+        val = val.toLowerCase();
+        const listaId = MODO === 'Grupo' ? 'listaGrupos' : 'listaUsuarios';
+        document.querySelectorAll(`#${listaId} .item-lista`).forEach(el => {
+            el.style.display = el.innerText.toLowerCase().includes(val) ? 'flex' : 'none';
+        });
+    }
+
+    function FiltrarPermissoes(val) {
+        val = val.toLowerCase();
+        document.querySelectorAll('.item-permissao').forEach(el => {
+            el.style.display = el.innerText.toLowerCase().includes(val) ? 'flex' : 'none';
+        });
+        document.querySelectorAll('.categoria-block').forEach(cat => {
+            const visible = cat.querySelectorAll('.item-permissao[style="display: flex;"]').length > 0;
+            cat.style.display = visible ? 'block' : 'none';
+        });
+    }
+    
+    function AbrirModalPermissao() { document.getElementById('modalPermissao').classList.add('show'); }
+</script>
+{% endblock %}

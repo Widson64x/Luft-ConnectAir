@@ -25,7 +25,8 @@ def Login():
                 Nome=DadosUsuario['nome'],
                 Email=DadosUsuario['email'],
                 Grupo=DadosUsuario['grupo'],
-                IdBanco=DadosUsuario['id']
+                IdBanco=DadosUsuario['id'],
+                Id_Grupo_Banco=DadosUsuario.get('id_grupo')
             )
 
             login_user(UsuarioLogado)

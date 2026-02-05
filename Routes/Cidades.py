@@ -2,12 +2,14 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
 from datetime import datetime
 from Services.CidadesService import CidadesService
-from Services.LogService import LogService # <--- Import Log
+from Services.LogService import LogService
+from Services.PermissaoService import RequerPermissao # <--- Import Log
 
 CidadeBp = Blueprint('Cidade', __name__)
 
 @CidadeBp.route('/Cidades/Gerenciar', methods=['GET', 'POST'])
 @login_required
+@RequerPermissao('cadastros.cidades.editar')
 def Gerenciar():
     ModalConfirmacao = False
     DadosConfirmacao = {}
@@ -53,6 +55,7 @@ def Gerenciar():
 
 @CidadeBp.route('/Cidades/Excluir/<int:id_remessa>')
 @login_required
+@RequerPermissao('cadastros.cidades.editar')
 def Excluir(id_remessa):
     LogService.Info("Route.Cidades", f"Usuário {current_user.Login} solicitou exclusão da remessa {id_remessa}")
     Ok, Msg = CidadesService.ExcluirRemessa(id_remessa)

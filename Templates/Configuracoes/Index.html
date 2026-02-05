@@ -1,0 +1,63 @@
+{% extends "Base.html" %}
+
+{% block titulo %}Configurações | FlightOps{% endblock %}
+
+{% block conteudo %}
+<style>
+    /* Injeta o CSS específico */
+    {% include 'static/CSS/Configuracoes.css' ignore missing %}
+    /* Fallback simples se não incluir arquivo separado */
+    @import url("{{ url_for('static', filename='CSS/Configuracoes.css') }}");
+</style>
+
+<div class="config-container">
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">Configurações do Sistema</h1>
+            <p class="section-subtitle">Gerencie preferências, usuários e segurança da aplicação.</p>
+        </div>
+    </div>
+
+    <div class="config-grid">
+        <a href="{{ url_for('Configuracoes.Permissoes') }}" class="config-card">
+            <div class="card-icon">
+                <i class="ph-bold ph-shield-check"></i>
+            </div>
+            <div class="card-info">
+                <h3>Permissões de Acesso</h3>
+                <p>Gerencie grupos de usuários, níveis de acesso e vincule permissões específicas a funcionalidades.</p>
+            </div>
+        </a>
+
+        <a href="#" class="config-card" onclick="AlternarTema(); return false;">
+            <div class="card-icon" style="background: rgba(var(--cor-aviso-rgb), 0.1); color: var(--cor-aviso);">
+                <i class="ph-bold ph-paint-brush-broad"></i>
+            </div>
+            <div class="card-info">
+                <h3>Aparência e Tema</h3>
+                <p>Alterne entre modo claro e escuro ou customize as cores da interface.</p>
+            </div>
+        </a>
+
+        <div class="config-card" style="opacity: 0.6; cursor: not-allowed;">
+            <div class="card-icon" style="background: rgba(var(--cor-info-rgb), 0.1); color: var(--cor-info);">
+                <i class="ph-bold ph-scroll"></i>
+            </div>
+            <div class="card-info">
+                <h3>Logs de Auditoria</h3>
+                <p>Em breve: Visualize quem acessou o que e quando. Histórico de segurança.</p>
+            </div>
+        </div>
+
+        <div class="config-card" style="opacity: 0.6; cursor: not-allowed;">
+            <div class="card-icon" style="background: rgba(var(--cor-erro-rgb), 0.1); color: var(--cor-erro);">
+                <i class="ph-bold ph-plugs"></i>
+            </div>
+            <div class="card-info">
+                <h3>Integrações API</h3>
+                <p>Em breve: Gerencie chaves de API e conexões externas (Omie, Totvs).</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -2,11 +2,13 @@ from flask import Blueprint, jsonify, render_template, request, redirect, url_fo
 from flask_login import login_required, current_user
 from datetime import datetime
 from Services.MalhaService import MalhaService
-from Services.LogService import LogService # <--- Import Adicionado
+from Services.LogService import LogService
+from Services.PermissaoService import RequerPermissao # <--- Import Adicionado
 MalhaBp = Blueprint('Malha', __name__)
 
 @MalhaBp.route('/Malha/API/Rotas')
 @login_required
+@RequerPermissao('cadastros.malha.editar')
 def ApiRotas():
     Inicio = request.args.get('inicio')
     Fim = request.args.get('fim')
@@ -34,6 +36,7 @@ def ApiRotas():
 
 @MalhaBp.route('/Malha/Gerenciar', methods=['GET', 'POST'])
 @login_required
+@RequerPermissao('cadastros.malha.editar')
 def Gerenciar():
     # Variáveis para controlar o Modal de Confirmação
     ModalConfirmacao = False
@@ -113,6 +116,7 @@ def Gerenciar():
 
 @MalhaBp.route('/Malha/Excluir/<int:id_remessa>')
 @login_required
+@RequerPermissao('cadastros.malha.editar')
 def Excluir(id_remessa):
     LogService.Warning("Routes.Malha", f"Solicitação de exclusão de remessa {id_remessa} por {current_user.Login}")
     Sucesso, Mensagem = MalhaService.ExcluirRemessa(id_remessa)

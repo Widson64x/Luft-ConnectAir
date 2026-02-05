@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
+from Services.PermissaoService import RequerPermissao
 from Services.TabelaFreteService import TabelaFreteService
 from Services.LogService import LogService
 
@@ -7,6 +8,7 @@ FreteBp = Blueprint('Frete', __name__)
 
 @FreteBp.route('/Fretes/Gerenciar', methods=['GET', 'POST'])
 @login_required
+@RequerPermissao('cadastros.tabelas.visualizar')
 def Gerenciar():
     if request.method == 'POST':
         if 'arquivo_xlsx' in request.files:
@@ -27,6 +29,7 @@ def Gerenciar():
 
 @FreteBp.route('/Fretes/Excluir/<int:id_remessa>')
 @login_required
+@RequerPermissao('cadastros.tabelas.editar')
 def Excluir(id_remessa):
     Sucesso, Msg = TabelaFreteService.ExcluirRemessa(id_remessa)
     if Sucesso: flash(Msg, 'info')

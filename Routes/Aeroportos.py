@@ -3,7 +3,8 @@ from flask_login import login_required, current_user
 from datetime import datetime
 # Importa a CLASSE do Serviço agora, não as funções soltas
 from Services.AeroportosService import AeroportoService
-from Services.LogService import LogService # <--- Import Log
+from Services.LogService import LogService
+from Services.PermissaoService import RequerPermissao # <--- Import Log
 
 AeroportoBp = Blueprint('Aeroporto', __name__)
 
@@ -20,6 +21,7 @@ def ApiListarSimples():
 
 @AeroportoBp.route('/Aeroportos/Gerenciar', methods=['GET', 'POST'])
 @login_required
+@RequerPermissao('cadastros.aeroportos.editar') 
 def Gerenciar():
     ModalConfirmacao = False
     DadosConfirmacao = {}
@@ -89,6 +91,7 @@ def Gerenciar():
 
 @AeroportoBp.route('/Aeroportos/Excluir/<int:id_remessa>')
 @login_required
+@RequerPermissao('cadastros.aeroportos.editar')
 def Excluir(id_remessa):
     LogService.Info("Route.Aeroportos", f"Usuário {current_user.Login} solicitou exclusão da remessa {id_remessa}")
     # Chamada corrigida

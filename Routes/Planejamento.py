@@ -3,6 +3,7 @@ from flask_login import login_required, current_user
 from datetime import timedelta, datetime, date
 
 # Import dos Serviços
+from Services.PermissaoService import RequerPermissao
 from Services.PlanejamentoService import PlanejamentoService
 from Services.Shared.GeoService import BuscarCoordenadasCidade, BuscarAeroportoMaisProximo
 from Services.MalhaService import MalhaService
@@ -29,12 +30,14 @@ COORDENADAS_UFS = {
 
 @PlanejamentoBp.route('/Dashboard')
 @login_required
+@RequerPermissao('planejamento.visualizar')
 def Dashboard():
     LogService.Info("Routes.Planejamento", f"Usuário {current_user.id} acessou Dashboard Planejamento.")
     return render_template('Planejamento/Index.html')
 
 @PlanejamentoBp.route('/API/Listar')
 @login_required
+@RequerPermissao('planejamento.visualizar')
 def ApiCtcsHoje():
     # Log de Debug para não poluir o histórico principal com chamadas de API frequentes
     LogService.Debug("Routes.Planejamento", "API Listar CTCs requisitada.")
@@ -43,6 +46,7 @@ def ApiCtcsHoje():
 
 @PlanejamentoBp.route('/Montar/<string:filial>/<string:serie>/<string:ctc>')
 @login_required
+@RequerPermissao('planejamento.editar')
 def MontarPlanejamento(filial, serie, ctc):
     LogService.Info("Routes.Planejamento", f"Iniciando Montagem Planejamento: {filial}-{serie}-{ctc}")
     
@@ -98,6 +102,7 @@ def MontarPlanejamento(filial, serie, ctc):
 
 @PlanejamentoBp.route('/API/Salvar', methods=['POST'])
 @login_required
+@RequerPermissao('planejamento.editar')
 def SalvarPlanejamento():
     try:
         dados_front = request.json
@@ -151,6 +156,7 @@ def SalvarPlanejamento():
     
 @PlanejamentoBp.route('/Mapa-Global')
 @login_required
+@RequerPermissao('planejamento.mapa')
 def MapaGlobal():
     try:
         LogService.Debug("Routes.Planejamento", "Gerando Mapa Global...")
