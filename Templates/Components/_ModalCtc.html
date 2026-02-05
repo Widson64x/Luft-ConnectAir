@@ -1,6 +1,6 @@
 <style>
     /* =========================================
-       CSS: SYSTEM UI & GRID
+       CSS: SYSTEM UI & GRID (MODAL CTC)
        ========================================= */
     :root {
         --c-bg-app: #f1f5f9;       
@@ -14,21 +14,21 @@
         --radius: 8px;
     }
 
-    /* Reset e Base */
+    /* Overlay e Modal Base */
     .md-overlay {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px);
-        z-index: 10000; display: none; align-items: center; justify-content: center;
-        opacity: 0; transition: opacity 0.2s ease-out;
+        background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(4px);
+        z-index: 9999; display: none; align-items: center; justify-content: center;
+        opacity: 0; transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .md-overlay.show { opacity: 1; }
 
     .md-box {
-        width: 96%; max-width: 1300px; height: 92vh;
+        width: 95%; max-width: 1300px; height: 90vh;
         background: var(--c-bg-app); border-radius: 12px;
-        box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+        box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
         display: flex; flex-direction: column; overflow: hidden;
-        transform: scale(0.98); transition: transform 0.2s ease-out;
+        transform: scale(0.96); transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         font-family: 'Inter', system-ui, -apple-system, sans-serif;
     }
     .md-overlay.show .md-box { transform: scale(1); }
@@ -40,72 +40,77 @@
         display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
     }
     .doc-badge {
-        background: var(--c-accent); color: #fff; padding: 6px 12px;
-        border-radius: 6px; font-weight: 700; font-size: 0.9rem; letter-spacing: 0.5px;
-        display: flex; align-items: center; gap: 8px;
+        background: var(--c-accent); color: #fff; padding: 8px 16px;
+        border-radius: 6px; font-weight: 700; font-size: 1rem; letter-spacing: 0.5px;
+        display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
     }
     .md-close {
-        border: none; background: transparent; font-size: 1.5rem; color: var(--c-text-muted);
-        cursor: pointer; transition: color 0.2s; display: flex; align-items: center;
+        border: none; background: transparent; font-size: 1.8rem; color: var(--c-text-muted);
+        cursor: pointer; transition: color 0.2s; display: flex; align-items: center; padding: 0;
     }
     .md-close:hover { color: #ef4444; }
 
-    /* --- NAVEGAÇÃO DE ABAS (Estilo AWB) --- */
+    /* --- NAVEGAÇÃO DE ABAS --- */
     .md-tabs-nav {
-        display: flex; padding: 0 24px; gap: 24px; background: #fff;
+        display: flex; padding: 0 24px; gap: 32px; background: #fff;
         border-bottom: 1px solid var(--c-border); flex-shrink: 0;
     }
     .md-tab-btn {
-        padding: 16px 4px; background: none; border: none;
+        padding: 16px 0; background: none; border: none;
         font-size: 0.9rem; font-weight: 600; color: #64748b;
         border-bottom: 3px solid transparent; cursor: pointer; transition: 0.2s;
-        display: flex; align-items: center; gap: 8px;
+        display: flex; align-items: center; gap: 8px; position: relative;
     }
     .md-tab-btn:hover { color: var(--c-primary); }
     .md-tab-btn.active { color: var(--c-primary); border-bottom-color: var(--c-primary); }
+    .tab-badge { 
+        background: #e2e8f0; color: #475569; padding: 1px 6px; 
+        border-radius: 10px; font-size: 0.7rem; font-weight: 700;
+        margin-left: 4px; 
+    }
+    .md-tab-btn.active .tab-badge { background: #dbeafe; color: #1e40af; }
 
     /* --- CORPO (Scroll) --- */
     .md-body {
         flex: 1; overflow-y: auto; padding: 24px;
-        display: flex; flex-direction: column; background: var(--c-bg-app);
+        display: flex; flex-direction: column; background: var(--c-bg-app); position: relative;
     }
     
+    /* Scrollbar Custom */
     .md-body::-webkit-scrollbar { width: 8px; }
     .md-body::-webkit-scrollbar-track { background: transparent; }
-    .md-body::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
+    .md-body::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; border: 2px solid var(--c-bg-app); }
 
     /* --- SISTEMA DE GRID --- */
     .grid-container {
         display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; width: 100%;
+        animation: fadeIn 0.3s ease-out;
     }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
     .col-12 { grid-column: span 12; }
     .col-9  { grid-column: span 9; }
     .col-8  { grid-column: span 8; }
+    .col-7  { grid-column: span 7; }
     .col-6  { grid-column: span 6; }
+    .col-5  { grid-column: span 5; }
     .col-4  { grid-column: span 4; }
     .col-3  { grid-column: span 3; }
     .col-2  { grid-column: span 2; }
-
-    @media (max-width: 1024px) {
-        .col-3, .col-4 { grid-column: span 6; }
-        .col-8, .col-9 { grid-column: span 12; }
-    }
-    @media (max-width: 768px) {
-        .col-2, .col-3, .col-4, .col-6 { grid-column: span 12; }
-    }
 
     /* --- CARDS & CAMPOS --- */
     .box-card {
         background: var(--c-bg-card); border: 1px solid var(--c-border);
         border-radius: var(--radius); box-shadow: var(--shadow-sm);
-        display: flex; flex-direction: column; overflow: hidden;
+        display: flex; flex-direction: column; overflow: hidden; height: 100%;
     }
     .box-header {
-        background: #f8fafc; padding: 10px 16px; border-bottom: 1px solid var(--c-border);
+        background: #f8fafc; padding: 12px 16px; border-bottom: 1px solid var(--c-border);
         font-size: 0.75rem; font-weight: 700; color: var(--c-text-muted); text-transform: uppercase; letter-spacing: 0.05em;
-        display: flex; align-items: center; gap: 6px;
+        display: flex; align-items: center; gap: 8px; flex-shrink: 0;
     }
-    .box-body { padding: 16px; }
+    .box-body { padding: 16px; flex: 1; }
+    .box-body.no-pad { padding: 0; }
 
     .field-row { display: flex; gap: 16px; margin-bottom: 12px; }
     .field-row:last-child { margin-bottom: 0; }
@@ -122,25 +127,58 @@
         min-height: 1.2em;
     }
     
-    /* Variações */
+    /* Variações de Valor */
     .vl.lg { font-size: 1.1rem; font-weight: 700; color: var(--c-accent); }
     .vl.mono { font-family: 'Roboto Mono', monospace; font-size: 0.85rem; letter-spacing: -0.5px; }
     .vl.money { font-family: 'Roboto Mono', monospace; font-weight: 700; color: #059669; }
     .vl.status-ok { color: #16a34a; font-weight: 700; }
+    .vl.status-warn { color: #ca8a04; font-weight: 700; }
     .vl.status-err { color: #dc2626; font-weight: 700; }
 
-    /* Tabela Interna */
+    /* --- TABELAS --- */
     .table-clean { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-    .table-clean td { padding: 6px 0; border-bottom: 1px dashed var(--c-border); }
+    .table-clean td { padding: 8px 0; border-bottom: 1px dashed var(--c-border); }
     .table-clean tr:last-child td { border-bottom: none; }
     .td-lb { color: var(--c-text-muted); }
     .td-vl { text-align: right; font-weight: 600; color: var(--c-text-main); font-family: 'Roboto Mono', monospace;}
 
-    /* Loader */
+    .table-list { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .table-list th { text-align: left; background: #f1f5f9; padding: 10px 16px; color: #64748b; font-weight: 600; position: sticky; top: 0; border-bottom: 1px solid var(--c-border);}
+    .table-list td { padding: 10px 16px; border-bottom: 1px solid var(--c-border); color: #334155; }
+    .table-list tr:last-child td { border-bottom: none; }
+
+    /* --- TIMELINE --- */
+    .timeline-container { position: relative; padding: 10px 0 10px 20px; }
+    .timeline-container::before {
+        content: ''; position: absolute; top: 15px; bottom: 15px; left: 7px; width: 2px; background: #e2e8f0;
+    }
+    .timeline-item { position: relative; margin-bottom: 24px; padding-left: 24px; }
+    .timeline-item:last-child { margin-bottom: 0; }
+    
+    .timeline-marker {
+        position: absolute; left: 0; top: 4px; width: 16px; height: 16px;
+        border-radius: 50%; background: #fff; border: 3px solid #cbd5e1; z-index: 2;
+        transition: all 0.2s;
+    }
+    .timeline-item:hover .timeline-marker { transform: scale(1.2); }
+
+    /* Cores Timeline por tipo */
+    .timeline-item.tm-info .timeline-marker { border-color: #3b82f6; } /* Azul */
+    .timeline-item.tm-success .timeline-marker { border-color: #10b981; background: #10b981; } /* Verde - Cheio */
+    .timeline-item.tm-warn .timeline-marker { border-color: #f59e0b; } /* Laranja */
+    .timeline-item.tm-error .timeline-marker { border-color: #ef4444; background: #ef4444; } /* Vermelho */
+
+    .tl-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
+    .tl-title { font-weight: 700; color: #1e293b; font-size: 0.9rem; }
+    .tl-date { font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-weight: 600; border: 1px solid #e2e8f0; }
+    .tl-desc { color: #475569; font-size: 0.85rem; line-height: 1.5; margin-bottom: 4px; background: #f8fafc; padding: 8px; border-radius: 6px; border: 1px solid #f1f5f9; }
+    .tl-meta { font-size: 0.7rem; color: #94a3b8; font-style: italic; display: flex; gap: 10px; }
+
+    /* Loader Overlay */
     .loader-overlay {
-        position: absolute; inset: 0; background: rgba(255,255,255,0.95); z-index: 50;
+        position: absolute; inset: 0; background: rgba(255,255,255,0.9); z-index: 50;
         display: flex; flex-direction: column; align-items: center; justify-content: center;
-        color: var(--c-primary); gap: 10px; font-weight: 600;
+        color: var(--c-primary); gap: 12px; font-weight: 600;
     }
 </style>
 
@@ -148,13 +186,13 @@
     <div class="md-box" onclick="event.stopPropagation()">
         
         <div class="md-header">
-            <div style="display:flex; align-items:center; gap:16px;">
+            <div style="display:flex; align-items:center; gap:20px;">
                 <div class="doc-badge">
-                    <i class="bi bi-truck"></i> <span id="mdg-ctc-num">CTC --</span>
+                    <i class="bi bi-box-seam"></i> <span id="mdg-ctc-num">CTC --</span>
                 </div>
-                <div style="display:flex; flex-direction:column; justify-content:center;">
-                    <span id="mdg-filial" style="font-weight:700; font-size:1rem; color:var(--c-accent); line-height:1.1;">--</span>
-                    <span style="font-size:0.75rem; color:var(--c-text-muted);">Detalhes do Conhecimento de Transporte</span>
+                <div style="display:flex; flex-direction:column;">
+                    <span id="mdg-filial" style="font-weight:800; font-size:1.1rem; color:var(--c-accent); line-height:1;">--</span>
+                    <span style="font-size:0.8rem; color:var(--c-text-muted);">Visualizador de Documento</span>
                 </div>
             </div>
             <button class="md-close" onclick="FecharModalGlobal(null)">&times;</button>
@@ -164,46 +202,60 @@
             <button class="md-tab-btn active" onclick="MudarAbaCtc('geral')">
                 <i class="bi bi-grid-1x2"></i> Visão Geral
             </button>
+            <button class="md-tab-btn" onclick="MudarAbaCtc('financeiro')">
+                <i class="bi bi-currency-dollar"></i> Financeiro & Frete
+            </button>
             <button class="md-tab-btn" onclick="MudarAbaCtc('cpl')">
-                <i class="bi bi-layers"></i> Dados Complementares (CPL)
+                <i class="bi bi-layers"></i> Dados CPL
+            </button>
+            <button class="md-tab-btn" onclick="MudarAbaCtc('rastreio')">
+                <i class="bi bi-clock-history"></i> Rastreio & NFs
+                <span class="tab-badge" id="badge-ocorr">0</span>
             </button>
         </div>
 
-        <div class="md-body" style="position: relative;">
+        <div class="md-body">
             
             <div id="mdg-loader" class="loader-overlay">
                 <div class="spinner-border text-primary" role="status"></div>
                 <div>Carregando dados completos...</div>
             </div>
 
-            <div id="tab-geral" class="grid-container" style="display:grid;">
-                </div>
+            <div id="tab-geral" class="grid-container" style="display:grid;"></div>
 
-            <div id="tab-cpl" class="grid-container" style="display:none;">
-                </div>
+            <div id="tab-financeiro" class="grid-container" style="display:none;"></div>
+
+            <div id="tab-cpl" class="grid-container" style="display:none;"></div>
+            
+            <div id="tab-rastreio" class="grid-container" style="display:none;"></div>
             
         </div>
     </div>
 </div>
 
 <script>
-    // --- CONTROLE DE ABAS ---
+    // --- FUNÇÕES DE NAVEGAÇÃO ---
     function MudarAbaCtc(abaNome) {
-        // Atualiza botões
+        // UI Tabs
         document.querySelectorAll('.md-tab-btn').forEach(b => b.classList.remove('active'));
-        const btn = event.currentTarget || document.querySelector(`.md-tab-btn[onclick*="'${abaNome}'"]`);
+        const btn = document.querySelector(`.md-tab-btn[onclick*="'${abaNome}'"]`);
         if(btn) btn.classList.add('active');
 
-        // Atualiza conteudos
-        document.getElementById('tab-geral').style.display = 'none';
-        document.getElementById('tab-cpl').style.display = 'none';
-
-        if (abaNome === 'geral') document.getElementById('tab-geral').style.display = 'grid';
-        if (abaNome === 'cpl')   document.getElementById('tab-cpl').style.display = 'grid';
+        // UI Conteúdo
+        ['geral', 'financeiro', 'cpl', 'rastreio'].forEach(id => {
+            document.getElementById(`tab-${id}`).style.display = 'none';
+        });
+        document.getElementById(`tab-${abaNome}`).style.display = 'grid';
     }
 
-    // --- FUNÇÕES PRINCIPAIS ---
-    
+    function FecharModalGlobal(e) {
+        const modal = document.getElementById('modal-global-ctc');
+        if(!e || e.target === modal || e.target.closest('.md-close')) {
+            modal.classList.remove('show');
+            setTimeout(() => { modal.style.display = 'none'; }, 200);
+        }
+    }
+
     async function AbrirModalGlobal(filial, serie, ctc) {
         const modal = document.getElementById('modal-global-ctc');
         const loader = document.getElementById('mdg-loader');
@@ -211,18 +263,18 @@
         // Reset Visual
         document.getElementById('mdg-ctc-num').innerText = `${ctc}-${serie}`;
         document.getElementById('mdg-filial').innerText = `FILIAL: ${filial}`;
-        document.getElementById('tab-geral').innerHTML = ''; 
-        document.getElementById('tab-cpl').innerHTML = ''; 
+        ['geral', 'financeiro', 'cpl', 'rastreio'].forEach(id => document.getElementById(`tab-${id}`).innerHTML = '');
         
-        // Reset da Aba para 'Geral'
         MudarAbaCtc('geral');
 
-        // Abre Modal
         modal.style.display = 'flex';
-        requestAnimationFrame(() => modal.classList.add('show'));
+        // Pequeno delay para permitir o display:flex renderizar antes da opacidade
+        requestAnimationFrame(() => requestAnimationFrame(() => modal.classList.add('show')));
+        
         loader.style.display = 'flex';
 
         try {
+            // Ajuste a URL conforme sua rota
             const url = '{{ url_for("Global.ApiCtcDetalhes", filial="__FIL__", serie="__SER__", ctc="__NUM__") }}'
                 .replace('__FIL__', filial).replace('__SER__', serie).replace('__NUM__', ctc);
             
@@ -235,10 +287,10 @@
         } catch (error) {
             console.error(error);
             document.getElementById('tab-geral').innerHTML = `
-                <div class="col-12" style="text-align:center; padding:40px;">
-                    <i class="bi bi-x-circle" style="font-size:3rem; color:#ef4444;"></i>
-                    <h3 style="color:#334155;">Falha ao carregar</h3>
-                    <p style="color:#94a3b8;">${error.message || error}</p>
+                <div class="col-12" style="text-align:center; padding:60px;">
+                    <i class="bi bi-emoji-frown" style="font-size:3rem; color:#ef4444; margin-bottom:16px;"></i>
+                    <h3 style="color:#334155;">Não foi possível carregar os dados</h3>
+                    <p style="color:#94a3b8;">${error.message || "Erro desconhecido"}</p>
                 </div>
             `;
         } finally {
@@ -246,32 +298,10 @@
         }
     }
 
-    function FecharModalGlobal(e) {
-        const modal = document.getElementById('modal-global-ctc');
-        if(!e || e.target === modal || e.target.closest('.md-close')) {
-            modal.classList.remove('show');
-            setTimeout(() => { modal.style.display = 'none'; }, 200);
-        }
-    }
-
-    // --- HELPERS (Formatação) ---
-    const fmtM = (v) => {
-        if (v === undefined || v === null || String(v).includes('NULL')) return '-';
-        return parseFloat(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    };
-
-    const fmtD = (v) => {
-        if (!v) return '-';
-        const s = String(v); 
-        if (s === 'None' || s.includes('NULL')) return '-';
-        try { return s.split(' ')[0].split('-').reverse().join('/'); } catch { return s; }
-    };
-
-    const ck = (v) => {
-        if (v === undefined || v === null) return '&nbsp;';
-        const s = String(v);
-        return (s !== 'None' && s !== 'null' && s !== '[NULL]') ? s : '&nbsp;';
-    };
+    // --- HELPERS ---
+    const fmtM = (v) => (!v || isNaN(v)) ? '-' : parseFloat(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const fmtD = (v) => (!v || String(v).includes('NULL')) ? '-' : String(v).split(' ')[0].split('-').reverse().join('/');
+    const ck = (v) => (v === undefined || v === null || String(v).includes('NULL')) ? '-' : v;
     
     const kv = (label, val, cls='') => `
         <div class="kv">
@@ -279,44 +309,49 @@
             <span class="vl ${cls}">${ck(val)}</span>
         </div>`;
 
-    // --- RENDERIZADOR ---
+    // --- RENDERIZAÇÃO PRINCIPAL ---
     function RenderizarGrid(d) {
         const cGeral = document.getElementById('tab-geral');
+        const cFin = document.getElementById('tab-financeiro');
         const cCpl = document.getElementById('tab-cpl');
+        const cRastro = document.getElementById('tab-rastreio');
         
         const temEntrega = d.entrega_data && !String(d.entrega_data).includes('NULL');
 
-        // ==========================================
-        // ABA 1: VISÃO GERAL (Mantida Original)
-        // ==========================================
-        let htmlGeral = `
-        <div class="col-12 grid-container" style="gap:16px;">
+        // Atualiza Badge de Ocorrências
+        const qtdOcorrencias = d._ListaOcorrencias ? d._ListaOcorrencias.length : 0;
+        document.getElementById('badge-ocorr').innerText = qtdOcorrencias;
+
+        // =========================================================
+        // 1. ABA GERAL
+        // =========================================================
+        cGeral.innerHTML = `
+        <div class="col-12 grid-container" style="gap:16px; margin-bottom:0;">
             <div class="col-2 box-card">
                 <div class="box-body">
                     ${kv('Data Emissão', fmtD(d.data), 'lg')}
-                    <span style="font-size:0.75rem; color:#64748b;">${ck(d.hora)}</span>
+                    <span style="font-size:0.75rem; color:#64748b;">Hora: ${ck(d.hora)}</span>
                 </div>
             </div>
             <div class="col-2 box-card" style="border-left:4px solid #2563eb;">
                 <div class="box-body">
-                    ${kv('Previsão Entrega', fmtD(d.prev_entrega), 'lg')}
+                    ${kv('Previsão', fmtD(d.prev_entrega), 'lg')}
                     <span style="font-size:0.75rem; color:#64748b;">Tipo: ${ck(d.prev_entregatipo)}</span>
                 </div>
             </div>
              <div class="col-2 box-card" style="${temEntrega ? 'background:#f0fdf4; border-color:#86efac;' : ''}">
                 <div class="box-body">
-                    ${kv('Status Entrega', temEntrega ? 'REALIZADA' : 'PENDENTE', temEntrega ? 'status-ok' : '')} 
-                    <span style="font-size:0.75rem; color:#64748b;">${ck(d.entrega_data)}</span>
+                    ${kv('Status Entrega', temEntrega ? 'ENTREGUE' : 'PENDENTE', temEntrega ? 'status-ok' : 'status-warn')} 
+                    <span style="font-size:0.75rem; color:#64748b;">${fmtD(d.entrega_data)}</span>
                 </div>
             </div>
             <div class="col-6 box-card">
-                <div class="box-body" style="display:flex; justify-content:space-between;">
+                <div class="box-body" style="display:flex; justify-content:space-between; gap:16px;">
                     ${kv('Motivo', d.motivodoc)}
                     ${kv('Natureza', d.natureza)}
                     ${kv('Modal', d.modal)}
                     ${kv('Volumes', d.volumes, 'lg')}
                     ${kv('Peso Real', d.peso + ' kg')} 
-                    ${kv('Valor Merc.', fmtM(d.valmerc), 'money')}
                 </div>
             </div>
         </div>
@@ -325,8 +360,9 @@
             <div class="box-header"><i class="bi bi-box-arrow-up"></i> Remetente</div>
             <div class="box-body">
                 <div class="field-row">${kv('Razão Social', d.remet_nome, 'lg')}</div>
-                <div class="field-row">${kv('CNPJ', d.remet_cgc, 'mono')} ${kv('IE', d.remet_ie, 'mono')}</div>
-                 <div class="field-row">${kv('Cidade / UF', `${ck(d.remet_cidade)} - ${ck(d.remet_uf)}`)}</div>
+                <div class="field-row">${kv('CNPJ', d.remet_cgc, 'mono')}</div>
+                <hr style="margin:8px 0; border:0; border-top:1px dashed #e2e8f0;">
+                <div class="field-row">${kv('Endereço', `${ck(d.remet_cidade)} - ${ck(d.remet_uf)}`)}</div>
             </div>
         </div>
 
@@ -334,208 +370,203 @@
             <div class="box-header"><i class="bi bi-box-arrow-in-down"></i> Destinatário</div>
             <div class="box-body">
                 <div class="field-row">${kv('Razão Social', d.dest_nome, 'lg')}</div>
-                <div class="field-row">${kv('CNPJ', d.dest_cgc, 'mono')} ${kv('IE', d.dest_ie, 'mono')}</div>
-                 <div class="field-row">${kv('Cidade / UF', `${ck(d.dest_cidade)} - ${ck(d.dest_uf)}`)}</div>
+                <div class="field-row">${kv('CNPJ', d.dest_cgc, 'mono')}</div>
+                <hr style="margin:8px 0; border:0; border-top:1px dashed #e2e8f0;">
+                <div class="field-row">${kv('Endereço', `${ck(d.dest_cidade)} - ${ck(d.dest_uf)}`)}</div>
             </div>
         </div>
 
         <div class="col-4 box-card">
-            <div class="box-header"><i class="bi bi-person-badge"></i> Tomador / Outros</div>
+            <div class="box-header"><i class="bi bi-info-circle"></i> Tomador / Outros</div>
             <div class="box-body">
-                <div class="field-row">${kv('Pagador', d.respons_nome)}</div>
+                <div class="field-row">${kv('Pagador do Frete', d.respons_nome)}</div>
                 <div class="field-row">${kv('CNPJ Pagador', d.respons_cgc, 'mono')}</div>
-                <hr style="margin:10px 0; border:0; border-top:1px dashed #e2e8f0;">
-                <div class="field-row">${kv('Redespacho', d.redesp_nome)}</div>
-            </div>
-        </div>
-
-        <div class="col-8 box-card">
-            <div class="box-header"><i class="bi bi-map"></i> Dados Operacionais</div>
-            <div class="box-body">
-                <div class="field-row">
-                    ${kv('Rota', `${d.cidade_orig}/${d.uf_orig} <i class="bi bi-arrow-right"></i> ${d.cidade_dest}/${d.uf_dest}`)}
-                    ${kv('Unid. LASTMILE', d.rotafilialdest)}
-                    ${kv('Desc. Rota', d.descr_rotafilial)}
-                </div>
-                <div class="field-row" style="margin-top:16px;">
-                    ${kv('Espécie', d.especie)}
-                    ${kv('Peso Taxado', d.pesotax, 'mono')}
-                    ${kv('Data Limite', fmtD(d.datalimiteembarque))}
-                    ${kv('CFOP', d.cfop, 'mono')}
-                </div>
-                <div class="field-row" style="margin-top:16px;">
-                    <div class="kv" style="flex:3;">
-                         <span class="lb">Notas Fiscais (NFs)</span>
-                         <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:8px; border-radius:4px; font-size:0.8rem; font-family:'Roboto Mono'; max-height:50px; overflow-y:auto;">
-                            ${ck(d.nfs)}
-                         </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-4 box-card">
-            <div class="box-header"><i class="bi bi-currency-dollar"></i> Custos & Frete</div>
-            <div class="box-body" style="background:#fcfcfc;">
-                <table class="table-clean">
-                    <tr><td class="td-lb">Frete Peso</td><td class="td-vl">${fmtM(d.fretepeso)}</td></tr>
-                    <tr><td class="td-lb">Frete Valor</td><td class="td-vl">${fmtM(d.fretevalor)}</td></tr>
-                    <tr><td class="td-lb">GRIS/Pedágio</td><td class="td-vl">${fmtM(parseFloat(d.gris)+parseFloat(d.pedagio))}</td></tr>
-                    <tr><td class="td-lb">Taxas</td><td class="td-vl">${fmtM(parseFloat(d.txcoleta||0) + parseFloat(d.txentregared||0))}</td></tr>
-                    <tr style="border-top:2px solid #e2e8f0;">
-                        <td class="td-lb" style="padding-top:10px; font-weight:700;">TOTAL FRETE</td>
-                        <td class="td-vl" style="padding-top:10px; font-size:1.2rem; color:#2563eb;">${fmtM(d.fretetotalbruto)}</td>
-                    </tr>
-                </table>
+                <hr style="margin:8px 0; border:0; border-top:1px dashed #e2e8f0;">
+                <div class="field-row">${kv('Redespacho', d.redesp_nome || 'Não informado')}</div>
             </div>
         </div>
 
         <div class="col-12 box-card">
-            <div class="box-header"><i class="bi bi-chat-text"></i> Observações</div>
+            <div class="box-header"><i class="bi bi-chat-left-text"></i> Observações de Emissão</div>
             <div class="box-body">
-                <p style="background:#fffbeb; padding:8px; border-radius:4px; font-size:0.85rem; color:#92400e; margin:0;">
+                <p style="background:#f8fafc; padding:10px; border-radius:6px; font-size:0.85rem; color:#475569; margin:0; border:1px solid #e2e8f0;">
                     ${ck(d.obs_emissao)}
                 </p>
             </div>
         </div>
         `;
 
-        cGeral.innerHTML = htmlGeral;
-
-
-        // ==========================================
-        // ABA 2: DADOS COMPLEMENTARES (CPL)
-        // ==========================================
-        let htmlCpl = ``;
-        
-        // GRUPO 1: FISCAL & CTE
-        htmlCpl += `
-        <div class="col-6 box-card">
-            <div class="box-header"><i class="bi bi-qr-code"></i> Fiscal & Sefaz (CTE)</div>
-            <div class="box-body">
-                <div class="field-row">
-                    ${kv('CTE Número', d.CTE, 'lg')}
-                    ${kv('Série', d.CTE_Serie)}
-                    ${kv('Status', d.CTE_Status_Retorno, d.CTE_Status_Retorno=='100'?'status-ok':'')}
-                </div>
-                <div class="field-row">
-                     <div class="kv col-12">
-                        <span class="lb">Chave de Acesso</span>
-                        <span class="vl mono" style="font-size:0.75rem; word-break:break-all;">${ck(d.CTE_Chave)}</span>
-                     </div>
-                </div>
-                <div class="field-row">
-                    ${kv('Data Retorno', fmtD(d.CTE_Data_Retorno))}
-                    ${kv('Manifesto Vinc.', d.ManifestoQtdManifestos)}
-                    ${kv('Tipo Carga', d.TipoCarga)}
-                </div>
+        // =========================================================
+        // 2. ABA FINANCEIRO
+        // =========================================================
+        cFin.innerHTML = `
+        <div class="col-4 box-card">
+            <div class="box-header"><i class="bi bi-calculator"></i> Composição do Frete</div>
+            <div class="box-body" style="background:#fcfcfc;">
+                <table class="table-clean">
+                    <tr><td class="td-lb">Frete Peso</td><td class="td-vl">${fmtM(d.fretepeso)}</td></tr>
+                    <tr><td class="td-lb">Frete Valor</td><td class="td-vl">${fmtM(d.fretevalor)}</td></tr>
+                    <tr><td class="td-lb">GRIS</td><td class="td-vl">${fmtM(d.gris)}</td></tr>
+                    <tr><td class="td-lb">Pedágio</td><td class="td-vl">${fmtM(d.pedagio)}</td></tr>
+                    <tr><td class="td-lb">Taxas (Coleta/Entrega)</td><td class="td-vl">${fmtM(parseFloat(d.txcoleta||0) + parseFloat(d.txentregared||0))}</td></tr>
+                    <tr><td class="td-lb">Outras Taxas</td><td class="td-vl">${fmtM(d.txoutros)}</td></tr>
+                    <tr style="border-top:2px solid #e2e8f0;">
+                        <td class="td-lb" style="padding-top:12px; font-weight:700; color:#1e293b;">TOTAL FRETE</td>
+                        <td class="td-vl" style="padding-top:12px; font-size:1.3rem; color:#2563eb;">${fmtM(d.fretetotalbruto)}</td>
+                    </tr>
+                </table>
             </div>
-        </div>`;
+        </div>
 
-        // GRUPO 2: FINANCEIRO
-        htmlCpl += `
-        <div class="col-6 box-card">
-            <div class="box-header"><i class="bi bi-wallet2"></i> Faturamento</div>
+        <div class="col-4 box-card">
+             <div class="box-header"><i class="bi bi-receipt-cutoff"></i> Faturamento</div>
+             <div class="box-body">
+                <div class="field-row">${kv('Número Fatura', d.Fatura_Numero, 'lg')}</div>
+                <div class="field-row">${kv('Status', d.Fatura_Status)}</div>
+                <div class="field-row">${kv('Vencimento', fmtD(d.Fatura_Vencimento))}</div>
+                <hr style="margin:12px 0; border:0; border-top:1px dashed #e2e8f0;">
+                <div class="field-row">${kv('Valor Líquido', fmtM(d.Fatura_Valor_Liquido), 'money')}</div>
+             </div>
+        </div>
+
+        <div class="col-4 box-card">
+            <div class="box-header"><i class="bi bi-tags"></i> Impostos & Fiscal</div>
             <div class="box-body">
-                <div class="field-row">
-                    ${kv('Fatura Nº', d.Fatura_Numero, 'lg')}
-                    ${kv('Vencimento', fmtD(d.Fatura_Vencimento))}
-                    ${kv('Status Fat.', d.Fatura_Status)}
-                </div>
-                <div class="field-row" style="background:#f8fafc; padding:8px; border-radius:6px;">
-                    ${kv('Valor Bruto', fmtM(d.Fatura_Valor_Bruto))}
-                    ${kv('Descontos', fmtM(d.Fatura_Desconto))}
-                    ${kv('Valor Líquido', fmtM(d.Fatura_Valor_Liquido), 'money')}
-                </div>
-                <div class="field-row">
-                    ${kv('Gerada em', fmtD(d.Fatura_dt))}
-                    ${kv('Emissor', d.Fatura_Emissor)}
-                </div>
+                <div class="field-row">${kv('Valor Mercadoria', fmtM(d.valmerc), 'money')}</div>
+                <div class="field-row">${kv('ICMS', fmtM(d.ValorICMS))}</div>
+                <div class="field-row">${kv('CFOP', d.cfop, 'mono')}</div>
+                <div class="field-row">${kv('Chave CTE', d.CTE_Chave, 'mono')}</div>
             </div>
-        </div>`;
+        </div>
+        `;
 
-        // GRUPO 3: TRANSPORTE / LAST MILE (Os campos UltDocEntrega)
-        htmlCpl += `
-        <div class="col-12 box-card">
-            <div class="box-header"><i class="bi bi-truck-flatbed"></i> Execução de Transporte (Última Milha)</div>
-            <div class="box-body">
-                <div class="grid-container">
-                    <div class="col-4">
-                         <div class="field-row">${kv('Transportadora', d.UltDocEntregaTransportadora)}</div>
-                         <div class="field-row">${kv('CNPJ Transp.', d.UltDocEntregaTransportadoraCNPJ, 'mono')}</div>
-                         <div class="field-row">${kv('Motorista', d.UltDocEntregaMotoristaNome)}</div>
-                         <div class="field-row">${kv('CPF Motorista', d.UltDocEntregaMotoristaCpf, 'mono')}</div>
-                    </div>
-                    <div class="col-4">
-                         <div class="field-row">${kv('Doc. Entrega', d.UltDocEntregaNumero, 'lg')}</div>
-                         <div class="field-row">${kv('Placa Veículo', d.UltDocEntregaPlaca, 'lg')}</div>
-                         <div class="field-row">${kv('Data Geração', fmtD(d.UltDocEntregaData))}</div>
-                         <div class="field-row">${kv('Origem Doc', d.UltDocEntregaOrigem)}</div>
-                    </div>
-                    <div class="col-4">
-                         <div class="field-row">${kv('Resp. Unidade', d.UnidadeResponsavelNome)}</div>
-                         <div class="field-row">${kv('Resp. Fantasia', d.UltDocEntregaResponsavelFantasia)}</div>
-                         <div class="field-row">${kv('Resp. CNPJ', d.UltDocEntregaResponsavelCNPJ, 'mono')}</div>
-                    </div>
-                </div>
-            </div>
-        </div>`;
-
-        // GRUPO 4: OCORRÊNCIAS & IMAGENS
+        // =========================================================
+        // 3. ABA DADOS CPL
+        // =========================================================
         const temImg = d.ImagemTemImagem || d.ImagemUrl;
         
-        htmlCpl += `
+        cCpl.innerHTML = `
         <div class="col-6 box-card">
-            <div class="box-header"><i class="bi bi-exclamation-triangle"></i> Última Ocorrência</div>
+            <div class="box-header"><i class="bi bi-truck-front"></i> Última Milha (Last Mile)</div>
             <div class="box-body">
-                <div class="field-row">
-                    ${kv('Data Ocorr.', fmtD(d.UltimaOcorrCTCData))}
-                    ${kv('Código Última Ocorr.', d.UltimaOcorrCTCCodigo)}
-                </div>
-                <div class="field-row">
-                     <div class="kv col-12">
-                        <span class="lb">Descrição</span>
-                        <p style="background:#fef2f2; padding:8px; border-radius:4px; font-size:0.85rem; color:#991b1b; margin:0;">
-                            ${ck(d.UltimaOcorrCTCDescricao) || 'Nenhuma ocorrência recente.'}
-                        </p>
-                     </div>
+                <div class="grid-container" style="margin:0; width:100%;">
+                    <div class="col-6">
+                        ${kv('Transportadora', d.UltDocEntregaTransportadora)}
+                        ${kv('Motorista', d.UltDocEntregaMotoristaNome)}
+                        ${kv('Placa', d.UltDocEntregaPlaca, 'mono')}
+                    </div>
+                    <div class="col-6">
+                        ${kv('Documento Entrega', d.UltDocEntregaNumero, 'lg')}
+                        ${kv('Data Geração', fmtD(d.UltDocEntregaData))}
+                        ${kv('Origem', d.UltDocEntregaOrigem)}
+                    </div>
                 </div>
             </div>
         </div>
 
         <div class="col-6 box-card" style="${temImg ? 'border-color:#2563eb;' : ''}">
-            <div class="box-header"><i class="bi bi-images"></i> Comprovantes / Canhoto</div>
-            <div class="box-body">
-                <div style="display:flex; gap:16px; align-items:center;">
-                    <div style="font-size:2.5rem; color:${temImg ? '#2563eb' : '#cbd5e1'};">
-                        <i class="bi ${temImg ? 'bi-file-earmark-check' : 'bi-file-earmark-x'}"></i>
-                    </div>
-                    <div style="flex:1;">
-                         <div class="field-row">${kv('Status Imagem', d.AnaliseStatusImagem)}</div>
-                         <div class="field-row">${kv('Link URL', d.ImagemUrl ? '<a href="'+d.ImagemUrl+'" target="_blank" style="font-weight:700;">ABRIR COMPROVANTE</a>' : 'Indisponível')}</div>
-                         <div class="field-row">
-                            ${kv('Protocolo', d.ImagemNroProtocolo)}
-                            ${kv('Data Rec.', fmtD(d.ImagemDataRecepcao))}
-                         </div>
-                    </div>
+            <div class="box-header"><i class="bi bi-images"></i> Comprovante de Entrega</div>
+            <div class="box-body" style="display:flex; align-items:center; gap:20px;">
+                <div style="font-size:3rem; color:${temImg ? '#2563eb' : '#cbd5e1'};">
+                    <i class="bi ${temImg ? 'bi-file-earmark-check' : 'bi-file-earmark-x'}"></i>
+                </div>
+                <div style="flex:1;">
+                    <div class="field-row">${kv('Status Imagem', d.AnaliseStatusImagem)}</div>
+                    <div class="field-row">${kv('Link URL', d.ImagemUrl ? '<a href="'+d.ImagemUrl+'" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-box-arrow-up-right"></i> Abrir Comprovante</a>' : 'Indisponível')}</div>
+                    <div class="field-row">${kv('Protocolo', d.ImagemNroProtocolo)} ${kv('Recepção', fmtD(d.ImagemDataRecepcao))}</div>
                 </div>
             </div>
         </div>
-        
+
         <div class="col-12 box-card">
-            <div class="box-header"><i class="bi bi-info-circle"></i> Outras Infos. Sistema</div>
+            <div class="box-header"><i class="bi bi-database"></i> Dados Técnicos CPL</div>
             <div class="box-body">
-                 <div class="field-row">
-                    ${kv('Cotação Nº', d.CotacaoNumero)}
-                    ${kv('Tipo Cotação', d.CotacaoTipo)}
-                    ${kv('Qtd Agendamentos', d.QtdAgendamento)}
-                    ${kv('Prazo Entrega', d.PrazoEntrega + ' dias')}
-                    ${kv('Troca Gelo?', d.Cliente_PermiteTrocarGelo === 'S' ? 'SIM' : 'NÃO')}
+                <div class="grid-container">
+                    <div class="col-3">${kv('Cotação', d.CotacaoNumero)}</div>
+                    <div class="col-3">${kv('Tipo Carga', d.TipoCarga)}</div>
+                    <div class="col-3">${kv('Agendamentos', d.QtdAgendamento)}</div>
+                    <div class="col-3">${kv('Prazo Dias', d.PrazoEntrega)}</div>
                 </div>
             </div>
         </div>
         `;
 
-        cCpl.innerHTML = htmlCpl;
+        // =========================================================
+        // 4. ABA RASTREIO & NFS (NOVA!)
+        // =========================================================
+        
+        // 4.1 Lista de NFs
+        const listaNFs = d._ListaNFs && d._ListaNFs.length > 0 ? d._ListaNFs.map(nf => `
+            <tr>
+                <td><span style="background:#e0f2fe; color:#0369a1; padding:2px 6px; border-radius:4px; font-weight:700;">${nf.numnf}</span></td>
+                <td>${ck(nf.serie)}</td>
+                <td>${fmtM(nf.valornf)}</td>
+                <td>${parseFloat(nf.pesonf||0).toFixed(2)}</td>
+                <td>${nf.volumesnf||0}</td>
+            </tr>
+        `).join('') : '<tr><td colspan="5" style="text-align:center; padding:20px; color:#94a3b8;">Nenhuma NF encontrada.</td></tr>';
+
+        // 4.2 Timeline
+        const listaTimeline = d._ListaOcorrencias && d._ListaOcorrencias.length > 0 ? d._ListaOcorrencias.map(oc => {
+            // Lógica de Estilo por Tipo de Ocorrência
+            let tipoClass = 'tm-info';
+            if(['0','1','00','01'].includes(oc.cod_ocorr)) tipoClass = 'tm-success'; // Entregue
+            if(['98','99','85'].includes(oc.cod_ocorr)) tipoClass = 'tm-error'; // Extravio/Avaria
+            if(['10','11','26'].includes(oc.cod_ocorr)) tipoClass = 'tm-warn'; // Pendências
+
+            return `
+            <div class="timeline-item ${tipoClass}">
+                <div class="timeline-marker"></div>
+                <div class="tl-header">
+                    <span class="tl-title">${oc.cod_ocorr} - ${oc.descr_ocorr}</span>
+                    <span class="tl-date">${fmtD(oc.data)} ${oc.hora ? oc.hora.substring(0,5) : ''}</span>
+                </div>
+                <div class="tl-desc">
+                    ${oc.obs_ocorr || '<i style="color:#cbd5e1">Sem observações.</i>'}
+                </div>
+                <div class="tl-meta">
+                    <span><i class="bi bi-person"></i> ${oc.usu_ocorr || 'SISTEMA'}</span>
+                    <span><i class="bi bi-pencil"></i> Reg: ${fmtD(oc.usu_dataocorr)}</span>
+                </div>
+            </div>`;
+        }).join('') : `
+            <div style="text-align:center; padding:40px; color:#94a3b8;">
+                <i class="bi bi-hourglass-split" style="font-size:2rem; display:block; margin-bottom:10px;"></i>
+                Nenhuma ocorrência registrada até o momento.
+            </div>`;
+
+        cRastro.innerHTML = `
+        <div class="col-5 box-card">
+            <div class="box-header" style="justify-content:space-between;">
+                <span><i class="bi bi-receipt"></i> Notas Fiscais</span>
+                <span class="badge bg-secondary">${d._ListaNFs ? d._ListaNFs.length : 0}</span>
+            </div>
+            <div class="box-body no-pad">
+                <div style="max-height:500px; overflow-y:auto;">
+                    <table class="table-list">
+                        <thead>
+                            <tr>
+                                <th>Número</th>
+                                <th>Série</th>
+                                <th>Valor</th>
+                                <th>Peso</th>
+                                <th>Vol</th>
+                            </tr>
+                        </thead>
+                        <tbody>${listaNFs}</tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-7 box-card">
+            <div class="box-header"><i class="bi bi-clock-history"></i> Histórico de Eventos (Timeline)</div>
+            <div class="box-body">
+                <div class="timeline-container" style="max-height:500px; overflow-y:auto; padding-right:10px;">
+                    ${listaTimeline}
+                </div>
+            </div>
+        </div>
+        `;
     }
 </script>

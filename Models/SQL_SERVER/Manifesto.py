@@ -33,6 +33,9 @@ class Manifesto(Base):
     qtdepallets = Column(Integer)
     qtdegaiolas = Column(Integer)
     
+    filialctc = Column(String(10)) 
+    motivo = Column(String(50))
+    
 class CteInfo(Base):
     __tablename__ = 'CTe_infCte'
     __table_args__ = {'schema': 'intec.dbo'}
