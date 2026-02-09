@@ -41,7 +41,7 @@ def Dashboard():
 def ApiCtcsHoje():
     # Log de Debug para não poluir o histórico principal com chamadas de API frequentes
     LogService.Debug("Routes.Planejamento", "API Listar CTCs requisitada.")
-    Dados = PlanejamentoService.BuscarCtcsAereoHoje()
+    Dados = PlanejamentoService.BuscarCtcsPlanejamento()
     return jsonify(Dados)
 
 @PlanejamentoBp.route('/Montar/<string:filial>/<string:serie>/<string:ctc>')
@@ -160,7 +160,7 @@ def SalvarPlanejamento():
 def MapaGlobal():
     try:
         LogService.Debug("Routes.Planejamento", "Gerando Mapa Global...")
-        ListaCtcs = PlanejamentoService.BuscarCtcsAereoHoje()
+        ListaCtcs = PlanejamentoService.BuscarCtcsPlanejamento()
         Agrupamento = {}
 
         for c in ListaCtcs:
