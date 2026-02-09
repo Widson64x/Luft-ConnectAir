@@ -31,6 +31,8 @@ class ConfiguracaoBase:
     AD_SERVER = os.getenv("LDAP_SERVER")
     AD_DOMAIN = os.getenv("LDAP_DOMAIN")
     
+    APP_SECRET_KEY = os.getenv("APP_SECRET_KEY", "CHAVE_SUPER_SECRETA_DO_PROJETO_VOOS")
+    
     # Define se mostra logs de conexão (SQLAlchemy Echo)
     MOSTRAR_LOGS_DB = os.getenv("DB_CONNECT_LOGS", "False").lower() == "true"
 

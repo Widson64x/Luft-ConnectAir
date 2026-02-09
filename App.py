@@ -30,7 +30,10 @@ app = Flask(__name__,
             static_url_path=f'{Prefix}/Static', 
             static_folder='Static')
 
-app.secret_key = 'CHAVE_SUPER_SECRETA_DO_PROJETO_VOOS' # Trocar por algo seguro depois
+Key = ConfiguracaoAtual.APP_SECRET_KEY
+
+app.secret_key = Key
+print(f"Chave secreta do Flask definida: {app.secret_key[:8]}... (total {len(app.secret_key)} caracteres)")
 
 LogService.Inicializar()
 LogService.Info("App", f"Iniciando aplicação no ambiente: {os.getenv('AMBIENTE_APP', 'DEV')}")
