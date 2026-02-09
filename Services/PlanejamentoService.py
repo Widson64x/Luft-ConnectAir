@@ -1,6 +1,6 @@
 from datetime import datetime, date, time, timedelta
 from decimal import Decimal
-from sqlalchemy import desc, func
+from sqlalchemy import desc, func, text
 from Conexoes import ObterSessaoSqlServer, ObterSessaoSqlServer
 from Models.SQL_SERVER.Ctc import CtcEsp, CtcEspCpl
 from Models.SQL_SERVER.Planejamento import PlanejamentoCabecalho, PlanejamentoItem, PlanejamentoTrecho
@@ -8,162 +8,266 @@ from Services.LogService import LogService
 
 class PlanejamentoService:
     """
-    Service Layer para o Módulo de Planejamento.
-    Responsável por buscar CTCs no SQL Server, tratar tipos de dados (Decimal/Date)
-    e preparar objetos para o Front-end.
+    Service Layer Refatorada: Separação em Blocos (Diário, Reversa, Backlog).
+    """
+
+    # --- SQL BASE (Compartilhado entre os métodos para evitar repetição) ---
+# --- SQL BASE ATUALIZADO (Correção da lógica TM) ---
+    _QueryBase = """
+        SELECT 
+             c.filial as Filial
+            ,c.filialctc as CTC
+            ,c.seriectc as Serie
+            ,C.MODAL as Modal
+            ,c.motivodoc as MotivoCTC
+            ,c.data as DataEmissao
+            ,c.hora as HoraEmissao
+            ,c.volumes as Volumes
+            ,c.pesotax as Peso
+            ,c.valmerc as Valor
+            ,c.fretetotalbruto as FreteTotal
+            ,upper(c.remet_nome) as Remetente
+            ,upper(c.dest_nome) as Destinatario
+            ,c.cidade_orig as CidadeOrigem
+            ,c.uf_orig as UFOrigem
+            ,c.cidade_dest as CidadeDestino
+            ,c.uf_dest as UFDestino
+            ,c.rotafilialdest as UnidadeDestino
+            ,c.prioridade as Prioridade
+            ,cl.StatusCTC as StatusCTC
+            ,ISNULL(cl.TipoCarga, '') AS Tipo_carga
+            ,c.nfs as Notas
+        FROM intec.dbo.tb_ctc_esp c (nolock) 
+        INNER JOIN intec.dbo.tb_ctc_esp_cpl cl (nolock) on cl.filialctc = c.filialctc
+        INNER JOIN intec.dbo.tb_nf_esp n (nolock) on n.filialctc = c.filialctc
+        
+        -- Join AWB
+        LEFT JOIN intec.dbo.tb_airAWBnota B (NOLOCK) ON c.filialctc = b.filialctc AND n.numnf = b.nota collate database_default
+        LEFT JOIN intec.dbo.tb_airawb A (NOLOCK) ON A.codawb = B.codawb 
+        
+        -- Join Manifesto
+        LEFT JOIN intec.dbo.tb_manifesto m (nolock) on m.filialctc = c.filialctc
+        
+        -- Join Reversa
+        LEFT JOIN intec.dbo.Tb_PLN_ControleReversa rev (nolock) ON 
+            rev.Filial COLLATE DATABASE_DEFAULT = c.filial COLLATE DATABASE_DEFAULT AND 
+            rev.Serie COLLATE DATABASE_DEFAULT = c.seriectc COLLATE DATABASE_DEFAULT AND 
+            rev.Ctc COLLATE DATABASE_DEFAULT = c.filialctc COLLATE DATABASE_DEFAULT
+
+        WHERE 
+            n.filialctc = c.filialctc
+            and a.codawb is null
+            and c.tipodoc <> 'COB'
+            and c.tem_ocorr not in ('C','0','1')
+            and left(c.respons_cgc,8) <> '02426290'
+            and (a.cancelado is null or a.cancelado = '') 
+            and (m.cancelado is null OR m.cancelado = 'S')
+            and (m.motivo NOT in ('TRA','RED') OR m.motivo IS NULL)
+            
+            -- LÓGICA DE MODAL E OCORRÊNCIA TM (ATUALIZADO)
+            AND (
+                -- CASO 1: É AÉREO NATIVO E NÃO TEM TM (Continua Aéreo)
+                (c.modal LIKE 'AEREO%' AND NOT EXISTS (
+                    SELECT 1 FROM intec.dbo.tb_ocorr cr (nolock) 
+                    WHERE cr.cod_ocorr = 'TM' AND cr.filialctc = c.filialctc
+                ))
+                OR
+                -- CASO 2: NÃO É AÉREO (Ex: RODO) MAS TEM TM (Virou Aéreo)
+                (c.modal NOT LIKE 'AEREO%' AND EXISTS (
+                    SELECT 1 FROM intec.dbo.tb_ocorr cr (nolock) 
+                    WHERE cr.cod_ocorr = 'TM' AND cr.filialctc = c.filialctc
+                ))
+            )
     """
 
     @staticmethod
-    def BuscarCtcsAereoHoje():
-        """
-        Lista principal do Dashboard.
-        Traz todos os CTCs Aéreos emitidos HOJE do SQL Server e cruza com o
-        Postgres para saber o Status do Planejamento.
-        """
-        SessaoSQL = ObterSessaoSqlServer()
-        SessaoPG = ObterSessaoSqlServer() 
-        
-        try:
-            LogService.Debug("PlanejamentoService", "Iniciando busca de CTCs Aéreos de Hoje/Ontem...")
-            
-            # 1. BUSCA DADOS NO SQL SERVER (CTCs DO DIA) + JOIN COM CPL
-            Hoje = date.today() - timedelta(days=0) # Ajuste de dias se necessário
-            Inicio = datetime.combine(Hoje, time.min)
-            Fim = datetime.combine(Hoje, time.max)
-            
-            Resultados = SessaoSQL.query(CtcEsp, CtcEspCpl).outerjoin(
-                CtcEspCpl, 
-                CtcEsp.filialctc == CtcEspCpl.filialctc
-            ).filter(
-                CtcEsp.data >= Inicio,
-                CtcEsp.data <= Fim,
-                CtcEsp.tipodoc != 'COB',
-                CtcEsp.modal.like('AEREO%'),
-                CtcEspCpl.StatusCTC != 'CTC CANCELADO' # Exclui CTCs cancelados
-            ).order_by(
-                desc(CtcEsp.data),
-                desc(CtcEsp.hora)
-            ).all()
-
-            LogService.Info("PlanejamentoService", f"Encontrados {len(Resultados)} CTCs no SQL Server.")
-            LogService.Debug("PlanejamentoService", f"Os CTCs de tipo 'COB' ou modal diferente de 'AÉREO' foram excluídos.")
-            # 2. BUSCA CACHE DE PLANEJAMENTOS NO POSTGRES
-            rows_pg = []
-            if SessaoPG:
-                try:
-                    rows_pg = SessaoPG.query(
-                        PlanejamentoItem.Filial,
-                        PlanejamentoItem.Serie,
-                        PlanejamentoItem.Ctc,
-                        PlanejamentoCabecalho.Status,
-                        PlanejamentoCabecalho.IdPlanejamento
-                    ).join(
-                        PlanejamentoCabecalho, 
-                        PlanejamentoItem.IdPlanejamento == PlanejamentoCabecalho.IdPlanejamento
-                    ).all()
-                except Exception as e:
-                    LogService.Error("PlanejamentoService", "Erro ao consultar Cache Postgres (Planejamento)", e)
-
-            mapa_planejamento = {}
-            for row in rows_pg:
-                chave = f"{str(row.Filial).strip()}-{str(row.Serie).strip()}-{str(row.Ctc).strip()}"
-                mapa_planejamento[chave] = {
-                    'status': row.Status,
-                    'id_plan': row.IdPlanejamento
-                }
-
-            # 3. MONTAGEM DA LISTA FINAL
-            ListaCtcs = []
-            
-            def to_float(val): return float(val) if val else 0.0
-            def to_int(val): return int(val) if val else 0
-            def to_str(val): return str(val).strip() if val else ''
-            def fmt_moeda(val): return f"{to_float(val):,.2f}"
-
-            for c, cpl in Resultados:
+    def _ObterMapaCache():
+        """Helper para buscar o cache de planejamentos existentes."""
+        SessaoPln = ObterSessaoSqlServer()
+        mapa = {}
+        if SessaoPln:
+            try:
+                rows = SessaoPln.query(
+                    PlanejamentoItem.Filial, PlanejamentoItem.Serie, PlanejamentoItem.Ctc,
+                    PlanejamentoCabecalho.Status, PlanejamentoCabecalho.IdPlanejamento
+                ).join(PlanejamentoCabecalho, PlanejamentoItem.IdPlanejamento == PlanejamentoCabecalho.IdPlanejamento).all()
                 
-                # TipoCarga
-                tipo_carga_valor = cpl.TipoCarga if cpl and cpl.TipoCarga else ""
+                for r in rows:
+                    k = f"{str(r.Filial).strip()}-{str(r.Serie).strip()}-{str(r.Ctc).strip()}"
+                    mapa[k] = {'status': r.Status, 'id_plan': r.IdPlanejamento}
+            except: pass
+            finally: SessaoPln.close()
+        return mapa
 
-                # Serializa dados do CTC principal
-                dados_completos = {}
-                for coluna in c.__table__.columns:
-                    valor = getattr(c, coluna.name)
-                    if isinstance(valor, (datetime, date, time)): valor = str(valor)
-                    elif isinstance(valor, Decimal): valor = float(valor)
-                    elif valor is None: valor = ""
-                    dados_completos[coluna.name] = valor
-                
-                if cpl:
-                    dados_completos['TipoCarga'] = tipo_carga_valor
+    @staticmethod
+    def _SerializarResultados(ResultadoSQL, NomeBloco, MapaCache):
+        """Transforma o RowProxy do SQLAlchemy em Dicionário JSON padronizado."""
+        Lista = []
+        def to_float(val): return float(val) if val else 0.0
+        def to_int(val): return int(val) if val else 0
+        def to_str(val): return str(val).strip() if val else ''
+        def fmt_moeda(val): return f"{to_float(val):,.2f}"
 
-                # Contagem de Notas
-                raw_notas = getattr(c, 'notas', '') 
-                qtd_notas_calc = 0
-                if raw_notas:
-                    s_notas = str(raw_notas).replace('/', ',').replace(';', ',').replace('-', ',')
-                    lista_n = [n for n in s_notas.split(',') if n.strip()]
-                    qtd_notas_calc = len(lista_n)
-                if qtd_notas_calc == 0 and to_int(c.volumes) > 0: qtd_notas_calc = 1
-
-                # Formatação Hora
-                HoraFormatada = '--:--'
-                if c.hora:
-                    h = str(c.hora).strip()
-                    if len(h) == 4 and ':' not in h: h = f"{h[:2]}:{h[2:]}"
-                    elif len(h) == 3 and ':' not in h: h = f"0{h[:1]}:{h[1:]}"
+        for row in ResultadoSQL:
+            data_emissao = row.DataEmissao.strftime('%d/%m/%Y') if row.DataEmissao else ''
+            
+            # Formatação Hora
+            hora_fmt = '--:--'
+            if row.HoraEmissao:
+                h = str(row.HoraEmissao).strip()
+                if ':' not in h:
+                    if len(h) == 4: h = f"{h[:2]}:{h[2:]}"
                     elif len(h) <= 2: h = f"{h.zfill(2)}:00"
-                    HoraFormatada = h
+                hora_fmt = h
 
-                # Verificação Planejamento
-                chave_ctc = f"{to_str(c.filial)}-{to_str(c.seriectc)}-{to_str(c.filialctc)}"
-                info_plan = mapa_planejamento.get(chave_ctc)
-                
-                tem_planejamento = False
-                status_plan = None
-                id_plan = None
-                
-                if info_plan:
-                    tem_planejamento = True
-                    status_plan = info_plan['status']
-                    id_plan = info_plan['id_plan']
+            # Qtd Notas
+            qtd_notas = 0
+            if row.Notas:
+                s = str(row.Notas).replace('/', ',').replace(';', ',').replace('-', ',')
+                qtd_notas = len([n for n in s.split(',') if n.strip()])
+            if qtd_notas == 0 and to_int(row.Volumes) > 0: qtd_notas = 1
 
-                # Objeto Final
-                ListaCtcs.append({
-                    'id_unico': f"{to_str(c.filial)}-{to_str(c.filialctc)}",
-                    'filial': to_str(c.filial),
-                    'ctc': to_str(c.filialctc),
-                    'serie': to_str(c.seriectc),
-                    'data_emissao': c.data.strftime('%d/%m/%Y') if c.data else '',
-                    'hora_emissao': HoraFormatada,
-                    'prioridade': to_str(c.prioridade),
-                    'status_ctc': to_str(cpl.StatusCTC) if cpl else '',
-                    'origem': f"{to_str(c.cidade_orig)}/{to_str(c.uf_orig)}",
-                    'destino': f"{to_str(c.cidade_dest)}/{to_str(c.uf_dest)}",
-                    'unid_lastmile': to_str(c.rotafilialdest),
-                    'remetente': to_str(c.remet_nome),
-                    'destinatario': to_str(c.dest_nome),
-                    'volumes': to_int(c.volumes),
-                    'peso_taxado': to_float(c.pesotax),
-                    'val_mercadoria': fmt_moeda(c.valmerc),
-                    'raw_val_mercadoria': to_float(c.valmerc),
-                    'raw_frete_total': to_float(c.fretetotalbruto),
-                    'qtd_notas': qtd_notas_calc,
-                    'tipo_carga': tipo_carga_valor,
-                    'tem_planejamento': tem_planejamento,
-                    'status_planejamento': status_plan,
-                    'id_planejamento': id_plan,
-                    'full_data': dados_completos
-                })
+            # Cache Planejamento
+            chave = f"{to_str(row.Filial)}-{to_str(row.Serie)}-{to_str(row.CTC)}"
+            info = MapaCache.get(chave)
             
-            return ListaCtcs
+            
+            print(f"Cabeçalho Row: {row} | Chave: {chave} | Info Cache: {info}")  # Log de debug para verificar a chave e o cache
+            Lista.append({
+                'id_unico': f"{to_str(row.Filial)}-{to_str(row.CTC)}",
+                'origem_dados': NomeBloco,  # <--- IMPORTANTE: DIARIO, REVERSA ou BACKLOG
+                'filial': to_str(row.Filial),
+                'ctc': to_str(row.CTC),
+                'serie': to_str(row.Serie),
+                'data_emissao': data_emissao,
+                'hora_emissao': hora_fmt,
+                'prioridade': to_str(row.Prioridade),
+                'motivodoc': to_str(row.MotivoCTC),
+                'status_ctc': to_str(row.StatusCTC),
+                'origem': f"{to_str(row.CidadeOrigem)}/{to_str(row.UFOrigem)}",
+                'destino': f"{to_str(row.CidadeDestino)}/{to_str(row.UFDestino)}",
+                'unid_lastmile': to_str(row.UnidadeDestino),
+                'remetente': to_str(row.Remetente),
+                'destinatario': to_str(row.Destinatario),
+                'volumes': to_int(row.Volumes),
+                'peso_taxado': to_float(row.Peso),
+                'val_mercadoria': fmt_moeda(row.Valor),
+                'raw_val_mercadoria': to_float(row.Valor),
+                'raw_frete_total': to_float(row.FreteTotal),
+                'qtd_notas': qtd_notas,
+                'tipo_carga': to_str(row.Tipo_carga),
+                'tem_planejamento': bool(info),
+                'status_planejamento': info['status'] if info else None,
+                'id_planejamento': info['id_plan'] if info else None,
+                'full_data': { # Usado para montagem
+                     'filial': row.Filial, 'filialctc': row.CTC, 'seriectc': row.Serie,
+                     'data': str(row.DataEmissao), 'hora': str(row.HoraEmissao),
+                     'origem_cidade': row.CidadeOrigem, 'uf_orig': row.UFOrigem,
+                     'destino_cidade': row.CidadeDestino, 'uf_dest': row.UFDestino
+                }
+            })
+        return Lista
 
+    # -------------------------------------------------------------------------
+    # BLOCO 1: DIÁRIO
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def BuscarCtcsDiario(mapa_cache=None):
+        Sessao = ObterSessaoSqlServer()
+        try:
+            if not mapa_cache: mapa_cache = PlanejamentoService._ObterMapaCache()
+            Hoje = date.today()
+            
+            # Filtro Específico
+            FiltroSQL = """
+                AND c.motivodoc IN ('REE', 'ENT', 'NOR') 
+                AND c.data >= :data_hoje
+            """
+            
+            Query = text(PlanejamentoService._QueryBase + FiltroSQL + " ORDER BY c.data DESC, c.hora DESC")
+            Rows = Sessao.execute(Query, {'data_hoje': Hoje}).fetchall()
+            
+            return PlanejamentoService._SerializarResultados(Rows, "DIARIO", mapa_cache)
         except Exception as e:
-            LogService.Error("PlanejamentoService", "Falha crítica em BuscarCtcsAereoHoje", e)
+            LogService.Error("PlanejamentoService", "Erro Buscar Diario", e)
             return []
-        finally:
-            SessaoSQL.close()
-            if SessaoPG: SessaoPG.close()
+        finally: Sessao.close()
+
+    # -------------------------------------------------------------------------
+    # BLOCO 2: REVERSA
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def BuscarCtcsReversa(mapa_cache=None):
+        Sessao = ObterSessaoSqlServer()
+        try:
+            if not mapa_cache: mapa_cache = PlanejamentoService._ObterMapaCache()
+            
+            # Filtro Específico: Motivo DEV + Tabela Reversa Liberada
+            FiltroSQL = """
+                AND c.motivodoc = 'DEV' 
+                AND rev.LiberadoPlanejamento = 1
+            """
+            
+            Query = text(PlanejamentoService._QueryBase + FiltroSQL + " ORDER BY c.data DESC")
+            Rows = Sessao.execute(Query).fetchall()
+            
+            return PlanejamentoService._SerializarResultados(Rows, "REVERSA", mapa_cache)
+        except Exception as e:
+            LogService.Error("PlanejamentoService", "Erro Buscar Reversa", e)
+            return []
+        finally: Sessao.close()
+
+    # -------------------------------------------------------------------------
+    # BLOCO 3: BACKLOG
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def BuscarCtcsBacklog(mapa_cache=None):
+        Sessao = ObterSessaoSqlServer()
+        try:
+            if not mapa_cache: mapa_cache = PlanejamentoService._ObterMapaCache()
+            
+            Hoje = date.today()
+            Corte = Hoje - timedelta(days=120)
+            
+            # Filtro Específico: Anterior a hoje, maior que corte, REE/ENT
+            FiltroSQL = """
+                AND c.motivodoc IN ('REE', 'ENT')
+                AND c.data < :data_hoje 
+                AND c.data >= :data_corte
+            """
+            
+            Query = text(PlanejamentoService._QueryBase + FiltroSQL + " ORDER BY c.data ASC") # Backlog ordena pelos mais velhos
+            Rows = Sessao.execute(Query, {'data_hoje': Hoje, 'data_corte': Corte}).fetchall()
+            
+            return PlanejamentoService._SerializarResultados(Rows, "BACKLOG", mapa_cache)
+        except Exception as e:
+            LogService.Error("PlanejamentoService", "Erro Buscar Backlog", e)
+            return []
+        finally: Sessao.close()
+
+    # -------------------------------------------------------------------------
+    # VISÃO GLOBAL (Chamada pela API Principal)
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def BuscarCtcsPlanejamento():
+        """
+        Executa as 3 buscas e consolida o resultado.
+        """
+        LogService.Debug("PlanejamentoService", "Iniciando busca GLOBAL (3 Blocos)...")
+        
+        # 1. Busca Cache uma única vez
+        Cache = PlanejamentoService._ObterMapaCache()
+        
+        # 2. Busca os Blocos
+        ListaDiario = PlanejamentoService.BuscarCtcsDiario(Cache)
+        ListaReversa = PlanejamentoService.BuscarCtcsReversa(Cache)
+        ListaBacklog = PlanejamentoService.BuscarCtcsBacklog(Cache)
+        
+        Total = len(ListaDiario) + len(ListaReversa) + len(ListaBacklog)
+        LogService.Info("PlanejamentoService", f"Busca Concluída. Total: {Total} (D:{len(ListaDiario)}, R:{len(ListaReversa)}, B:{len(ListaBacklog)})")
+        
+        # 3. Retorna Unificado
+        return ListaDiario + ListaReversa + ListaBacklog
 
     @staticmethod
     def ObterCtcDetalhado(Filial, Serie, Numero):

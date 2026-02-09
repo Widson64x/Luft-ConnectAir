@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
 
 <style>
     /* --- ESTRUTURA ORIGINAL --- */
@@ -26,9 +27,44 @@
     }
     #map { width: 100%; height: 100%; z-index: 1; }
 
-    /* --- ESTILOS INTERNOS --- */
-    .painel-top { padding: 20px; background: var(--cor-fundo-principal, #f8f9fa); border-bottom: 1px solid var(--cor-borda, #eee); }
+    /* --- ESTILOS DO PAINEL LATERAL --- */
+    .painel-top { 
+        padding: 16px; 
+        background: var(--cor-fundo-principal, #f8f9fa); 
+        border-bottom: 1px solid var(--cor-borda, #eee);
+        display: flex; flex-direction: column; gap: 12px;
+    }
+    .painel-header h5 { margin: 0; font-weight: 700; color: var(--cor-texto-principal, #333); font-size: 1rem; }
+    .painel-header small { color: var(--cor-texto-secundario, #666); font-size: 0.8rem; }
+
     .painel-content { padding: 15px; flex: 1; overflow-y: auto; background: var(--cor-fundo-painel, #fdfdfd); }
+
+    /* --- BOTÕES DE FILTRO (Estilo Tab) --- */
+    .tabs-container {
+        display: flex; 
+        background: #fff; 
+        border: 1px solid #dee2e6;
+        padding: 4px; border-radius: 8px; gap: 4px;
+        justify-content: space-between;
+    }
+    
+    .tab-btn {
+        flex: 1;
+        background: transparent; border: none; border-radius: 6px;
+        padding: 6px 4px; cursor: pointer; font-weight: 600; font-size: 11px;
+        color: #64748b; 
+        display: flex; align-items: center; justify-content: center; gap: 4px;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+
+    .tab-btn:hover { background: #f1f5f9; color: #334155; }
+    
+    .tab-btn.active {
+        background: rgba(59, 130, 246, 0.1); /* Azul claro */
+        color: #2563eb; /* Azul forte */
+    }
+    .tab-btn i { font-size: 14px; }
 
     /* Card CTC */
     .ctc-card {
@@ -128,11 +164,27 @@
 <div class="page-grid">
     <div class="painel">
         <div class="painel-top">
-            <h5 style="margin:0; font-weight:700; color:var(--cor-texto-principal, #333);">
-                <i class="bi bi-radar"></i> Expedição Aérea
-            </h5>
-            <small style="color:var(--cor-texto-secundario, #666);">Selecione um cluster no mapa</small>
+            <div class="painel-header">
+                <h5><i class="bi bi-radar"></i> Expedição Aérea</h5>
+                <small>Selecione um filtro e um cluster</small>
+            </div>
+            
+            <div class="tabs-container">
+                <button class="tab-btn active" onclick="MudarFiltroMapa('TODOS')" id="btn-todos">
+                    <i class="ph-bold ph-squares-four"></i> Global
+                </button>
+                <button class="tab-btn" onclick="MudarFiltroMapa('DIARIO')" id="btn-diario">
+                    <i class="ph-bold ph-sun"></i> Do Dia
+                </button>
+                <button class="tab-btn" onclick="MudarFiltroMapa('BACKLOG')" id="btn-backlog">
+                    <i class="ph-bold ph-clock-counter-clockwise"></i> Backlog
+                </button>
+                <button class="tab-btn" onclick="MudarFiltroMapa('REVERSA')" id="btn-reversa">
+                    <i class="ph-bold ph-arrow-u-up-left"></i> Reversa
+                </button>
+            </div>
         </div>
+        
         <div id="lista-ctcs" class="painel-content">
             <div class="empty-state">
                 <i class="bi bi-map-fill" style="font-size: 2.5rem; display:block; margin-bottom:10px;"></i>
@@ -155,43 +207,92 @@
         </div>
         <div class="modal-body">
             <table class="details-table" id="tabela-detalhes">
-                </table>
+            </table>
         </div>
     </div>
 </div>
 
 <script>
-    const dadosEstados = {{ Dados | tojson | safe }};
+    // Dados originais vindo do Backend
+    const DADOS_COMPLETOS = {{ Dados | tojson | safe }};
     const URL_BASE_MONTAR = "{{ url_for('Planejamento.MontarPlanejamento', filial='__FIL__', serie='__SER__', ctc='__NUM__') }}";
+    
+    let map;
+    let markersLayer; // Grupo de marcadores para poder limpar depois
+    let FILTRO_ATUAL = 'TODOS';
 
     const fmtShortMoney = (val) => {
+        if (!val) return 'R$ 0';
         if (val >= 1000000) return 'R$ ' + (val / 1000000).toFixed(1).replace('.', ',') + 'M';
         if (val >= 1000) return 'R$ ' + (val / 1000).toFixed(0) + 'k';
         return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
     };
 
     document.addEventListener("DOMContentLoaded", function() {
-        var map = L.map('map', {zoomControl: false}).setView([-15.7, -52], 4);
+        map = L.map('map', {zoomControl: false}).setView([-15.7, -52], 4);
         L.control.zoom({position: 'topright'}).addTo(map);
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
             attribution: 'Luft-ConnectAir', maxZoom: 18
         }).addTo(map);
 
-        dadosEstados.forEach(est => {
-            if(est.qtd_docs === 0) return;
-            const isUrgente = est.tem_urgencia;
-            const cssClass = isUrgente ? 'map-marker is-urgente' : 'map-marker';
-            const headerClass = isUrgente ? 'bg-red' : 'bg-blue';
+        // Cria o grupo de camadas para gerenciar os marcadores
+        markersLayer = L.layerGroup().addTo(map);
+
+        // Renderiza inicial (Todos)
+        RenderizarMapa('TODOS');
+    });
+
+    // --- FUNÇÃO PRINCIPAL DE FILTRO ---
+    function MudarFiltroMapa(tipo) {
+        FILTRO_ATUAL = tipo;
+
+        // Atualiza estilo dos botões
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`btn-${tipo.toLowerCase()}`).classList.add('active');
+
+        // Renderiza o mapa novamente
+        RenderizarMapa(tipo);
+
+        // Limpa a sidebar para evitar confusão
+        document.getElementById('lista-ctcs').innerHTML = `
+            <div class="empty-state">
+                <i class="bi bi-funnel" style="font-size: 2.5rem; display:block; margin-bottom:10px;"></i>
+                Filtro aplicado: <b>${tipo}</b>.<br>Selecione um cluster.
+            </div>`;
+    }
+
+    function RenderizarMapa(filtro) {
+        markersLayer.clearLayers(); // Remove marcadores antigos
+
+        DADOS_COMPLETOS.forEach(est => {
+            // 1. Filtra a lista de CTCs dentro deste estado
+            const listaFiltrada = est.lista_ctcs.filter(ctc => {
+                if (filtro === 'TODOS') return true;
+                return ctc.origem_dados === filtro; // 'DIARIO', 'BACKLOG', 'REVERSA'
+            });
+
+            // Se não sobrar nada, não desenha o marcador
+            if (listaFiltrada.length === 0) return;
+
+            // 2. Recalcula os totais para o Bubble (Marcador)
+            const qtdDocs = listaFiltrada.length;
+            const valorTotal = listaFiltrada.reduce((acc, cur) => acc + (cur.raw_val_mercadoria || 0), 0);
+            const qtdVols = listaFiltrada.reduce((acc, cur) => acc + (cur.volumes || 0), 0);
+            const temUrgencia = listaFiltrada.some(c => c.eh_urgente);
+
+            // 3. Cria o Marcador Visual
+            const cssClass = temUrgencia ? 'map-marker is-urgente' : 'map-marker';
+            const headerClass = temUrgencia ? 'bg-red' : 'bg-blue';
             const size = 90; 
 
             const iconHtml = `
                 <div class="marker-bubble">
                     <div class="marker-header ${headerClass}">${est.uf}</div>
                     <div class="marker-body">
-                        <div class="marker-docs">${est.qtd_docs}</div>
-                        <div class="marker-vols">${est.qtd_vols} vol</div>
-                        <div class="marker-value">${fmtShortMoney(est.valor_total)}</div>
+                        <div class="marker-docs">${qtdDocs}</div>
+                        <div class="marker-vols">${qtdVols} vol</div>
+                        <div class="marker-value">${fmtShortMoney(valorTotal)}</div>
                     </div>
                 </div>
             `;
@@ -200,20 +301,29 @@
                 html: iconHtml, className: cssClass, iconSize: [size, size], iconAnchor: [size/2, size/2]
             });
 
-            const marker = L.marker([est.coords.lat, est.coords.lon], {icon: customIcon}).addTo(map);
-
+            const marker = L.marker([est.coords.lat, est.coords.lon], {icon: customIcon});
+            
+            // Adiciona evento de clique passando a LISTA JÁ FILTRADA
             marker.on('click', () => {
-                CarregarSidebar(est);
+                CarregarSidebar(listaFiltrada);
                 map.flyTo([est.coords.lat, est.coords.lon], 6, {duration: 1.2});
             });
-        });
-    });
 
-    function CarregarSidebar(estado) {
+            markersLayer.addLayer(marker);
+        });
+    }
+
+    function CarregarSidebar(listaCtcs) {
         const container = document.getElementById('lista-ctcs');
         container.innerHTML = '';
 
-        const listaOrdenada = estado.lista_ctcs.sort((a, b) => {
+        if(listaCtcs.length === 0) {
+            container.innerHTML = '<div class="empty-state">Nenhum registro encontrado.</div>';
+            return;
+        }
+
+        // Ordenação: Urgente primeiro, depois maior frete
+        const listaOrdenada = listaCtcs.sort((a, b) => {
             if (a.eh_urgente && !b.eh_urgente) return -1;
             if (!a.eh_urgente && b.eh_urgente) return 1;
             return parseFloat(b.raw_frete_total || 0) - parseFloat(a.raw_frete_total || 0);
@@ -229,7 +339,6 @@
                 .replace('__SER__', c.serie)
                 .replace('__NUM__', c.ctc);
             
-            // Encode para passar no onclick
             const jsonFullData = encodeURIComponent(JSON.stringify(c.full_data));
 
             const html = `
@@ -250,7 +359,8 @@
                     </div>
 
                     <div class="data-emissao" style="font-size:0.7rem; color:#888; margin-bottom:8px;">
-                        <i class="bi bi-calendar-event"></i> Emissão: ${c.data_emissao} - ${c.hora_emissao}
+                        <i class="bi bi-calendar-event"></i> ${c.data_emissao}
+                        <span style="float:right; font-weight:bold; color:#666;">${c.origem_dados}</span>
                     </div>
 
                     <div class="card-stats">
@@ -263,7 +373,7 @@
                             <span class="stat-val">${c.volumes}</span>
                         </div>
                         <div class="stat-box">
-                            <span class="stat-label">Qtd. Notas</span>
+                            <span class="stat-label">NFs</span>
                             <span class="stat-val">${c.qtd_notas}</span>
                         </div>
                         <div class="stat-box">
@@ -276,7 +386,7 @@
                         <a href="${urlFinal}" class="btn-planejar">
                             <i class="bi bi-airplane"></i> Planejar Voo
                         </a>
-                        <button class="btn-detalhes" onclick="AbrirModalGlobal('${c.filial}', '${c.serie}', '${c.ctc}')" style="align-items:center;" 
+                        <button class="btn-detalhes" onclick="AbrirModalGlobal('${c.filial}', '${c.serie}', '${c.ctc}')" 
                         title="Ver Documento Completo">
                             <i class="ph-bold ph-file-text"></i>
                         </button>
@@ -292,16 +402,13 @@
         const modal = document.getElementById('modal-detalhes');
         const titulo = document.getElementById('modal-ctc-id');
         const tabela = document.getElementById('tabela-detalhes');
-        
-        // Decodifica os dados
         const data = JSON.parse(decodeURIComponent(jsonDataEncoded));
         
         titulo.innerText = ctcNum;
-        tabela.innerHTML = ''; // Limpa
+        tabela.innerHTML = ''; 
 
-        // Gera as linhas da tabela
         for (const [key, value] of Object.entries(data)) {
-            if(value !== null && value !== "") { // Oculta campos vazios
+            if(value !== null && value !== "") {
                 const row = `
                     <tr>
                         <th>${key}</th>
@@ -311,12 +418,10 @@
                 tabela.innerHTML += row;
             }
         }
-
         modal.style.display = 'flex';
     }
 
     function FecharModal(event) {
-        // Se click for no overlay ou no botão fechar
         if(!event || event.target.className === 'modal-overlay' || event.target.className === 'btn-close') {
             document.getElementById('modal-detalhes').style.display = 'none';
         }

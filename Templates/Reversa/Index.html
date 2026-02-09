@@ -387,38 +387,45 @@
 </div>
 
 <script>
-    // Variável global para o filtro atual
+    // Variável global para o filtro atual (inicia em 'todos')
     let currentFilter = 'todos'; 
 
     document.addEventListener('DOMContentLoaded', () => {
         // Atualiza hora
         document.getElementById('last-update').innerText = new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
         
-        // Inicializa contadores
+        // Inicializa a tabela e contadores
         filtrarTabela();
 
-        // Adiciona listeners aos checkboxes
+        // Adiciona listeners aos checkboxes de ação
         const checkboxes = document.querySelectorAll('.chk-action');
         checkboxes.forEach(chk => {
             chk.addEventListener('change', handleCheck);
         });
     });
 
-    // Função de filtro visual
+    // Função para alterar o botão ativo e disparar o filtro
     function setFilter(filterType, btnElement) {
         currentFilter = filterType;
         
-        // Atualiza botões
+        // Atualiza visual dos botões
         document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
         btnElement.classList.add('active');
 
         filtrarTabela();
     }
 
-    // Lógica principal de filtragem
+    // --- LÓGICA PRINCIPAL (FILTRO + CONTADORES) ---
     function filtrarTabela() {
         const searchText = document.getElementById('searchInput').value.toLowerCase();
         const rows = document.querySelectorAll('.data-row');
+        
+        // Variáveis para contagem dinâmica
+        let countTotal = 0;
+        let countPendente = 0;
+        let countLiberado = 0;
+
+        // Variáveis para controle da tabela
         let visibleCount = 0;
         let hasData = false;
 
@@ -426,13 +433,23 @@
             const status = row.dataset.status; // 'pendente' ou 'liberado'
             const textContent = row.dataset.search.toLowerCase();
             
-            // Verifica Filtro de Status
-            let statusMatch = (currentFilter === 'todos') || (currentFilter === status);
-            
-            // Verifica Busca
-            let textMatch = textContent.includes(searchText);
+            // 1. Verificação de Busca (Search Input)
+            // A busca afeta os contadores globais. Se eu digito "SP", conto quantos pendentes/liberados existem em SP.
+            const matchesSearch = textContent.includes(searchText);
 
-            if (statusMatch && textMatch) {
+            if (matchesSearch) {
+                // Incrementa os contadores baseados no resultado da BUSCA
+                countTotal++;
+                if (status === 'pendente') countPendente++;
+                if (status === 'liberado') countLiberado++;
+            }
+
+            // 2. Verificação do Botão de Filtro (Abas)
+            // A aba decide se a linha aparece ou não na tela
+            const matchesFilter = (currentFilter === 'todos') || (currentFilter === status);
+
+            // A linha só aparece se passar na BUSCA E no FILTRO DE ABA
+            if (matchesSearch && matchesFilter) {
                 row.style.display = '';
                 visibleCount++;
                 hasData = true;
@@ -441,17 +458,33 @@
             }
         });
 
+        // --- ATUALIZAÇÃO DO DOM ---
+
+        // Atualiza os Cards Superiores com os números calculados
+        animateValue("count-total", countTotal);
+        animateValue("count-pendente", countPendente);
+        animateValue("count-liberado", countLiberado);
+
         // Controle de mensagens de "vazio"
         const noSearchRow = document.getElementById('no-search-results');
         const noDataRow = document.getElementById('no-data-row');
 
-        if (noSearchRow) noSearchRow.style.display = (!hasData && rows.length > 0) ? '' : 'none';
+        // Se houver linhas no HTML mas nenhuma visível pelo filtro de busca
+        if (noSearchRow) {
+            noSearchRow.style.display = (!hasData && rows.length > 0) ? '' : 'none';
+        }
         
-        // Atualiza contador de rodapé
+        // Atualiza contador do rodapé da tabela
         document.getElementById('visible-count').innerText = visibleCount;
     }
 
-    // Função Async para salvar no banco
+    // Função auxiliar para animar a troca de números (opcional, para visual suave)
+    function animateValue(id, value) {
+        const obj = document.getElementById(id);
+        if(obj) obj.innerText = value;
+    }
+
+    // --- FUNÇÃO DE SALVAR (AJAX) ---
     async function handleCheck(e) {
         const el = e.target;
         const isChecked = el.checked;
@@ -482,8 +515,9 @@
             const json = await response.json();
 
             if (json.sucesso) {
-                // Atualiza Dataset da linha para os filtros funcionarem
-                row.dataset.status = isChecked ? 'liberado' : 'pendente';
+                // Atualiza Dataset da linha para os filtros funcionarem imediatamente
+                const novoStatus = isChecked ? 'liberado' : 'pendente';
+                row.dataset.status = novoStatus;
                 
                 // Atualiza HTML do status
                 if (isChecked) {
@@ -497,36 +531,20 @@
                     `;
                 }
 
-                // Atualiza os contadores do topo (simulação simples baseada na ação)
-                updateStatsCounters();
+                // Recalcula todos os filtros e contadores para refletir a mudança de status
+                filtrarTabela(); 
+
             } else {
                 throw new Error(json.msg);
             }
         } catch (error) {
             console.error(error);
             alert('Erro ao comunicar com o servidor: ' + error.message);
-            el.checked = !isChecked; // Reverte
+            el.checked = !isChecked; // Reverte checkbox
             statusDisplay.innerHTML = originalHtml; // Reverte visual
         } finally {
             el.disabled = false;
-            // Reaplica filtros caso o usuário esteja vendo "Só Pendentes" e acabou de liberar um
-            filtrarTabela(); 
         }
-    }
-
-    function updateStatsCounters() {
-        // Recalcula os totais baseados no DOM atual
-        const allRows = document.querySelectorAll('.data-row');
-        let pendentes = 0;
-        let liberados = 0;
-
-        allRows.forEach(row => {
-            if (row.dataset.status === 'pendente') pendentes++;
-            else liberados++;
-        });
-
-        document.getElementById('count-pendente').innerText = pendentes;
-        document.getElementById('count-liberado').innerText = liberados;
     }
 </script>
 {% endblock %}

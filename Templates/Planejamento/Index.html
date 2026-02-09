@@ -4,96 +4,118 @@
 
 {% block conteudo %}
 {% include "Components/_ModalCtc.html" %}
-<link rel="stylesheet" href="{{ url_for('static', filename='CSS/Planejamento/Index.css') }}">
-<div class="monitoring-dashboard">
 
-    <div class="dash-header">
-        <div class="header-title">
-            <h2>
-                Monitoramento de Cargas
-                <div class="live-indicator"><div class="live-dot"></div>RT-10s</div>
-            </h2>
-            <div class="header-subtitle">
-                <i class="ph-bold ph-calendar-blank"></i> <span id="data-extenso"></span>
-                <span style="margin: 0 8px; color: var(--cor-borda);">|</span>
-                <span id="contador-linhas">0 registros</span>
+<link rel="stylesheet" href="{{ url_for('static', filename='CSS/Planejamento/Index.css') }}">
+
+<header class="app-header">
+    <div class="header-content">
+        <div class="logo-area">
+            <i class="ph-duotone ph-airplane-tilt logo-icon"></i>
+            <div>
+                <h1>Painel de Planejamento</h1>
+                <p class="subtitle" id="data-extenso">Carregando data...</p>
+            </div>
+        </div>
+        <div class="user-area">
+            <a href="{{ url_for('Planejamento.MapaGlobal') }}" class="btn-icon-only" title="Mapa Global"><i class="ph-bold ph-globe-hemisphere-west"></i></a>
+        </div>
+    </div>
+</header>
+
+<main class="app-main">
+    
+    <section class="top-section">
+        <div class="kpi-container">
+            <div class="kpi-card kpi-blue">
+                <div class="kpi-icon"><i class="ph-duotone ph-package"></i></div>
+                <div class="kpi-info"><span class="kpi-label">Total CT-e</span><span class="kpi-value" id="kpi-total">0</span></div>
+            </div>
+            <div class="kpi-card kpi-orange">
+                <div class="kpi-icon"><i class="ph-duotone ph-scales"></i></div>
+                <div class="kpi-info"><span class="kpi-label">Peso Total</span><span class="kpi-value"><span id="kpi-peso">0</span> kg</span></div>
+            </div>
+            <div class="kpi-card kpi-green">
+                <div class="kpi-icon"><i class="ph-duotone ph-currency-circle-dollar"></i></div>
+                <div class="kpi-info"><span class="kpi-label">Valor Total</span><span class="kpi-value">R$ <span id="kpi-valor">0,00</span></span></div>
+            </div>
+            <div class="kpi-card kpi-purple">
+                <div class="kpi-icon"><i class="ph-duotone ph-receipt"></i></div>
+                <div class="kpi-info"><span class="kpi-label">Qtd. Notas</span><span class="kpi-value" id="kpi-notas">0</span></div>
             </div>
         </div>
 
-        <a href="{{ url_for('Planejamento.MapaGlobal') }}" class="btn-action-primary">
-            <i class="ph-bold ph-globe-hemisphere-west"></i> Diário de Voos
-        </a>
-    </div>
-
-    <div class="kpi-grid">
-        <div class="kpi-card">
-            <div class="kpi-icon icon-blue"><i class="ph-duotone ph-files"></i></div>
-            <div class="kpi-info"><span class="kpi-label">Documentos Hoje</span><span class="kpi-value" id="kpi-docs">0</span></div>
+        <div class="tabs-wrapper">
+            <div class="tabs-container">
+                <button class="tab-btn active" onclick="MudarAba('TODOS')" id="tab-todos"><i class="ph-bold ph-squares-four"></i> Visão Global</button>
+                <button class="tab-btn" onclick="MudarAba('DIARIO')" id="tab-diario"><i class="ph-bold ph-sun"></i> Do Dia</button>
+                <button class="tab-btn" onclick="MudarAba('BACKLOG')" id="tab-backlog"><i class="ph-bold ph-clock-counter-clockwise"></i> Backlog</button>
+                <button class="tab-btn" onclick="MudarAba('REVERSA')" id="tab-reversa"><i class="ph-bold ph-arrow-u-up-left"></i> Reversa</button>
+            </div>
         </div>
-        <div class="kpi-card">
-            <div class="kpi-icon icon-orange"><i class="ph-duotone ph-scales"></i></div>
-            <div class="kpi-info"><span class="kpi-label">Peso Taxado Total</span><span class="kpi-value" id="kpi-peso">0 kg</span></div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-icon icon-green"><i class="ph-duotone ph-currency-dollar"></i></div>
-            <div class="kpi-info"><span class="kpi-label">Faturamento Estimado</span><span class="kpi-value" id="kpi-fat">R$ 0,00</span></div>
-        </div>
-    </div>
+    </section>
 
-    <div class="toolbar-container">
-        <div class="search-group">
-            <i class="ph-bold ph-magnifying-glass"></i>
-            <input type="text" id="input-busca" class="input-filter" placeholder="Buscar CTC, Cidade, Cliente..." onkeyup="FiltrarTabela()">
+    <section class="content-card">
+        <div class="toolbar-container">
+            <div class="search-box">
+                <i class="ph-bold ph-magnifying-glass"></i>
+                <input type="text" id="input-busca" placeholder="Buscar por CTC, cidade, cliente..." onkeyup="FiltrarTabela()">
+            </div>
+            <div class="filters-box">
+                <div class="select-wrapper">
+                    <i class="ph-bold ph-flag-banner"></i>
+                    <select id="filtro-prioridade" onchange="FiltrarTabela()">
+                        <option value="TODOS">Todas Prioridades</option>
+                        <option value="URGENTE">⚠️ Apenas Urgentes</option>
+                        <option value="AGENDADA">📅 Apenas Agendadas</option> <option value="NORMAL">✅ Apenas Normais</option>
+                    </select>
+                </div>
+                <div class="select-wrapper">
+                    <i class="ph-bold ph-storefront"></i>
+                    <select id="filtro-filial" onchange="FiltrarTabela()"><option value="TODOS">Todas Filiais</option></select>
+                </div>
+                <div class="select-wrapper">
+                    <i class="ph-bold ph-info"></i>
+                    <select id="filtro-motivo" onchange="FiltrarTabela()"><option value="TODOS">Todos Motivos</option></select>
+                </div>
+            </div>
         </div>
-        
-        <select id="filtro-prioridade" class="select-filter" onchange="FiltrarTabela()">
-            <option value="TODOS">Todas Prioridades</option>
-            <option value="URGENTE">⚠️ Apenas Urgentes</option>
-            <option value="NORMAL">✅ Apenas Normais</option>
-        </select>
 
-        <select id="filtro-filial" class="select-filter" onchange="FiltrarTabela()">
-            <option value="TODOS">Todas Filiais</option>
-        </select>
-    </div>
-
-    <div class="table-container">
-        <div class="table-scroll-area">
-            <table class="flight-table">
-                <thead>
-                    <tr>
-                        <th style="text-align: center; width: 90px;">Ação</th>
-                        <th style="text-align: center; width: 110px;">Status Plan.</th>
-                        
-                        <th onclick="Ordenar('filial')" style="text-align: center; width: 80px;">Filial <i class="ph-bold ph-caret-up-down sort-icon"></i></th>
-                        <th onclick="Ordenar('ctc')" style="width: 120px;">CTC <i class="ph-bold ph-caret-up-down sort-icon"></i></th>
-                        
-                        <th onclick="Ordenar('tipo_carga')" style="width: 120px;">Tipo Carga <i class="ph-bold ph-caret-up-down sort-icon"></i></th>
-                        
-                        <th onclick="Ordenar('data_raw')" style="width: 100px;">Emissão <i class="ph-bold ph-caret-up-down sort-icon"></i></th>
-                        <th onclick="Ordenar('prioridade')" style="text-align: center; width: 100px;">Prio <i class="ph-bold ph-caret-up-down sort-icon"></i></th>
-                        <th onclick="Ordenar('status_ctc')" style="text-align: center; width: 120px;">Status CTC <i class="ph-bold ph-caret-up-down sort-icon"></i></th>
-                        <th style="text-align: center;">LastMile</th>
-                        <th style="width: 140px;">Rota</th>
-                        <th>Remetente / Destinatário</th>
-                        <th onclick="Ordenar('volumes')" style="text-align: right;">Vol. <i class="ph-bold ph-caret-up-down sort-icon"></i></th>
-                        <th onclick="Ordenar('raw_val_mercadoria')" style="text-align: right;">Valor <i class="ph-bold ph-caret-up-down sort-icon"></i></th>
-                        <th onclick="Ordenar('peso_taxado')" style="text-align: right;">Peso <i class="ph-bold ph-caret-up-down sort-icon"></i></th>
-                    </tr>
-                </thead>
+        <div id="transition-container" class="table-responsive">
+            <table class="modern-table">
+            <thead>
+                <tr>
+                    <th style="text-align: center;">Ações</th> 
+                    <th onclick="Ordenar('status_planejamento')">Status</th>
+                    <th onclick="Ordenar('prioridade')" style="text-align: center;" title="Prioridade">Prio.</th>
+                    <th onclick="Ordenar('origem_dados')">Tipo</th>
+                    <th onclick="Ordenar('ctc')">CTC / Série</th>
+                    <th onclick="Ordenar('unid_lastmile')" style="text-align: center;">U. Dest.</th> 
+                    <th onclick="Ordenar('data_raw')">Emissão <i id="seta-data_raw" class="ph-bold ph-arrow-down"></i></th>
+                    <th>Origem <i class="ph-bold ph-arrow-right flow-icon"></i> Destino</th>
+                    <th onclick="Ordenar('remetente')">Cliente / Tipo Carga</th>
+                    <th onclick="Ordenar('qtd_notas')" style="text-align: center;" title="NFs">NFs</th> 
+                    <th onclick="Ordenar('volumes')" style="text-align: right;">Vols.</th>
+                    <th onclick="Ordenar('peso_taxado')" style="text-align: right;">Peso (kg)</th>
+                    <th onclick="Ordenar('raw_val_mercadoria')" style="text-align: right;">Valor</th>
+                </tr>
+            </thead>
                 <tbody id="table-body">
-                    <tr><td colspan="15"><div class="empty-state"><i class="ph-duotone ph-airplane-tilt"></i><span>Carregando dados...</span></div></td></tr>
+                    <tr><td colspan="13" style="text-align: center; padding: 40px;">Carregando dados...</td></tr>
                 </tbody>
             </table>
         </div>
-    </div>
 
-</div>
+        <div class="table-footer">
+            <div id="contador-registros">Mostrando 0 registros</div>
+        </div>
+    </section>
+
+</main>
 
 <script>
-    // --- LÓGICA INTELIGENTE (CLIENT-SIDE) ---
     const URL_API_LISTAR = "{{ url_for('Planejamento.ApiCtcsHoje') }}";
     const URL_BASE_MONTAR = "{{ url_for('Planejamento.MontarPlanejamento', filial='__F__', serie='__S__', ctc='__C__') }}";
 </script>
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
 <script src="{{ url_for('static', filename='JS/Planejamento/Index.js') }}" defer></script>
 {% endblock %}

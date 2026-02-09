@@ -229,9 +229,21 @@ body {
     flex: 1; display: flex; flex-direction: column;
     background: var(--cor-fundo-principal);
     position: relative;
+    overflow: hidden; /* Garante que o layout principal não vaze */
 }
 
-.conteudo-pagina { padding: 32px; flex: 1; overflow-y: auto; }
+.conteudo-pagina { 
+    padding: 32px; 
+    flex: 1; 
+    
+    /* ALTERAÇÃO CRÍTICA AQUI: */
+    /* Antes era overflow-y: auto (o que causava o bug da tela infinita) */
+    overflow: hidden; 
+    overflow-y: auto; /* Permite rolagem apenas vertical, mas evita o bug da tela infinita */
+    
+    display: flex;           /* Necessário para o filho (.app-main) preencher 100% */
+    flex-direction: column;  /* Organiza verticalmente */
+}
 
 /* Alertas */
 .alert {
