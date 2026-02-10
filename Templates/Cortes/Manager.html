@@ -1,0 +1,558 @@
+{% extends "Base.html" %}
+
+{% block titulo %}Gerenciar Cortes | Luft-ConnectAir{% endblock %}
+
+{% block conteudo %}
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+<style>
+    /* --- ESTILIZAÇÃO (Mantida a original) --- */
+    .manager-card {
+        background-color: var(--cor-fundo-painel);
+        border-radius: 16px;
+        box-shadow: var(--sombra-card);
+        border: 1px solid var(--cor-borda);
+        padding: 24px;
+        margin-top: 20px;
+        animation: fadeUp 0.4s ease-out;
+    }
+
+    @keyframes fadeUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .manager-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .title-group {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .title-group h2 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--cor-texto-principal);
+        margin: 0;
+    }
+
+    .icon-wrapper {
+        width: 40px; height: 40px;
+        background: rgba(var(--cor-primaria-rgb), 0.1);
+        border-radius: 8px;
+        display: flex; align-items: center; justify-content: center;
+        color: var(--cor-primaria);
+        font-size: 1.5rem;
+    }
+
+    .filter-group {
+        display: flex;
+        gap: 12px;
+        align-items: flex-end;
+    }
+
+    .custom-label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--cor-texto-secundario);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 6px;
+        display: block;
+    }
+
+    .custom-input {
+        background: var(--cor-fundo-principal);
+        border: 1px solid var(--cor-borda);
+        color: var(--cor-texto-principal);
+        padding: 10px 14px;
+        border-radius: 8px;
+        font-family: 'Inter', sans-serif;
+        font-size: 0.9rem;
+        outline: none;
+        transition: 0.2s;
+        min-width: 200px;
+    }
+    
+    .custom-input:focus {
+        border-color: var(--cor-primaria);
+        box-shadow: 0 0 0 3px rgba(var(--cor-primaria-rgb), 0.1);
+    }
+
+    .btn-primary {
+        background: var(--cor-primaria);
+        color: #fff;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex; align-items: center; gap: 8px;
+        transition: 0.2s;
+        height: 42px;
+    }
+    .btn-primary:hover {
+        background: var(--cor-primaria-hover);
+        transform: translateY(-2px);
+    }
+
+    .tabs-container {
+        display: flex;
+        border-bottom: 2px solid var(--cor-borda);
+        margin-bottom: 24px;
+    }
+
+    .tab-btn {
+        background: none;
+        border: none;
+        padding: 12px 24px;
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--cor-texto-secundario);
+        cursor: pointer;
+        position: relative;
+        transition: 0.3s;
+    }
+    .tab-btn:hover { color: var(--cor-primaria); }
+    .tab-btn.active { color: var(--cor-primaria); }
+    .tab-btn.active::after {
+        content: '';
+        position: absolute;
+        bottom: -2px; left: 0; width: 100%;
+        height: 2px;
+        background: var(--cor-primaria);
+    }
+
+    .table-responsive { width: 100%; overflow-x: auto; }
+    .modern-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-bottom: 10px; }
+    .modern-table th {
+        background: var(--cor-fundo-principal);
+        color: var(--cor-texto-secundario);
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        padding: 16px;
+        text-align: left;
+        border-bottom: 1px solid var(--cor-borda);
+    }
+    .modern-table td {
+        padding: 16px;
+        border-bottom: 1px solid var(--cor-borda);
+        color: var(--cor-texto-principal);
+        font-size: 0.9rem;
+        vertical-align: middle;
+    }
+    .modern-table tr:last-child td { border-bottom: none; }
+    .modern-table tr:hover td { background-color: rgba(0,0,0,0.02); }
+
+    .badge-filial {
+        background: rgba(var(--cor-info-rgb), 0.1);
+        color: var(--cor-info);
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 0.8rem;
+    }
+    .time-display {
+        font-family: monospace;
+        font-size: 1rem;
+        font-weight: 600;
+        background: var(--cor-fundo-principal);
+        padding: 4px 8px;
+        border-radius: 4px;
+        border: 1px solid var(--cor-borda);
+    }
+
+    .action-btn-group { display: flex; gap: 8px; }
+    .btn-icon {
+        width: 32px; height: 32px;
+        border-radius: 6px;
+        border: 1px solid var(--cor-borda);
+        background: transparent;
+        color: var(--cor-texto-secundario);
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; transition: 0.2s;
+    }
+    .btn-icon:hover { background: var(--cor-fundo-principal); color: var(--cor-primaria); }
+    .btn-icon.delete:hover { color: var(--cor-erro); border-color: rgba(var(--cor-erro-rgb), 0.3); background: rgba(var(--cor-erro-rgb), 0.05); }
+
+    /* Modal */
+    .modal-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5);
+        backdrop-filter: blur(4px);
+        z-index: 2000;
+        display: none;
+        align-items: center; justify-content: center;
+        opacity: 0; transition: opacity 0.3s;
+    }
+    .modal-overlay.open { display: flex; opacity: 1; }
+    .modal-box {
+        background: var(--cor-fundo-painel);
+        width: 450px;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: var(--sombra-card);
+        transform: scale(0.9); transition: transform 0.3s;
+        border: 1px solid var(--cor-borda);
+    }
+    .modal-overlay.open .modal-box { transform: scale(1); }
+    .modal-header {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 20px;
+        border-bottom: 1px solid var(--cor-borda);
+        padding-bottom: 12px;
+    }
+    .modal-title { font-size: 1.2rem; font-weight: 700; color: var(--cor-texto-principal); }
+    .close-modal { background: none; border: none; cursor: pointer; color: var(--cor-texto-secundario); font-size: 1.2rem; }
+    .form-group { margin-bottom: 16px; }
+    .modal-footer { margin-top: 24px; display: flex; justify-content: flex-end; gap: 10px; }
+    .btn-cancel {
+        background: transparent; border: 1px solid var(--cor-borda);
+        color: var(--cor-texto-secundario);
+        padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer;
+    }
+    .btn-cancel:hover { background: var(--cor-fundo-principal); }
+
+</style>
+
+<script>
+    // Cria um mapa JSON de Filial -> UF baseado no que o Jinja renderizou
+    const MAPA_FILIAIS = {
+        {% for filial in Filiais %}
+        "{{ filial.codigo }}": "{{ filial.uf }}",
+        {% endfor %}
+    };
+</script>
+
+<div class="manager-card">
+    <div class="manager-header">
+        <div class="title-group">
+            <div class="icon-wrapper">
+                <i class="ph-bold ph-clock-countdown"></i>
+            </div>
+            <h2>Horários de Corte</h2>
+        </div>
+
+        <div class="filter-group">
+            <div>
+                <label class="custom-label">Filtrar por Filial</label>
+                <select id="filtro-filial-global" class="custom-input" onchange="FiltrarTabelaFrontend()">
+                    <option value="">Todas as Filiais</option>
+                    {% for filial in Filiais %}
+                        <option value="{{ filial.codigo }}">{{ filial.codigo }} - {{ filial.nome }}</option>
+                    {% endfor %}
+                </select>
+                
+                <select id="filtro-uf-global" class="custom-input" onchange="FiltrarTabelaFrontend()" style="margin-top: 8px;">
+                    <option value="">Todas as UFs</option>
+                    {% set ufs = Filiais | map(attribute='uf') | unique | list %}
+                    {% for uf in ufs %}
+                        <option value="{{ uf }}">{{ uf }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% if current_user.TemPermissao('cadastros.cortes.editar') %}
+            <button class="btn-primary" onclick="AbrirModal()">
+                <i class="ph-bold ph-plus"></i> Novo Horário
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="tabs-container">
+        <button class="tab-btn active" onclick="MudarAba('planejamento')" id="tab-planejamento">
+            <i class="ph-bold ph-calendar-check"></i> Planejamento
+        </button>
+        <button class="tab-btn" onclick="MudarAba('emissao')" id="tab-emissao">
+            <i class="ph-bold ph-file-text"></i> Emissão
+        </button>
+    </div>
+
+    <div class="table-responsive">
+        <table class="modern-table">
+            <thead>
+                <tr id="table-header-row">
+                    </tr>
+            </thead>
+            <tbody id="table-body">
+                </tbody>
+        </table>
+        <div id="loading" style="text-align: center; padding: 20px; color: var(--cor-texto-secundario); display: none;">
+            <i class="ph-bold ph-spinner ph-spin" style="font-size: 24px;"></i><br>Carregando...
+        </div>
+        <div id="empty-state" style="text-align: center; padding: 40px; color: var(--cor-texto-secundario); display: none;">
+            <i class="ph-duotone ph-ghost" style="font-size: 32px;"></i>
+            <p style="margin-top: 10px;">Nenhum registro encontrado.</p>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal-form">
+    <div class="modal-box">
+        <div class="modal-header">
+            <span class="modal-title" id="modal-title-text">Novo Horário</span>
+            <button class="close-modal" onclick="FecharModal()"><i class="ph-bold ph-x"></i></button>
+        </div>
+        
+        <form id="form-corte" onsubmit="SalvarRegistro(event)">
+            <input type="hidden" id="input-id">
+            
+            <div class="form-group">
+                <label class="custom-label">Filial *</label>
+                <select id="input-filial" class="custom-input" required style="width: 100%;">
+                    <option value="" disabled selected>Selecione...</option>
+                    {% for filial in Filiais %}
+                        <option value="{{ filial.codigo }}">{{ filial.codigo }} - {{ filial.nome }} - {{ filial.uf }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group" id="group-descricao">
+                <label class="custom-label">Descrição da Rota/Corte *</label>
+                <input type="text" id="input-descricao" class="custom-input" placeholder="Ex: Rota Norte / Fechamento Geral" style="width: 100%;" required>
+            </div>
+
+            <div class="form-group">
+                <label class="custom-label">Horário Limite *</label>
+                <input type="time" id="input-horario" class="custom-input" required style="width: 100%;">
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-cancel" onclick="FecharModal()">Cancelar</button>
+                <button type="submit" class="btn-primary">
+                    <i class="ph-bold ph-floppy-disk"></i> Salvar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    let TAB_ATUAL = 'planejamento';
+    
+    const CONFIG_ABAS = {
+        'planejamento': {
+            urlListar: "{{ url_for('Cortes.ApiListarPlanejamento') }}",
+            urlSalvar: "{{ url_for('Cortes.ApiSalvarPlanejamento') }}",
+            headers: ['Filial', 'Descrição', 'Horário de Corte', 'Ações'],
+            temDescricao: true
+        },
+        'emissao': {
+            urlListar: "{{ url_for('Cortes.ApiListarEmissao') }}",
+            urlSalvar: "{{ url_for('Cortes.ApiSalvarEmissao') }}",
+            headers: ['Filial', 'Descrição', 'Horário Limite Emissão', 'Ações'], 
+            temDescricao: true 
+        }
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+        CarregarDados();
+    });
+
+    function MudarAba(novaAba) {
+        if (TAB_ATUAL === novaAba) return;
+        TAB_ATUAL = novaAba;
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`tab-${novaAba}`).classList.add('active');
+        CarregarDados();
+    }
+
+    async function CarregarDados() {
+        const config = CONFIG_ABAS[TAB_ATUAL];
+        // Nota: Não passamos filtro na URL, pegamos tudo para filtrar no frontend
+        // Se a base for muito grande (milhares de registros), ideal voltar para filtro backend.
+        // Mas para horários de corte geralmente são poucos registros.
+        
+        const tbody = document.getElementById('table-body');
+        const thead = document.getElementById('table-header-row');
+        const loading = document.getElementById('loading');
+        const empty = document.getElementById('empty-state');
+
+        thead.innerHTML = config.headers.map(h => `<th>${h}</th>`).join('');
+        tbody.innerHTML = '';
+        empty.style.display = 'none';
+        loading.style.display = 'block';
+
+        try {
+            let url = `${config.urlListar}?dummy=1`; 
+            // Não envia filial na URL para trazer tudo e permitir filtro dinâmico
+            
+            const response = await fetch(url);
+            const dados = await response.json();
+
+            loading.style.display = 'none';
+
+            if (dados.length === 0) {
+                empty.style.display = 'block';
+                return;
+            }
+
+            dados.forEach(item => {
+                const tr = document.createElement('tr');
+                const itemStr = JSON.stringify(item).replace(/"/g, '&quot;');
+                
+                // --- LÓGICA DO FILTRO ---
+                // Adicionamos atributos data-filial e data-uf na TR
+                // Usamos o objeto MAPA_FILIAIS criado lá em cima com Jinja
+                const codigoFilial = String(item.filial).trim();
+                const ufFilial = MAPA_FILIAIS[codigoFilial] || '';
+
+                tr.setAttribute('data-filial', codigoFilial);
+                tr.setAttribute('data-uf', ufFilial);
+                tr.classList.add('linha-tabela'); // Classe para facilitar seleção
+
+                let htmlCells = `
+                    <td><span class="badge-filial">${item.filial}</span></td>
+                    <td><strong>${item.descricao || '-'}</strong></td>
+                    <td><span class="time-display">${item.horario}</span></td>
+                    <td>
+                        {% if current_user.TemPermissao('cadastros.cortes.editar') or current_user.TemPermissao('cadastros.cortes.excluir') %}
+                        <div class="action-btn-group">
+                            {% if current_user.TemPermissao('cadastros.cortes.editar') %}
+                            <button class="btn-icon" title="Editar" onclick="EditarRegistro(${itemStr})">
+                                <i class="ph-bold ph-pencil-simple"></i>
+                            </button>
+                            {% endif %}
+                            {% if current_user.TemPermissao('cadastros.cortes.excluir') %}
+                            <button class="btn-icon delete" title="Excluir" onclick="ExcluirRegistro(${item.id})">
+                                <i class="ph-bold ph-trash"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <span style="color: var(--cor-texto-secundario); font-style: italic;">Sem permissão para ações</span>
+                        {% endif %}
+                    </td>
+                `;
+                tr.innerHTML = htmlCells;
+                tbody.appendChild(tr);
+            });
+            
+            // Aplica filtro inicial caso já tenha algo selecionado nos selects
+            FiltrarTabelaFrontend();
+
+        } catch (error) {
+            console.error(error);
+            loading.style.display = 'none';
+            alert('Erro ao carregar dados. Consulte o console.');
+        }
+    }
+
+    // --- NOVA FUNÇÃO DE FILTRO INTERNO ---
+    function FiltrarTabelaFrontend() {
+        const selFilial = document.getElementById('filtro-filial-global').value;
+        const selUf = document.getElementById('filtro-uf-global').value;
+        const linhas = document.querySelectorAll('.linha-tabela');
+        let visiveis = 0;
+
+        linhas.forEach(tr => {
+            const trFilial = tr.getAttribute('data-filial');
+            const trUf = tr.getAttribute('data-uf');
+
+            let mostrar = true;
+
+            // Lógica E (AND): Deve satisfazer ambos os filtros se estiverem preenchidos
+            if (selFilial && trFilial !== selFilial) mostrar = false;
+            if (selUf && trUf !== selUf) mostrar = false;
+
+            if (mostrar) {
+                tr.style.display = '';
+                visiveis++;
+            } else {
+                tr.style.display = 'none';
+            }
+        });
+
+        // Controle do Empty State
+        const empty = document.getElementById('empty-state');
+        if (visiveis === 0 && linhas.length > 0) {
+            empty.style.display = 'block';
+            empty.querySelector('p').textContent = "Nenhum registro corresponde aos filtros.";
+        } else if (linhas.length === 0) {
+            empty.style.display = 'block'; // Tabela realmente vazia
+            empty.querySelector('p').textContent = "Nenhum registro encontrado.";
+        } else {
+            empty.style.display = 'none';
+        }
+    }
+
+    // --- MODAL & FORMULÁRIO (Mantidos iguais) ---
+
+    function AbrirModal(dadosEdicao = null) {
+        const modal = document.getElementById('modal-form');
+        const titulo = document.getElementById('modal-title-text');
+        
+        document.getElementById('form-corte').reset();
+        document.getElementById('input-id').value = '';
+
+        if (dadosEdicao) {
+            titulo.textContent = `Editar Corte (${TAB_ATUAL === 'planejamento' ? 'Plan.' : 'Emis.'})`;
+            document.getElementById('input-id').value = dadosEdicao.id;
+            document.getElementById('input-filial').value = dadosEdicao.filial;
+            document.getElementById('input-horario').value = dadosEdicao.horario;
+            document.getElementById('input-descricao').value = dadosEdicao.descricao_pura || dadosEdicao.descricao || '';
+        } else {
+            titulo.textContent = `Novo Corte (${TAB_ATUAL === 'planejamento' ? 'Planejamento' : 'Emissão'})`;
+        }
+        modal.classList.add('open');
+    }
+
+    function FecharModal() {
+        document.getElementById('modal-form').classList.remove('open');
+    }
+
+    function EditarRegistro(item) {
+        AbrirModal(item);
+    }
+
+    async function SalvarRegistro(event) {
+        event.preventDefault();
+        const config = CONFIG_ABAS[TAB_ATUAL];
+        
+        const payload = {
+            id: document.getElementById('input-id').value || null,
+            filial: document.getElementById('input-filial').value,
+            horario: document.getElementById('input-horario').value,
+            descricao: document.getElementById('input-descricao').value
+        };
+
+        try {
+            const resp = await fetch(config.urlSalvar, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (resp.ok) {
+                FecharModal();
+                CarregarDados();
+            } else {
+                const erro = await resp.json();
+                alert('Erro: ' + (erro.msg || 'Erro desconhecido'));
+            }
+        } catch (e) {
+            alert('Erro de conexão ao salvar.');
+        }
+    }
+
+    async function ExcluirRegistro(id) {
+        if(!confirm('Confirma exclusão?')) return;
+        try {
+            const url = `{{ url_for('Cortes.ApiExcluir', tipo='TIPO', id_corte=0) }}`.replace('TIPO', TAB_ATUAL).replace('0', id);
+            const resp = await fetch(url, { method: 'DELETE' });
+            if (resp.ok) CarregarDados();
+            else alert('Erro ao excluir.');
+        } catch (e) { alert('Erro de conexão.'); }
+    }
+
+</script>
+{% endblock %}
