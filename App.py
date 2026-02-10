@@ -19,6 +19,7 @@ from Routes.Planejamento import PlanejamentoBp
 from Routes.Acompanhamento import AcompanhamentoBP
 from Routes.TabelasFrete import FreteBp
 from Routes.Reversa import ReversaBp
+from Routes.Cortes import CortesBp
 from Routes.Global.Configuracoes import ConfiguracoesBp
 
 
@@ -89,6 +90,7 @@ app.register_blueprint(AuthBp, url_prefix=f'{Prefix}/auth')
 
 # Os demais módulos assumem o prefixo base, pois suas rotas internas já possuem nomes (ex: /malha/...)
 app.register_blueprint(ConfiguracoesBp, url_prefix=f'{Prefix}/Configuracoes')
+app.register_blueprint(CortesBp, url_prefix=f'{Prefix}/Cortes')
 app.register_blueprint(PlanejamentoBp, url_prefix=f'{Prefix}/Planejamento')
 app.register_blueprint(EscalasBp, url_prefix=f'{Prefix}/Escalas')
 app.register_blueprint(AcompanhamentoBP, url_prefix=f'{Prefix}/Acompanhamento')

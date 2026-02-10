@@ -261,6 +261,8 @@
 
         {% elif current_user.TemPermissao('cadastros.tabelas.editar') %}
             {% set link_destino = url_for('Frete.Gerenciar') %}
+        {% elif current_user.TemPermissao('cadastros.cortes.editar') %}
+            {% set link_destino = url_for('Cortes.Gerenciar') %}
         {% endif %}
 
 

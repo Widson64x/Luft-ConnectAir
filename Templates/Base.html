@@ -82,6 +82,12 @@
                            <span class="link-text">Tabelas de Frete</span>
                         </a>
                         {% endif %}
+                        {% if current_user.TemPermissao('cadastros.cortes.visualizar') %}
+                        <a href="{{ url_for('Cortes.Gerenciar') }}" 
+                           class="menu-link {{ 'ativo' if request.endpoint and 'Cortes' in request.endpoint else '' }}">
+                           <span class="link-text">Horários de Corte</span>
+                        </a>
+                        {% endif %}
                     </div>
                 </div>
                 {% endif %}
