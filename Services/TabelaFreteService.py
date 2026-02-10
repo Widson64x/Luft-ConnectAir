@@ -194,24 +194,41 @@ class TabelaFreteService:
     def CalcularCustoEstimado(origem, destino, cia, peso):
         """
         Busca a tarifa na tabela e calcula o custo total.
-        Retorna (CustoTotal, TarifaEncontrada). Se não achar, retorna (0.0, 0.0).
+        Retorna (CustoTotal, Detalhes).
+        Detalhes é um dicionário com 'tarifa_base', 'servico', 'cia_tarifaria', etc.
         """
         Sessao = ObterSessaoSqlServer()
         try:
             # Tenta buscar tarifa específica
+            # Join com RemessaFrete para garantir que a tabela está ativa
             Item = Sessao.query(TabelaFrete).join(RemessaFrete).filter(
                 RemessaFrete.Ativo == True,
                 TabelaFrete.Origem == origem,
                 TabelaFrete.Destino == destino,
                 TabelaFrete.CiaAerea == cia
             ).first()
+
             if Item and Item.Tarifa:
-                Custo = float(Item.Tarifa) * float(peso) # Valor total = tarifa * peso
-                return Custo, float(Item.Tarifa)
+                vl_tarifa = float(Item.Tarifa)
+                vl_peso = float(peso)
+                Custo = vl_tarifa * vl_peso
+                
+                # --- AQUI ESTÁ A MUDANÇA ---
+                # Montamos o objeto completo para o frontend
+                Detalhes = {
+                    'tarifa_base': vl_tarifa,
+                    'servico': Item.Servico,       # Coluna Servico da tabela
+                    'cia_tarifaria': Item.CiaAerea, # Coluna CiaAerea da tabela
+                    'peso_calculado': vl_peso
+                }
+                
+                return Custo, Detalhes
             
-            return 0.0, 0.0
+            # Se não achar, retorna 0 e dicionário vazio
+            return 0.0, {}
+
         except Exception as e:
             LogService.Error("TabelaFreteService", f"Erro calc custo {origem}->{destino}", e)
-            return 0.0, 0.0
+            return 0.0, {}
         finally:
             Sessao.close()

@@ -1,180 +1,317 @@
 {% extends "Base.html" %}
 
-{% block titulo %}Mapa de Escalas | Luft-ConnectAir{% endblock %}
+{% block titulo %}Otimizador de Escalas | Luft-ConnectAir{% endblock %}
 
 {% block conteudo %}
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/@phosphor-icons/web"></script>
+<script src="https://unpkg.com/leaflet-polylineoffset/leaflet.polylineoffset.js"></script>
 
 <style>
-    /* --- LAYOUT FULLSCREEN --- */
-    body { overflow: hidden; } /* Trava scroll do body */
+    /* --- CONFIGURAÇÕES GERAIS --- */
+    body { 
+        overflow: hidden; /* Mapa ocupa tudo, sem scroll na página */
+    }
     
     .map-wrapper {
         position: relative;
         width: 100%;
-        height: calc(100vh - 72px); /* Desconta Header */
+        height: calc(100vh - 72px); /* Altura total menos o Header */
         background: var(--cor-fundo-principal);
+        overflow: hidden;
     }
 
-    #mapa-voos { 
-        width: 100%; height: 100%; 
+    #mapa-rotas { 
+        width: 100%; 
+        height: 100%; 
         z-index: 1; 
         background: #cad2d3; /* Fallback */
+        outline: none;
     }
 
-    /* Ajuste Dark Mode para o Mapa (Inversão Inteligente) */
+    /* Adaptação Dark Mode para o Mapa (Inversão Inteligente) */
     [data-theme="dark"] .leaflet-layer {
         filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
     }
 
-    /* --- PAINEL DE CONTROLE FLUTUANTE (GLASSMORPHISM) --- */
+    /* --- PAINEL DE CONTROLE FLUTUANTE --- */
     .control-panel {
         position: absolute;
-        top: 20px; left: 20px;
-        width: 380px;
+        top: 20px; 
+        left: 20px;
+        width: 380px; /* Largura fixa ideal */
+        max-height: calc(100vh - 60px); /* Margem inferior de segurança */
+        
+        background: rgba(var(--cor-fundo-painel-rgb), 0.95); /* Se houver RGB no tema, senão use a cor direta */
         background: var(--cor-fundo-painel);
-        opacity: 0.96;
-        backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        opacity: 0.98;
+        
+        backdrop-filter: blur(16px); 
+        -webkit-backdrop-filter: blur(16px);
+        
         border: 1px solid var(--cor-borda);
         box-shadow: var(--sombra-card);
         border-radius: 16px;
         z-index: 1000;
-        padding: 24px;
-        display: flex; flex-direction: column; gap: 20px;
-        transition: all 0.3s ease;
+        
+        display: flex; 
+        flex-direction: column;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
+    /* CABEÇALHO DO PAINEL */
     .panel-header {
-        display: flex; align-items: center; justify-content: space-between;
-        margin-bottom: 5px;
-    }
-    .panel-title {
-        font-size: 1.4rem; font-weight: 800; 
-        color: var(--cor-texto-principal);
-        display: flex; align-items: center; gap: 10px;
+        padding: 24px 24px 16px 24px;
+        flex-shrink: 0;
+        border-bottom: 1px solid transparent; /* Reserva espaço visual */
     }
     
-    /* INPUTS MODERNOS */
-    .input-group { display: flex; flex-direction: column; gap: 6px; }
+    .panel-title {
+        font-family: 'Inter', sans-serif;
+        font-size: 1.25rem; 
+        font-weight: 800; 
+        color: var(--cor-texto-principal);
+        display: flex; 
+        align-items: center; 
+        gap: 10px;
+        letter-spacing: -0.5px;
+    }
+
+    /* CORPO DO PAINEL (COM SCROLL) */
+    .panel-body {
+        padding: 16px 24px 24px 24px;
+        overflow-y: auto;
+        flex-grow: 1;
+        
+        /* Scrollbar Fina e Elegante */
+        scrollbar-width: thin;
+        scrollbar-color: var(--cor-borda) transparent;
+    }
+    .panel-body::-webkit-scrollbar { width: 6px; }
+    .panel-body::-webkit-scrollbar-track { background: transparent; }
+    .panel-body::-webkit-scrollbar-thumb { background-color: var(--cor-borda); border-radius: 20px; }
+
+    /* --- FORMULÁRIO E INPUTS --- */
+    .input-group { 
+        display: flex; 
+        flex-direction: column; 
+        gap: 6px; 
+        margin-bottom: 16px; 
+    }
+    
     .input-label { 
-        font-size: 0.75rem; font-weight: 700; 
-        color: var(--cor-texto-secundario); text-transform: uppercase; letter-spacing: 0.5px; 
+        font-size: 0.75rem; 
+        font-weight: 700; 
+        color: var(--cor-texto-secundario); 
+        text-transform: uppercase; 
+        letter-spacing: 0.5px;
     }
     
     .custom-input {
-        background: var(--cor-fundo-principal);
+        background: var(--cor-fundo-principal); /* Contraste leve com o painel */
         border: 1px solid var(--cor-borda);
         color: var(--cor-texto-principal);
-        padding: 10px 14px; border-radius: 8px;
-        font-family: 'Inter', sans-serif; font-size: 0.9rem;
-        outline: none; transition: 0.2s;
+        padding: 12px 14px; 
+        border-radius: 8px;
+        font-family: 'Inter', sans-serif; 
+        font-size: 0.9rem;
+        font-weight: 500;
         width: 100%;
+        outline: none; 
+        transition: border-color 0.2s, box-shadow 0.2s;
     }
+    
     .custom-input:focus { 
         border-color: var(--cor-primaria); 
-        box-shadow: 0 0 0 3px rgba(var(--cor-primaria-rgb), 0.1); 
+        box-shadow: 0 0 0 3px rgba(var(--cor-primaria-rgb), 0.15); 
+    }
+    
+    .custom-input::placeholder { color: var(--cor-texto-secundario); opacity: 0.6; }
+
+    /* GRID DE INPUTS */
+    .row-dupla { 
+        display: grid; 
+        grid-template-columns: 1fr 1fr; 
+        gap: 12px; 
+    }
+    
+    .route-inputs { 
+        display: grid; 
+        grid-template-columns: 1fr auto 1fr; 
+        gap: 8px; 
+        align-items: end; 
+        margin-bottom: 16px;
+    }
+    
+    .route-arrow { 
+        color: var(--cor-texto-secundario); 
+        padding-bottom: 14px; 
+        font-size: 1.1rem; 
     }
 
-    /* Grid de Datas */
-    .date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    /* --- BOTÕES --- */
+    .btn-action {
+        background: var(--cor-primaria); 
+        color: #fff;
+        border: none; 
+        padding: 14px; 
+        border-radius: 10px;
+        font-weight: 600; 
+        font-size: 0.95rem;
+        cursor: pointer; 
+        width: 100%;
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        gap: 8px;
+        transition: background-color 0.2s, transform 0.1s;
+        margin-top: 8px;
+    }
     
-    /* Grid de Origem/Destino */
-    .route-row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: end; }
-    .route-icon { 
-        color: var(--cor-texto-secundario); padding-bottom: 12px; font-size: 1.2rem; 
+    .btn-action:hover { 
+        background: var(--cor-primaria-hover); 
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(var(--cor-primaria-rgb), 0.3);
+    }
+    
+    .btn-action:active { transform: translateY(0); }
+    .btn-action:disabled { 
+        opacity: 0.7; 
+        cursor: not-allowed; 
+        transform: none; 
+        box-shadow: none;
     }
 
-    /* BOTÕES DE AÇÃO */
-    .action-row { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-top: 10px; }
-    
-    .btn-search {
-        background: var(--cor-primaria); color: #fff;
-        border: none; padding: 12px; border-radius: 8px;
-        font-weight: 600; cursor: pointer;
-        display: flex; align-items: center; justify-content: center; gap: 8px;
-        transition: 0.2s;
+    .btn-expand {
+        background: transparent;
+        border: 1px solid var(--cor-borda);
+        border-radius: 6px;
+        width: 28px; height: 28px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer;
+        color: var(--cor-texto-secundario);
+        transition: all 0.2s;
     }
-    .btn-search:hover { background: var(--cor-primaria-hover); transform: translateY(-2px); }
-    
-    .btn-clear {
-        background: transparent; color: var(--cor-texto-secundario);
-        border: 1px solid var(--cor-borda); padding: 12px; border-radius: 8px;
-        font-weight: 600; cursor: pointer; transition: 0.2s;
+    .btn-expand:hover {
+        background: rgba(var(--cor-primaria-rgb), 0.1);
+        color: var(--cor-primaria);
+        border-color: var(--cor-primaria);
     }
-    .btn-clear:hover { background: rgba(0,0,0,0.05); color: var(--cor-texto-principal); }
 
-    /* SEARCH BAR (LOCALIZAR) */
-    .search-bar-wrapper {
-        position: relative;
-        margin-top: 10px; padding-top: 20px;
+    /* --- ÁREA DE RESULTADOS --- */
+    .results-container {
+        margin-top: 24px;
         border-top: 1px solid var(--cor-borda);
+        padding-top: 20px;
+        display: none; /* JS controla visibilidade */
+        animation: fadeIn 0.4s ease;
     }
-    .search-icon {
-        position: absolute; left: 12px; top: 43px;
-        color: var(--cor-texto-secundario); font-size: 1.1rem;
+    
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    
+    .result-label {
+        font-size: 0.75rem; 
+        font-weight: 800; 
+        color: var(--cor-texto-secundario);
+        margin-bottom: 12px; 
+        display: block; 
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
-    .search-input { padding-left: 40px; }
 
-    /* --- POPUPS ESTILIZADOS --- */
+    /* --- CARDS DE OPÇÃO --- */
+    .option-card {
+        background: var(--cor-fundo-principal);
+        border: 1px solid var(--cor-borda);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .option-card:hover { 
+        border-color: var(--cor-primaria); 
+        box-shadow: var(--sombra-suave);
+        transform: translateY(-2px);
+    }
+    
+    /* Estado Ativo (Selecionado) */
+    .option-card.active {
+        background: rgba(var(--cor-primaria-rgb), 0.04);
+        border-color: var(--cor-primaria);
+        box-shadow: 0 0 0 1px var(--cor-primaria) inset;
+    }
+    .option-card.active::before {
+        content: '';
+        position: absolute; left: 0; top: 0; bottom: 0;
+        width: 4px; background: var(--cor-primaria);
+    }
+
+    .card-header {
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    
+    /* BADGES (Etiquetas) */
+    .card-badge {
+        font-size: 0.7rem; 
+        font-weight: 700; 
+        text-transform: uppercase;
+        padding: 4px 10px; 
+        border-radius: 6px; 
+        color: white;
+        display: inline-flex; 
+        align-items: center; 
+        gap: 6px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .badge-recomendada { background: var(--cor-sucesso); }
+    .badge-rapida { background: var(--cor-info); }
+    .badge-barata { background: var(--cor-aviso); }
+    .badge-conexoes { background: #8B5CF6; }
+
+    .card-info {
+        display: flex; 
+        justify-content: space-between;
+        align-items: baseline;
+        font-family: 'Inter', sans-serif;
+    }
+    
+    .card-details {
+        margin-top: 10px; 
+        padding-top: 10px;
+        border-top: 1px dashed var(--cor-borda);
+        font-size: 0.85rem; 
+        color: var(--cor-texto-secundario);
+        display: flex; 
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    /* --- POPUP DO MAPA --- */
     .leaflet-popup-content-wrapper { 
         background: var(--cor-fundo-painel); 
         color: var(--cor-texto-principal); 
         border-radius: 12px; 
-        box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        box-shadow: var(--sombra-card);
         border: 1px solid var(--cor-borda);
-        padding: 0; overflow: hidden;
+        padding: 0; 
+        overflow: hidden;
     }
-    .leaflet-popup-tip { background: var(--cor-fundo-painel); border: 1px solid var(--cor-borda); border-top: none; border-left: none; }
-    .leaflet-popup-content { margin: 0 !important; min-width: 280px; }
-
-    /* Headers Específicos por Cia */
-    .pop-header { 
-        padding: 14px 18px; font-weight: 700; color: white;
-        display: flex; justify-content: space-between; align-items: center;
-        background: #495057; /* Default */
+    .leaflet-popup-tip { 
+        background: var(--cor-fundo-painel); 
+        border: 1px solid var(--cor-borda); 
+        border-top: none; 
+        border-left: none; 
     }
-    .header-latam { background: linear-gradient(135deg, #E30613, #b3000b); }
-    .header-azul { background: linear-gradient(135deg, #009FE3, #0077aa); }
-    .header-gol { background: linear-gradient(135deg, #FF7020, #e05e15); }
-
-    .pop-body { padding: 18px; }
-    
-    .pop-route-visual {
-        display: flex; justify-content: space-between; align-items: center;
-        background: rgba(0,0,0,0.04); border-radius: 8px; padding: 10px 15px;
-        margin-bottom: 15px;
-    }
-    .pop-iata { font-size: 1.4rem; font-weight: 800; color: var(--cor-texto-principal); }
-    .pop-arrow { color: var(--cor-texto-secundario); font-size: 1.2rem; }
-
-    .pop-info-row { 
-        display: flex; justify-content: space-between; margin-bottom: 8px; 
-        border-bottom: 1px dashed var(--cor-borda); padding-bottom: 8px;
-    }
-    .pop-info-row:last-child { border: none; padding: 0; margin: 0; }
-    
-    .pop-lbl { font-size: 0.75rem; color: var(--cor-texto-secundario); font-weight: 600; text-transform: uppercase; }
-    .pop-val { font-weight: 700; color: var(--cor-texto-principal); font-size: 0.9rem; }
-
-    /* Paginação Popup */
-    .pop-footer {
-        background: rgba(0,0,0,0.03); padding: 10px 18px;
-        display: flex; justify-content: space-between; align-items: center;
-        border-top: 1px solid var(--cor-borda);
-    }
-    .nav-btn {
-        background: var(--cor-fundo-painel); border: 1px solid var(--cor-borda);
-        width: 28px; height: 28px; border-radius: 6px;
-        display: flex; align-items: center; justify-content: center; cursor: pointer;
-        color: var(--cor-texto-principal); transition: 0.2s;
-    }
-    .nav-btn:hover:not(:disabled) { background: var(--cor-primaria); color: white; border-color: var(--cor-primaria); }
-    .nav-btn:disabled { opacity: 0.4; cursor: default; }
-    
-    .page-indicator { font-size: 0.8rem; font-weight: 600; color: var(--cor-texto-secundario); }
+    .leaflet-popup-content { margin: 12px !important; }
 
 </style>
 
@@ -185,288 +322,369 @@
     <div class="control-panel">
         <div class="panel-header">
             <div class="panel-title">
-                <i class="ph-duotone ph-globe-hemisphere-west" style="color: var(--cor-primaria);"></i>
-                Escalas
+                <i class="ph-duotone ph-airplane-in-flight" style="color: var(--cor-primaria);"></i>
+                Otimizador
             </div>
         </div>
 
-        <div class="date-row">
-            <div class="input-group">
-                <label class="input-label">Início</label>
-                <input type="date" id="data-inicio" class="custom-input">
-            </div>
-            <div class="input-group">
-                <label class="input-label">Fim</label>
-                <input type="date" id="data-fim" class="custom-input">
-            </div>
-        </div>
-
-        <div class="route-row">
-            <div class="input-group">
-                <label class="input-label">Origem</label>
-                <input type="text" id="filtro-origem" class="custom-input" placeholder="GRU" 
-                       list="lista-aeroportos" style="text-transform: uppercase; text-align: center; font-weight: 700;">
-            </div>
-            <div class="route-icon">
-                <i class="ph-bold ph-arrow-right"></i>
-            </div>
-            <div class="input-group">
-                <label class="input-label">Destino</label>
-                <input type="text" id="filtro-destino" class="custom-input" placeholder="MIA" 
-                       list="lista-aeroportos" style="text-transform: uppercase; text-align: center; font-weight: 700;">
-            </div>
-        </div>
-
-        <div class="input-group" style="margin-top: 5px;">
-            <label class="input-label">Nº Voo (Opcional)</label>
-            <div style="position: relative;">
-                <input type="text" id="filtro-voo" class="custom-input" 
-                       placeholder="Ex: 3678 ou LA3678" 
-                       style="padding-left: 36px; font-weight: 600; text-transform: uppercase;">
-                <i class="ph-bold ph-airplane-tilt" 
-                   style="position: absolute; left: 12px; top: 11px; color: var(--cor-texto-secundario);"></i>
-            </div>
-        </div>
-
-        <div class="action-row">
-            <button class="btn-search" onclick="CarregarMapa()">
-                <i class="ph-bold ph-magnifying-glass"></i> Buscar Rotas
-            </button>
-            <button class="btn-clear" onclick="LimparFiltros()">
-                <i class="ph-bold ph-trash"></i>
-            </button>
-        </div>
-
-        <div class="search-bar-wrapper">
-            <div class="input-group">
-                <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
-                    <i class="ph-bold ph-map-pin" style="color: var(--cor-primaria); font-size: 1.1rem;"></i>
-                    <label class="input-label" style="margin-bottom: 0;">Localizar Aeroporto</label>
+        <div class="panel-body">
+            <div class="row-dupla">
+                <div class="input-group">
+                    <label class="input-label">Início</label>
+                    <input type="date" id="data-inicio" class="custom-input">
                 </div>
-                
-                <input type="text" id="input-localizar" class="custom-input" 
-                       list="lista-aeroportos" placeholder="Digite IATA ou Nome..." 
-                       onchange="LocalizarAeroporto(this.value)">
+                <div class="input-group">
+                    <label class="input-label">Fim</label>
+                    <input type="date" id="data-fim" class="custom-input">
+                </div>
+            </div>
+
+            <div class="route-inputs">
+                <div class="input-group">
+                    <label class="input-label">De</label>
+                    <input type="text" id="origem" class="custom-input" placeholder="GRU" 
+                           list="lista-aeroportos" style="text-transform: uppercase; text-align: center; font-weight: 700;">
+                </div>
+                <div class="route-arrow"><i class="ph-bold ph-arrow-right"></i></div>
+                <div class="input-group">
+                    <label class="input-label">Para</label>
+                    <input type="text" id="destino" class="custom-input" placeholder="JFK" 
+                           list="lista-aeroportos" style="text-transform: uppercase; text-align: center; font-weight: 700;">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label class="input-label">Peso da Carga (kg)</label>
+                <div style="position: relative;">
+                    <input type="number" id="peso" class="custom-input" placeholder="100" value="100" style="padding-left: 40px;">
+                    <i class="ph-bold ph-package" style="position: absolute; left: 12px; top: 12px; font-size: 1.1rem; color: var(--cor-texto-secundario);"></i>
+                </div>
+            </div>
+
+            <button class="btn-action" onclick="BuscarOpcoes()" id="btn-buscar">
+                <i class="ph-bold ph-lightning"></i> Calcular Melhores Rotas
+            </button>
+
+            <div id="area-resultados" class="results-container">
+                <span class="result-label">Opções Encontradas</span>
+                <div id="lista-opcoes">
+                    </div>
             </div>
         </div>
     </div>
 
-    <div id="mapa-voos"></div>
+    <div id="mapa-rotas"></div>
 </div>
 
 <script>
-    // --- ROTAS DA API ---
     const API_URLS = {
         listarAeroportos: "{{ url_for('Aeroporto.ApiListarSimples') }}",
-        buscarRotas: "{{ url_for('Malha.ApiRotas') }}"
+        otimizarRotas: "{{ url_for('Escalas.ApiOtimizarRotas') }}"
     };
 
-    // --- GLOBAIS ---
-    let map, flightLayer, layerAeroportos;
-    let rotasAgrupadas = {}; 
-    let baseAeroportos = []; 
-    let cacheAeroportosData = null; 
-    let lastInicio = null, lastFim = null;
-    
-    document.addEventListener('DOMContentLoaded', function() {
+    let map, layerVoos, layerAeroportos;
+    let baseAeroportos = [];
+    let dadosUltimaBusca = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
         InicializarMapa();
-    });
-
-    function InicializarMapa() {
-        if (map) return;
-
-        map = L.map('mapa-voos', { zoomControl: false }).setView([-15.79, -47.88], 4);
-        L.control.zoom({ position: 'topright' }).addTo(map);
+        CarregarAeroportos();
         
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; Luft-ConnectAir', maxZoom: 19
-        }).addTo(map);
-
-        layerAeroportos = L.layerGroup().addTo(map);
-        flightLayer = L.layerGroup().addTo(map);
-
+        // Datas default: Hoje
         const hoje = new Date().toISOString().split('T')[0];
         document.getElementById('data-inicio').value = hoje;
         document.getElementById('data-fim').value = hoje;
+    });
+
+    function InicializarMapa() {
+        // Inicializa o mapa Leaflet
+        map = L.map('mapa-rotas', { zoomControl: false }).setView([-15.79, -47.88], 4);
         
-        CarregarListaAeroportos();
-        CarregarMapa();
-    }
-
-    async function CarregarListaAeroportos() {
-        try {
-            const resp = await fetch(API_URLS.listarAeroportos);
-            baseAeroportos = await resp.json();
-            const datalist = document.getElementById('lista-aeroportos');
-            datalist.innerHTML = '';
-            baseAeroportos.forEach(aero => {
-                const option = document.createElement('option');
-                option.value = aero.iata; 
-                option.label = `${aero.nome} (${aero.iata})`;
-                datalist.appendChild(option);
-            });
-        } catch (e) { console.error("Erro lista aeroportos", e); }
-    }
-
-    function LocalizarAeroporto(iataInput) {
-        if (!iataInput) return;
-        document.getElementById('input-localizar').value = '';
-        document.getElementById('input-localizar').blur();
-
-        const iata = iataInput.toUpperCase().trim();
-        const aero = baseAeroportos.find(a => a.iata === iata);
-
-        if (aero) {
-            map.flyTo([aero.lat, aero.lon], 12, { duration: 1.5 });
-            L.popup().setLatLng([aero.lat, aero.lon])
-                .setContent(`<div style="padding:10px; font-weight:700;">${aero.iata} - ${aero.nome}</div>`).openOn(map);
-        }
-    }
-
-    async function CarregarMapa() {
-        const inicio = document.getElementById('data-inicio').value;
-        const fim = document.getElementById('data-fim').value;
-        const origem = document.getElementById('filtro-origem').value;
-        const destino = document.getElementById('filtro-destino').value;
-        const voo = document.getElementById('filtro-voo').value; // --- CAPTURA O CAMPO NOVO
-
-        if(!inicio || !fim) return alert("Selecione o período.");
-
-        if (inicio !== lastInicio || fim !== lastFim || !cacheAeroportosData) {
-            await CarregarAeroportosFundo(inicio, fim);
-            lastInicio = inicio; lastFim = fim;
-        }
+        // Controle de Zoom posicionado no canto superior direito
+        L.control.zoom({ position: 'topright' }).addTo(map);
         
-        flightLayer.clearLayers();
-        rotasAgrupadas = {}; 
+        // Tile Layer (Estilo Clean/Voyager)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; Luft-ConnectAir', 
+            maxZoom: 19
+        }).addTo(map);
+
+        layerAeroportos = L.layerGroup().addTo(map);
+        layerVoos = L.layerGroup().addTo(map);
+    }
+
+    async function CarregarAeroportos() {
+        try {
+            const res = await fetch(API_URLS.listarAeroportos);
+            baseAeroportos = await res.json();
+            const dl = document.getElementById('lista-aeroportos');
+            dl.innerHTML = '';
+            baseAeroportos.forEach(a => {
+                const opt = document.createElement('option');
+                opt.value = a.iata;
+                opt.label = `${a.nome} (${a.cidade})`;
+                dl.appendChild(opt);
+            });
+        } catch(e) { console.error("Erro ao carregar aeroportos:", e); }
+    }
+
+    async function BuscarOpcoes() {
+        const btn = document.getElementById('btn-buscar');
+        const container = document.getElementById('area-resultados');
+        const lista = document.getElementById('lista-opcoes');
+        
+        // Coleta Parâmetros
+        const params = {
+            inicio: document.getElementById('data-inicio').value,
+            fim: document.getElementById('data-fim').value,
+            origem: document.getElementById('origem').value,
+            destino: document.getElementById('destino').value,
+            peso: document.getElementById('peso').value
+        };
+
+        if(!params.inicio || !params.fim || !params.origem || !params.destino) 
+            return alert("Por favor, preencha todos os campos obrigatórios.");
+
+        // UI Loading
+        btn.disabled = true;
+        btn.innerHTML = `<i class="ph-bold ph-spinner ph-spin"></i> Processando...`;
+        lista.innerHTML = '';
+        container.style.display = 'none';
+        LimparMapa();
 
         try {
-            let url = `${API_URLS.buscarRotas}?inicio=${inicio}&fim=${fim}`;
-            if(origem) url += `&origem=${origem}`;
-            if(destino) url += `&destino=${destino}`;
-            if(voo) url += `&numero_voo=${voo}`; // --- ENVIA NA URL
+            const url = `${API_URLS.otimizarRotas}?inicio=${params.inicio}&fim=${params.fim}&origem=${params.origem}&destino=${params.destino}&peso=${params.peso}`;
+            const resp = await fetch(url);
+            const json = await resp.json();
 
-            const response = await fetch(url);
-            const dadosBrutos = await response.json();
-
-            if (dadosBrutos.length === 0) { alert("Nenhuma rota encontrada."); return; }
-
-            dadosBrutos.forEach(voo => {
-                const chave = `${voo.origem.iata}-${voo.destino.iata}`;
-                if (!rotasAgrupadas[chave]) rotasAgrupadas[chave] = [];
-                rotasAgrupadas[chave].push(voo);
-            });
-
-            Object.keys(rotasAgrupadas).forEach(chave => {
-                const grupo = rotasAgrupadas[chave];
-                const vooPrincipal = grupo.find(v => v.cia.includes('GOL')) || grupo[0];
-                
-                const p1 = [vooPrincipal.origem.lat, vooPrincipal.origem.lon];
-                const p2 = [vooPrincipal.destino.lat, vooPrincipal.destino.lon];
-                const estilo = ObterEstiloVoo(vooPrincipal.cia, vooPrincipal.tipo_resultado);
-                
-                let linha;
-                if (estilo.isZebra) {
-                    L.polyline([p1, p2], { color: 'white', weight: estilo.weight+2, opacity: estilo.opacity }).addTo(flightLayer);
-                    linha = L.polyline([p1, p2], { color: estilo.color, weight: estilo.weight, opacity: estilo.opacity, dashArray: estilo.dashArray }).addTo(flightLayer);
-                } else {
-                    linha = L.polyline([p1, p2], { color: estilo.color, weight: estilo.weight, opacity: estilo.opacity }).addTo(flightLayer);
-                }
-
-                linha.bindPopup(GerarHtmlPopup(chave, 0));
-                
-                if (vooPrincipal.tipo_resultado !== 'Geral') {
-                    L.circleMarker(p1, { radius: 4, color: estilo.color, fillColor: '#fff', fillOpacity: 1 }).addTo(flightLayer);
-                    L.circleMarker(p2, { radius: 4, color: estilo.color, fillColor: '#fff', fillOpacity: 1 }).addTo(flightLayer);
-                }
-            });
-
-            if (dadosBrutos.length > 0) {
-                const bounds = L.latLngBounds(dadosBrutos.map(r => [r.origem.lat, r.origem.lon]).concat(dadosBrutos.map(r => [r.destino.lat, r.destino.lon])));
-                map.fitBounds(bounds, { padding: [100, 100] });
+            if (json.status !== 'sucesso') {
+                alert(json.mensagem || json.erro);
+                return;
             }
 
-        } catch (error) { console.error(error); }
+            dadosUltimaBusca = json.dados;
+            RenderizarCards(dadosUltimaBusca);
+            container.style.display = 'block';
+
+            // Seleciona a recomendada por padrão se existir
+            if(dadosUltimaBusca.recomendada && dadosUltimaBusca.recomendada.length > 0) {
+                SelecionarOpcao('recomendada');
+            } else {
+                // Tenta selecionar outra se a recomendada não existir
+                const keys = Object.keys(dadosUltimaBusca);
+                for(let k of keys) {
+                    if(dadosUltimaBusca[k] && dadosUltimaBusca[k].length > 0) {
+                        SelecionarOpcao(k);
+                        break;
+                    }
+                }
+            }
+
+        } catch (error) {
+            console.error(error);
+            alert("Erro de comunicação com o servidor.");
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="ph-bold ph-lightning"></i> Calcular Melhores Rotas`;
+        }
     }
 
-    // --- POPUP REFINADO (HTML) ---
-    function GerarHtmlPopup(chaveRota, index) {
-        const grupo = rotasAgrupadas[chaveRota];
-        const voo = grupo[index];
-        const total = grupo.length;
-        const estilo = ObterEstiloVoo(voo.cia, voo.tipo_resultado);
-        // Tratamento simples para limpar "Airport" do nome
-        const nomeOrigem = voo.origem.nome ? voo.origem.nome.replace('International Airport', '').replace('Airport', '') : '';
-        const nomeDestino = voo.destino.nome ? voo.destino.nome.replace('International Airport', '').replace('Airport', '') : '';
+    function RenderizarCards(dados) {
+        const lista = document.getElementById('lista-opcoes');
+        lista.innerHTML = '';
+        
+        const configs = {
+            'recomendada': { label: 'Recomendada', class: 'badge-recomendada', icon: 'ph-star' },
+            'mais_rapida': { label: 'Mais Rápida', class: 'badge-rapida', icon: 'ph-timer' },
+            'menor_custo': { label: 'Menor Custo', class: 'badge-barata', icon: 'ph-currency-dollar' },
+            'menos_conexoes': { label: 'Menos Conexões', class: 'badge-conexoes', icon: 'ph-arrows-left-right' }
+        };
 
-        return `
-            <div id="popup-content-${chaveRota}">
-                <div class="pop-header ${estilo.headerClass}">
-                    <span>${voo.cia} ${voo.voo}</span>
-                    <i class="ph-fill ph-airplane-tilt"></i>
-                </div>
-                <div class="pop-body">
-                    <div class="pop-route-visual">
-                        <span class="pop-iata">${voo.origem.iata}</span>
-                        <i class="ph-bold ph-arrow-right pop-arrow"></i>
-                        <span class="pop-iata">${voo.destino.iata}</span>
+        Object.keys(configs).forEach(chave => {
+            const rota = dados[chave];
+            if(!rota || rota.length === 0) return;
+
+            const meta = rota[0]; 
+            const conexoes = rota.length - 1;
+            const temAvisoTarifa = meta.sem_tarifa; 
+
+            const card = document.createElement('div');
+            card.className = 'option-card';
+            card.id = `card-${chave}`;
+            
+            // --- HEADER DO CARD ---
+            const headerHtml = `
+                <div onclick="SelecionarOpcao('${chave}')">
+                    <div class="card-header">
+                        <span class="card-badge ${configs[chave].class}">
+                            <i class="ph-bold ${configs[chave].icon}"></i> ${configs[chave].label}
+                        </span>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            ${temAvisoTarifa ? `<i class="ph-fill ph-warning" title="Tarifa Parcial/Ausente" style="color:var(--cor-aviso);"></i>` : ''}
+                            <span style="font-size:0.75rem; font-weight:700; color:var(--cor-texto-secundario);">${conexoes === 0 ? 'Direto' : conexoes + ' Conexões'}</span>
+                        </div>
                     </div>
-                    <div class="pop-info-row"><span class="pop-lbl">Partida</span><span class="pop-val">${voo.horario_saida}</span></div>
-                    <div class="pop-info-row"><span class="pop-lbl">Chegada</span><span class="pop-val">${voo.horario_chegada}</span></div>
-                    <div class="pop-info-row"><span class="pop-lbl">Data</span><span class="pop-val">${voo.data}</span></div>
+                    
+                    <div class="card-info">
+                        <span style="font-size:1.1rem; color:var(--cor-primaria); font-weight:800;">${meta.total_custo || 'R$ 0,00'}</span>
+                        <span style="font-size:0.9rem; color:var(--cor-texto-principal); font-weight:600;">${meta.total_duracao || '--'}</span>
+                    </div>
+
+                    <div class="card-details" style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="display:flex; align-items:center; gap:6px;">
+                            <i class="ph-bold ph-airplane-tilt" style="color:var(--cor-primaria);"></i> 
+                            ${rota.map(r => r.cia).join(' + ')}
+                        </span>
+                        
+                        <button class="btn-expand" onclick="ToggleDetalhes(event, '${chave}')" title="Ver detalhes por voo">
+                            <i class="ph-bold ph-caret-down" id="icon-expand-${chave}"></i>
+                        </button>
+                    </div>
                 </div>
-                ${total > 1 ? `
-                <div class="pop-footer">
-                    <button type="button" class="nav-btn" ${index===0?'disabled':''} onclick="NavegarPopup(event, '${chaveRota}', ${index-1})"><i class="ph-bold ph-caret-left"></i></button>
-                    <span class="page-indicator">Voo ${index+1} de ${total}</span>
-                    <button type="button" class="nav-btn" ${index===(total-1)?'disabled':''} onclick="NavegarPopup(event, '${chaveRota}', ${index+1})"><i class="ph-bold ph-caret-right"></i></button>
-                </div>` : ''}
-            </div>
-        `;
+            `;
+
+            // --- DETALHES (Acordeão) ---
+            let detalhesHtml = `<div id="detalhes-${chave}" style="display:none; margin-top:12px; border-top:1px dashed var(--cor-borda); padding-top:12px;">`;
+            
+            rota.forEach((trecho, idx) => {
+                const base = trecho.base_calculo || {};
+                
+                // Cálculos
+                const tarifaValor = parseFloat(base.tarifa) || 0;
+                const pesoValor = parseFloat(base.peso_usado) || 0;
+                const custoTrecho = tarifaValor * pesoValor;
+                
+                // Formatação
+                const tarifaBaseFmt = tarifaValor > 0 ? `R$ ${tarifaValor.toFixed(2)}` : '<span style="color:var(--cor-erro);">--</span>';
+                const custoTrechoFmt = custoTrecho > 0 ? `R$ ${custoTrecho.toFixed(2)}` : 'R$ 0,00';
+                const servico = base.servico || 'STD';
+                
+                detalhesHtml += `
+                    <div style="font-size:0.8rem; margin-bottom:10px; background:rgba(var(--cor-fundo-painel-rgb), 0.5); padding:10px; border-radius:8px; border: 1px solid var(--cor-borda); border-left: 3px solid var(--cor-primaria);">
+                        <div style="font-weight:700; display:flex; justify-content:space-between; color:var(--cor-texto-principal); margin-bottom:4px;">
+                            <span>${trecho.origem.iata} <i class="ph-bold ph-arrow-right" style="font-size:0.7rem; color:var(--cor-texto-secundario);"></i> ${trecho.destino.iata}</span>
+                            <span style="color:var(--cor-primaria);">${trecho.cia} ${trecho.voo}</span>
+                        </div>
+                        
+                        <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--cor-texto-secundario); margin-bottom:6px;">
+                            <span>Serviço: <strong style="color:var(--cor-texto-principal);">${servico}</strong></span>
+                            <span>Tarifa: ${tarifaBaseFmt}</span>
+                        </div>
+
+                        <div style="display:flex; justify-content:space-between; padding-top:6px; border-top:1px solid var(--cor-borda);">
+                            <span style="font-weight:600; color:var(--cor-texto-secundario);">Custo Voo:</span>
+                            <strong style="color:var(--cor-texto-principal);">${custoTrechoFmt}</strong>
+                        </div>
+                    </div>
+                `;
+            });
+            detalhesHtml += `</div>`;
+
+            card.innerHTML = headerHtml + detalhesHtml;
+            lista.appendChild(card);
+        });
     }
 
-    window.NavegarPopup = function(event, chaveRota, novoIndex) {
-        if (event) { event.stopPropagation(); event.preventDefault(); }
-        const novoHtml = GerarHtmlPopup(chaveRota, novoIndex);
-        if (map._popup) map._popup.setContent(novoHtml);
+    // Função para abrir/fechar o acordeão
+    window.ToggleDetalhes = function(event, chave) {
+        event.stopPropagation(); // Impede seleção do card
+        const div = document.getElementById(`detalhes-${chave}`);
+        const icon = document.getElementById(`icon-expand-${chave}`);
+        
+        if (div.style.display === 'none') {
+            div.style.display = 'block';
+            icon.classList.replace('ph-caret-down', 'ph-caret-up');
+        } else {
+            div.style.display = 'none';
+            icon.classList.replace('ph-caret-up', 'ph-caret-down');
+        }
     };
 
-    // --- ESTILOS VISUAIS ---
-    function ObterEstiloVoo(cia, tipo) {
-        const nome = cia ? String(cia).toUpperCase().trim() : '';
-        let c='#495057', z=false, h='header-default';
-        if (nome.includes('LATAM') || nome === 'JJ' || nome === 'LA') { c='#E30613'; h='header-latam'; }
-        else if (nome.includes('AZUL') || nome === 'AD') { c='#009FE3'; h='header-azul'; }
-        else if (nome.includes('GOL') || nome === 'G3') { c='#FF7020'; z=true; h='header-gol'; }
+    function SelecionarOpcao(chave) {
+        document.querySelectorAll('.option-card').forEach(c => c.classList.remove('active'));
+        const card = document.getElementById(`card-${chave}`);
+        if(card) card.classList.add('active');
+
+        LimparMapa();
+        const rotas = dadosUltimaBusca[chave];
+        if(!rotas) return;
+
+        const latlngs = [];
         
-        if (tipo === 'Geral') return { color: c, weight: 1.5, opacity: 0.3, dashArray: null, isZebra: false, headerClass: h };
-        return { color: c, weight: 4, opacity: 1, dashArray: z?'12,12':null, isZebra: z, headerClass: h };
+        rotas.forEach((trecho, index) => {
+            const p1 = [trecho.origem.lat, trecho.origem.lon];
+            const p2 = [trecho.destino.lat, trecho.destino.lon];
+            
+            latlngs.push(p1); latlngs.push(p2);
+
+            const base = trecho.base_calculo || {};
+            
+            // Cálculos para o Popup
+            const tarifaValor = parseFloat(base.tarifa) || 0;
+            const pesoValor = parseFloat(base.peso_usado) || 0;
+            const custoTrecho = tarifaValor * pesoValor;
+            const custoTrechoFmt = custoTrecho > 0 ? `R$ ${custoTrecho.toFixed(2)}` : 'R$ 0,00';
+            const tarifaFmt = tarifaValor > 0 ? `R$ ${tarifaValor.toFixed(2)}/kg` : 'N/A';
+
+            const color = ObterCorCia(trecho.cia);
+            const line = L.polyline([p1, p2], { color: color, weight: 5, opacity: 0.8 }).addTo(layerVoos);
+
+            // Conteúdo do Popup (Visualmente alinhado com o card)
+            const popupContent = `
+                <div style="font-family:'Inter', sans-serif; min-width:240px;">
+                    <div style="background:${color}; padding:10px; border-radius:8px 8px 0 0; color:white; font-weight:bold; display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:0.95rem;">${trecho.cia} ${trecho.voo}</span>
+                        <span style="font-size:0.75rem; background:rgba(255,255,255,0.2); padding:2px 6px; border-radius:4px;">${base.servico || 'STD'}</span>
+                    </div>
+                    
+                    <div style="padding:12px; background:var(--cor-fundo-painel);">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:1.1rem; align-items:center;">
+                            <strong>${trecho.origem.iata}</strong> 
+                            <i class="ph-bold ph-arrow-right" style="font-size:0.9rem; color:var(--cor-texto-secundario);"></i> 
+                            <strong>${trecho.destino.iata}</strong>
+                        </div>
+                        
+                        <div style="font-size:0.85rem; color:var(--cor-texto-secundario); margin-bottom:12px; line-height:1.4;">
+                            Saída: <strong>${trecho.horario_saida}</strong> <span style="font-size:0.75rem;">(${trecho.data})</span><br>
+                            Chegada: <strong>${trecho.horario_chegada}</strong>
+                        </div>
+
+                        <div style="background:var(--cor-fundo-principal); padding:10px; border-radius:8px; border:1px solid var(--cor-borda); font-size:0.85rem;">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                                <span style="color:var(--cor-texto-secundario);">Tarifa Base:</span>
+                                <span style="color:var(--cor-texto-principal); font-weight:600;">${tarifaFmt}</span>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; border-top:1px dashed var(--cor-borda); padding-top:6px;">
+                                <span style="font-weight:600; color:var(--cor-texto-secundario);">Custo Total:</span>
+                                <span style="font-weight:700; color:var(--cor-primaria); font-size:1rem;">${custoTrechoFmt}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            line.bindPopup(popupContent);
+
+            L.circleMarker(p1, { radius: 5, color: '#333', fillColor: '#fff', fillOpacity: 1 }).addTo(layerVoos);
+            if (index === rotas.length - 1) {
+                L.circleMarker(p2, { radius: 6, color: '#000', fillColor: '#10B981', fillOpacity: 1 }).addTo(layerVoos);
+            }
+        });
+
+        if (latlngs.length > 0) {
+            map.fitBounds(L.latLngBounds(latlngs), { padding: [100, 100] });
+        }
     }
 
-    async function CarregarAeroportosFundo(inicio, fim) {
-        layerAeroportos.clearLayers();
-        try {
-            const r = await fetch(`${API_URLS.buscarRotas}?inicio=${inicio}&fim=${fim}`);
-            const t = await r.json();
-            const u = new Set();
-            t.forEach(rota => {
-                if(!u.has(rota.origem.iata)) { u.add(rota.origem.iata); DesenharPonto(rota.origem); }
-                if(!u.has(rota.destino.iata)) { u.add(rota.destino.iata); DesenharPonto(rota.destino); }
-            });
-            cacheAeroportosData = true;
-        } catch(e){}
-    }
-    
-    function DesenharPonto(a) {
-        L.circleMarker([a.lat, a.lon], { radius:3, color:'#ced4da', weight:1, fillColor:'#e9ecef', fillOpacity:0.6 })
-         .bindTooltip(a.iata, { permanent:false, direction:'top', className: 'tooltip-aero' }).addTo(layerAeroportos);
+    function LimparMapa() {
+        layerVoos.clearLayers();
     }
 
-    function LimparFiltros() {
-        document.getElementById('filtro-origem').value = '';
-        document.getElementById('filtro-destino').value = '';
-        document.getElementById('filtro-voo').value = ''; // --- LIMPA O CAMPO NOVO
-        CarregarMapa();
+    function ObterCorCia(cia) {
+        const nome = cia ? cia.toUpperCase() : '';
+        if (nome.includes('LATAM') || nome === 'JJ' || nome === 'LA') return '#E30613';
+        if (nome.includes('AZUL') || nome === 'AD') return '#009FE3';
+        if (nome.includes('GOL') || nome === 'G3') return '#FF7020';
+        return '#495057';
     }
 </script>
 {% endblock %}
