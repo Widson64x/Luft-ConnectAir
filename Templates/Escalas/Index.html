@@ -296,6 +296,35 @@
         align-items: center;
     }
 
+    /* --- LOGOS DAS CIAS (Estilo vindo do Editor.css) --- */
+    .cia-list {
+        display: flex;
+        align-items: center;
+        gap: -8px; /* Efeito de sobreposição leve, ou use gap: 4px para separar */
+    }
+
+    .cia-logo-box {
+        width: 24px; 
+        height: 24px;
+        border-radius: 50%;
+        background: #fff;
+        padding: 3px;
+        border: 1px solid var(--cor-borda);
+        display: flex; 
+        align-items: center; 
+        justify-content: center;
+        flex-shrink: 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        z-index: 1; /* Para garantir a ordem na sobreposição */
+        position: relative;
+    }
+    
+    .cia-logo { 
+        width: 100%; 
+        height: 100%; 
+        object-fit: contain; 
+    }
+
     /* --- POPUP DO MAPA --- */
     .leaflet-popup-content-wrapper { 
         background: var(--cor-fundo-painel); 
@@ -489,13 +518,26 @@
             btn.innerHTML = `<i class="ph-bold ph-lightning"></i> Calcular Melhores Rotas`;
         }
     }
+    // Função auxiliar para pegar o caminho da imagem
+    function ObterUrlLogo(nomeCia) {
+        const nome = nomeCia ? nomeCia.toUpperCase().trim() : '';
+        let arquivo = '';
+
+        // Mapeamento simples baseado nos nomes comuns
+        if (nome.includes('LATAM') || nome === 'JJ' || nome === 'LA') arquivo = 'LATAM.png';
+        else if (nome.includes('AZUL') || nome === 'AD') arquivo = 'AZUL.png';
+        else if (nome.includes('GOL') || nome === 'G3') arquivo = 'GOL.png';
+        
+        if (!arquivo) return null;
+        
+        // Caminho estático conforme estrutura do projeto
+        return `{{ url_for('static', filename='Img/Logos/') }}${arquivo}`;
+    }
 
     function RenderizarCards(dados) {
         const lista = document.getElementById('lista-opcoes');
         lista.innerHTML = '';
         
-        // --- AQUI ESTAVA O PROBLEMA: As chaves não batiam com o Backend ---
-        // Atualizado para bater com RouteIntelligenceService.py
         const configs = {
             'recomendada': { label: 'Recomendada', class: 'badge-recomendada', icon: 'ph-star' },
             'direta': { label: 'Voo Direto', class: 'badge-direta', icon: 'ph-airplane-tilt' },
@@ -513,11 +555,31 @@
             const conexoes = rota.length - 1;
             const temAvisoTarifa = meta.sem_tarifa; 
 
+            // --- GERAÇÃO DOS LOGOS ---
+            // Cria um array HTML com os logos de cada trecho
+            let htmlLogos = '<div class="cia-list">';
+            rota.forEach((r, idx) => {
+                const urlLogo = ObterUrlLogo(r.cia);
+                if (urlLogo) {
+                    // Se tiver logo, mostra a imagem
+                    htmlLogos += `
+                        <div class="cia-logo-box" title="${r.cia}" style="z-index: ${10 - idx}; margin-left: ${idx > 0 ? '-8px' : '0'};">
+                            <img src="${urlLogo}" class="cia-logo" alt="${r.cia}">
+                        </div>
+                    `;
+                } else {
+                    // Fallback se não tiver logo (texto simples)
+                    htmlLogos += `<span style="font-size:0.7rem; font-weight:700; margin-left:4px;">${r.cia}</span>`;
+                }
+            });
+            htmlLogos += '</div>';
+            // --------------------------
+
             const card = document.createElement('div');
             card.className = 'option-card';
             card.id = `card-${chave}`;
             
-            // --- HEADER DO CARD ---
+            // --- HEADER DO CARD (Atualizado com htmlLogos) ---
             const headerHtml = `
                 <div onclick="SelecionarOpcao('${chave}')">
                     <div class="card-header">
@@ -536,10 +598,7 @@
                     </div>
 
                     <div class="card-details" style="display:flex; justify-content:space-between; align-items:center;">
-                        <span style="display:flex; align-items:center; gap:6px;">
-                            <i class="ph-bold ph-airplane-tilt" style="color:var(--cor-primaria);"></i> 
-                            ${rota.map(r => r.cia).join(' + ')}
-                        </span>
+                        ${htmlLogos}
                         
                         <button class="btn-expand" onclick="ToggleDetalhes(event, '${chave}')" title="Ver detalhes por voo">
                             <i class="ph-bold ph-caret-down" id="icon-expand-${chave}"></i>
@@ -548,27 +607,30 @@
                 </div>
             `;
 
-            // --- DETALHES (Acordeão) ---
+            // --- DETALHES (Acordeão) - Mantido igual, mas adicionei o logo pequeno no detalhe também ---
             let detalhesHtml = `<div id="detalhes-${chave}" style="display:none; margin-top:12px; border-top:1px dashed var(--cor-borda); padding-top:12px;">`;
             
             rota.forEach((trecho, idx) => {
                 const base = trecho.base_calculo || {};
+                const urlLogoPequeno = ObterUrlLogo(trecho.cia); // Logo para o detalhe
                 
-                // Cálculos
                 const tarifaValor = parseFloat(base.tarifa) || 0;
                 const pesoValor = parseFloat(base.peso_usado) || 0;
                 const custoTrecho = tarifaValor * pesoValor;
                 
-                // Formatação
                 const tarifaBaseFmt = tarifaValor > 0 ? `R$ ${tarifaValor.toFixed(2)}` : '<span style="color:var(--cor-erro);">--</span>';
                 const custoTrechoFmt = custoTrecho > 0 ? `R$ ${custoTrecho.toFixed(2)}` : 'R$ 0,00';
                 const servico = base.servico || 'STD';
                 
                 detalhesHtml += `
                     <div style="font-size:0.8rem; margin-bottom:10px; background:rgba(var(--cor-fundo-painel-rgb), 0.5); padding:10px; border-radius:8px; border: 1px solid var(--cor-borda); border-left: 3px solid var(--cor-primaria);">
-                        <div style="font-weight:700; display:flex; justify-content:space-between; color:var(--cor-texto-principal); margin-bottom:4px;">
+                        <div style="font-weight:700; display:flex; justify-content:space-between; color:var(--cor-texto-principal); margin-bottom:4px; align-items:center;">
                             <span>${trecho.origem.iata} <i class="ph-bold ph-arrow-right" style="font-size:0.7rem; color:var(--cor-texto-secundario);"></i> ${trecho.destino.iata}</span>
-                            <span style="color:var(--cor-primaria);">${trecho.cia} ${trecho.voo}</span>
+                            
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                ${urlLogoPequeno ? `<img src="${urlLogoPequeno}" style="width:16px; height:16px; object-fit:contain;">` : ''}
+                                <span style="color:var(--cor-primaria);">${trecho.voo}</span>
+                            </div>
                         </div>
                         
                         <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--cor-texto-secundario); margin-bottom:6px;">
@@ -630,38 +692,62 @@
             const custoTrecho = tarifaValor * pesoValor;
             const custoTrechoFmt = custoTrecho > 0 ? `R$ ${custoTrecho.toFixed(2)}` : 'R$ 0,00';
             const tarifaFmt = tarifaValor > 0 ? `R$ ${tarifaValor.toFixed(2)}/kg` : 'N/A';
-
+            
+            // Pega Logo e Cor
             const color = ObterCorCia(trecho.cia);
+            const urlLogo = ObterUrlLogo(trecho.cia);
+            
+            // Gera HTML do Logo (se existir) ou apenas texto
+            const logoHtml = urlLogo 
+                ? `<img src="${urlLogo}" style="width: 20px; height: 20px; object-fit: contain; background: #fff; border-radius: 50%; padding: 2px; margin-right: 6px;">`
+                : '';
+
             const line = L.polyline([p1, p2], { color: color, weight: 5, opacity: 0.8 }).addTo(layerVoos);
 
-            // Conteúdo do Popup (Visualmente alinhado com o card)
+            // --- CONTEÚDO DO POPUP REFORMULADO ---
             const popupContent = `
-                <div style="font-family:'Inter', sans-serif; min-width:240px;">
-                    <div style="background:${color}; padding:10px; border-radius:8px 8px 0 0; color:white; font-weight:bold; display:flex; justify-content:space-between; align-items:center;">
-                        <span style="font-size:0.95rem;">${trecho.cia} ${trecho.voo}</span>
-                        <span style="font-size:0.75rem; background:rgba(255,255,255,0.2); padding:2px 6px; border-radius:4px;">${base.servico || 'STD'}</span>
+                <div style="font-family:'Inter', sans-serif; min-width:260px;">
+                    <div style="background:${color}; padding:10px 12px; border-radius:8px 8px 0 0; color:white; display:flex; justify-content:space-between; align-items:center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <div style="display:flex; align-items:center;">
+                            ${logoHtml}
+                            <span style="font-size:0.95rem; font-weight:800; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">${trecho.cia} ${trecho.voo}</span>
+                        </div>
+                        <span style="font-size:0.7rem; font-weight:700; background:rgba(255,255,255,0.25); padding:3px 8px; border-radius:12px; letter-spacing:0.5px;">${base.servico || 'STD'}</span>
                     </div>
                     
-                    <div style="padding:12px; background:var(--cor-fundo-painel);">
-                        <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:1.1rem; align-items:center;">
-                            <strong>${trecho.origem.iata}</strong> 
-                            <i class="ph-bold ph-arrow-right" style="font-size:0.9rem; color:var(--cor-texto-secundario);"></i> 
-                            <strong>${trecho.destino.iata}</strong>
+                    <div style="padding:14px; background:var(--cor-fundo-painel);">
+                        
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                            <div style="text-align:center;">
+                                <div style="font-size:1.2rem; font-weight:900; color:var(--cor-texto-principal);">${trecho.origem.iata}</div>
+                                <div style="font-size:0.65rem; color:var(--cor-texto-secundario); margin-top:-2px;">Saída</div>
+                            </div>
+                            
+                            <div style="flex:1; display:flex; flex-direction:column; align-items:center; padding:0 10px;">
+                                <i class="ph-fill ph-airplane-in-flight" style="color:${color}; font-size:1.2rem;"></i>
+                                <div style="width:100%; height:1px; background:${color}; opacity:0.3; margin-top:-8px; z-index:-1;"></div>
+                                <span style="font-size:0.65rem; color:var(--cor-texto-secundario); margin-top:4px;">${trecho.data}</span>
+                            </div>
+
+                            <div style="text-align:center;">
+                                <div style="font-size:1.2rem; font-weight:900; color:var(--cor-texto-principal);">${trecho.destino.iata}</div>
+                                <div style="font-size:0.65rem; color:var(--cor-texto-secundario); margin-top:-2px;">Chegada</div>
+                            </div>
                         </div>
                         
-                        <div style="font-size:0.85rem; color:var(--cor-texto-secundario); margin-bottom:12px; line-height:1.4;">
-                            Saída: <strong>${trecho.horario_saida}</strong> <span style="font-size:0.75rem;">(${trecho.data})</span><br>
-                            Chegada: <strong>${trecho.horario_chegada}</strong>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:14px; background:rgba(0,0,0,0.03); padding:6px 10px; border-radius:6px;">
+                            <strong style="color:var(--cor-texto-principal); font-size:0.9rem;">${trecho.horario_saida}</strong>
+                            <strong style="color:var(--cor-texto-principal); font-size:0.9rem;">${trecho.horario_chegada}</strong>
                         </div>
 
-                        <div style="background:var(--cor-fundo-principal); padding:10px; border-radius:8px; border:1px solid var(--cor-borda); font-size:0.85rem;">
-                            <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
-                                <span style="color:var(--cor-texto-secundario);">Tarifa Base:</span>
+                        <div style="background:var(--cor-fundo-principal); padding:10px; border-radius:8px; border:1px solid var(--cor-borda);">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:0.8rem;">
+                                <span style="color:var(--cor-texto-secundario);">Tarifa (${trecho.peso_calculado || '100'}kg):</span>
                                 <span style="color:var(--cor-texto-principal); font-weight:600;">${tarifaFmt}</span>
                             </div>
-                            <div style="display:flex; justify-content:space-between; border-top:1px dashed var(--cor-borda); padding-top:6px;">
-                                <span style="font-weight:600; color:var(--cor-texto-secundario);">Custo Total:</span>
-                                <span style="font-weight:700; color:var(--cor-primaria); font-size:1rem;">${custoTrechoFmt}</span>
+                            <div style="display:flex; justify-content:space-between; border-top:1px dashed var(--cor-borda); padding-top:6px; align-items:center;">
+                                <span style="font-weight:700; color:var(--cor-texto-secundario); font-size:0.8rem;">Custo Total:</span>
+                                <span style="font-weight:800; color:${color}; font-size:1rem;">${custoTrechoFmt}</span>
                             </div>
                         </div>
                     </div>
