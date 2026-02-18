@@ -1,5 +1,6 @@
 import os
 import urllib.parse
+import secrets
 from dotenv import load_dotenv
 
 # Carrega as variáveis do arquivo .env
@@ -26,7 +27,7 @@ class ConfiguracaoBase:
     PG_PORT = os.getenv("PGDB_PORT", "5432")
     PG_USER = os.getenv("PGDB_USER", "postgres")
     PG_PASS = os.getenv("PGDB_PASSWORD", "")
-    PG_DRIVER = os.getenv("PGDB_DRIVER", "psycopg") # Ex: psycopg2 ou psycopg (v3)
+    PG_DRIVER = os.getenv("PGDB_DRIVER", "psycopg")
 
     AD_SERVER = os.getenv("LDAP_SERVER")
     AD_DOMAIN = os.getenv("LDAP_DOMAIN")
@@ -37,6 +38,18 @@ class ConfiguracaoBase:
     DIR_UPLOADS = os.path.join(DIR_BASE, "Data", "Uploads")
     DIR_TEMP    = os.path.join(DIR_BASE, "Data", "Temp")
     DIR_LOGS    = os.path.join(DIR_BASE, "Logs")
+    
+    # --- Lógica de Segurança da SECRET_KEY ---
+    _chave_env = os.getenv("APP_SECRET_KEY")
+    
+    # Verifica se a chave existe e não é "null". Se não for segura, gera uma nova.
+    if _chave_env and _chave_env.lower() != "null":
+        APP_SECRET_KEY = _chave_env
+    else:
+        # Gera uma chave URL-safe segura de 64 bytes
+        APP_SECRET_KEY = secrets.token_urlsafe(64)
+        print(f"[!] AVISO DE SEGURANÇA: 'APP_SECRET_KEY' não encontrada no .env.")
+        print(f"[!] Uma chave temporária foi gerada: {APP_SECRET_KEY}")
 
     def ObterUrlSqlServer(self):
         """
@@ -57,27 +70,22 @@ class ConfiguracaoBase:
     def ObterUrlPostgres(self):
         """
         Gera a string de conexão para o PostgreSQL.
-        Formato: postgresql+driver://user:pass@host:port/dbname
         """
         SenhaCodificada = urllib.parse.quote_plus(self.PG_PASS)
-        # self.PG_DB_NAME será definido nas classes filhas (Ambientes)
         return f"postgresql+{self.PG_DRIVER}://{self.PG_USER}:{SenhaCodificada}@{self.PG_HOST}:{self.PG_PORT}/{self.PG_DB_NAME}"
 
 # --- Ambientes Específicos ---
 
 class ConfiguracaoDesenvolvimento(ConfiguracaoBase):
     DEBUG = True
-    # Define o nome do banco específico para DEV
     PG_DB_NAME = os.getenv("PGDB_NAME_DEV", "Luft-ConnectAir_DEV")
 
 class ConfiguracaoHomologacao(ConfiguracaoBase):
     DEBUG = False
-    # Define o nome do banco específico para HOMOLOG
     PG_DB_NAME = os.getenv("PGDB_NAME_HOMOLOG", "Luft-ConnectAir_HOMOLOG")
 
 class ConfiguracaoProducao(ConfiguracaoBase):
     DEBUG = False
-    # Define o nome do banco específico para PROD
     PG_DB_NAME = os.getenv("PGDB_NAME_PROD", "Luft-ConnectAir")
 
 # Mapa de seleção do ambiente
@@ -87,10 +95,12 @@ MapaConfiguracao = {
     "producao": ConfiguracaoProducao
 }
 
-# Inicializa a configuração baseada no .env (AMBIENTE_APP)
-# Se não encontrar, assume 'desenvolvimento'
+# Inicializa a configuração
 NomeAmbiente = os.getenv("AMBIENTE_APP", "desenvolvimento").lower()
 ConfiguracaoAtual = MapaConfiguracao.get(NomeAmbiente, ConfiguracaoDesenvolvimento)()
 
 print(f"[OK] Configurações carregadas em modo: {NomeAmbiente.upper()}")
 print(f"[OK] Banco Postgres Alvo: {ConfiguracaoAtual.PG_DB_NAME}")
+# Opcional: imprimir aviso se a chave for temporária para lembrar o dev
+if not os.getenv("APP_SECRET_KEY") or os.getenv("APP_SECRET_KEY") == "null":
+    print("[!] ATENÇÃO: A APP_SECRET_KEY é temporária. Sessões serão invalidadas ao reiniciar.")

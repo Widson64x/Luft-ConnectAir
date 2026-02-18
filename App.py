@@ -27,17 +27,19 @@ from Routes.Global.Configuracoes import ConfiguracoesBp
 # Pega o prefixo definido no .env ou padrão (ex: /Luft-ConnectAir)
 Prefix = ConfiguracaoAtual.ROUTE_PREFIX
 
+# Define a aplicação Flask, configurando o caminho para arquivos estáticos com o prefixo
 app = Flask(__name__,
-            static_url_path=f'{Prefix}/Static', 
-            static_folder='Static')
+            static_url_path=f'{Prefix}/Static', # Define o caminho de URL para arquivos estáticos, incluindo o prefixo
+            static_folder='Static') # Define a pasta onde os arquivos estáticos estão localizados (sem o prefixo, pois é apenas para organização interna)
 
-app.secret_key = 'CHAVE_SUPER_SECRETA_DO_PROJETO_VOOS' # Trocar por algo seguro depois
+# Chave secreta para sessões, criptografia ou outras operações sensíveis.
+app.secret_key = ConfiguracaoAtual.APP_SECRET_KEY # Trocar por algo seguro depois
 
 LogService.Inicializar()
 LogService.Info("App", f"Iniciando aplicação no ambiente: {os.getenv('AMBIENTE_APP', 'DEV')}")
 
 # Configuração do Flask-Login
-GerenciadorLogin = LoginManager()
+GerenciadorLogin = LoginManager() # Instancia o gerenciador de login
 GerenciadorLogin.init_app(app)
 GerenciadorLogin.login_view = 'Auth.Login' # Nome da rota para redirecionar quem não tá logado
 
@@ -52,7 +54,8 @@ def CarregarUsuario(UserId):
     Sessao = ObterSessaoSqlServer()
     UsuarioEncontrado = None
 
-    try:
+    try: # Caso haja algum erro na consulta, é melhor logar e retornar None do que quebrar a aplicação inteira
+        
         # Log de debug para rastrear a persistência da sessão (opcional, bom para dev)
         # LogService.Debug("App.UserLoader", f"Recarregando usuário: {UserId}")
 

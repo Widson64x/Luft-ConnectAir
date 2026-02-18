@@ -766,3 +766,134 @@ class PlanejamentoService:
             raise e 
         finally:
             SessaoPG.close()
+            
+    @staticmethod
+    def ObterPlanejamentoPorCtc(filial, serie, ctc):
+        SessaoPG = ObterSessaoSqlServer()
+        try:
+            # 1. Busca o Item para achar o ID do Cabeçalho
+            Item = SessaoPG.query(PlanejamentoItem).join(PlanejamentoCabecalho).filter(
+                PlanejamentoItem.Filial == str(filial),
+                PlanejamentoItem.Serie == str(serie),
+                PlanejamentoItem.Ctc == str(ctc),
+                PlanejamentoCabecalho.Status != 'Cancelado'
+            ).first()
+
+            if not Item:
+                return None
+
+            Cabecalho = Item.Cabecalho
+            PesoTotal = float(Cabecalho.TotalPeso or 0) # Peso usado no cálculo original
+
+            # 2. Busca os Trechos ordenados E o valor da tarifa associada
+            # JOIN com TabelaFrete para recuperar o valor unitário
+            TrechosDB = SessaoPG.query(
+                PlanejamentoTrecho, 
+                TabelaFrete.Tarifa,
+                TabelaFrete.Servico
+            ).outerjoin(
+                TabelaFrete, PlanejamentoTrecho.IdFrete == TabelaFrete.Id
+            ).filter(
+                PlanejamentoTrecho.IdPlanejamento == Cabecalho.IdPlanejamento
+            ).order_by(PlanejamentoTrecho.Ordem).all()
+
+            RotaFormatada = []
+            CustoTotalCalculado = 0.0
+            
+            # Variáveis para cálculo de tempo
+            PrimeiraPartida = None
+            UltimaChegada = None
+
+            for row in TrechosDB:
+                t = row[0] # Objeto PlanejamentoTrecho
+                val_tarifa = float(row[1] or 0) # Coluna Tarifa da TabelaFrete
+                nm_servico = str(row[2] or 'STD') # Coluna Servico
+
+                # Formata Horários
+                partida_str = t.DataPartida.strftime('%H:%M') if t.DataPartida else "--:--"
+                chegada_str = t.DataChegada.strftime('%H:%M') if t.DataChegada else "--:--"
+                data_str = t.DataPartida.strftime('%d/%m/%Y') if t.DataPartida else ""
+                
+                # Controle de Tempo Total
+                DtPartida = datetime.combine(t.DataPartida, t.DataPartida.time()) if isinstance(t.DataPartida, datetime) else t.DataPartida
+                DtChegada = datetime.combine(t.DataChegada, t.DataChegada.time()) if isinstance(t.DataChegada, datetime) else t.DataChegada
+                
+                if PrimeiraPartida is None: PrimeiraPartida = DtPartida
+                UltimaChegada = DtChegada
+
+                # Recalcula Custo do Trecho (Visualização)
+                custo_trecho = val_tarifa * PesoTotal
+                CustoTotalCalculado += custo_trecho
+
+                RotaFormatada.append({
+                    'cia': t.CiaAerea,
+                    'voo': t.NumeroVoo,
+                    'data': data_str,
+                    'horario_saida': partida_str,
+                    'horario_chegada': chegada_str,
+                    'origem': {'iata': t.AeroportoOrigem, 'lat': 0, 'lon': 0}, 
+                    'destino': {'iata': t.AeroportoDestino, 'lat': 0, 'lon': 0},
+                    'base_calculo': {
+                        'servico': nm_servico,
+                        'tarifa': val_tarifa,
+                        'peso_usado': PesoTotal,
+                        'custo_trecho': custo_trecho,
+                        'custo_trecho_fmt': f"R$ {custo_trecho:,.2f}",
+                    }
+                })
+            
+            # 3. Calcula Duração Total
+            DuracaoMinutos = 0
+            DuracaoFmt = "--:--"
+            if PrimeiraPartida and UltimaChegada:
+                # Ajuste de dia se virou a noite (se necessário, mas o banco já deve ter a data correta)
+                diff = UltimaChegada - PrimeiraPartida
+                DuracaoMinutos = diff.total_seconds() / 60
+                
+                # Formata DDd HH:MM
+                seg = int(diff.total_seconds())
+                dias, resto = divmod(seg, 86400)
+                horas, mins = divmod(resto, 3600); mins //= 60
+                DuracaoFmt = f"{dias}d {horas:02}:{mins:02}" if dias > 0 else f"{horas:02}:{mins:02}"
+
+            return {
+                'id_planejamento': Cabecalho.IdPlanejamento,
+                'status': Cabecalho.Status,
+                'rota': RotaFormatada,
+                'criado_por': Cabecalho.UsuarioCriacao,
+                'data_criacao': Cabecalho.DataCriacao.strftime('%d/%m/%Y %H:%M') if Cabecalho.DataCriacao else "",
+                
+                # Métricas Totais para o Header do Editor
+                'metricas': {
+                    'custo': CustoTotalCalculado,
+                    'duracao': DuracaoMinutos,
+                    'duracao_fmt': DuracaoFmt,
+                    'escalas': len(RotaFormatada) - 1 if RotaFormatada else 0
+                }
+            }
+
+        except Exception as e:
+            LogService.Error("PlanejamentoService", "Erro ao obter planejamento existente", e)
+            return None
+        finally:
+            SessaoPG.close()
+
+    # --- NOVO MÉTODO: CANCELAR ---
+    @staticmethod
+    def CancelarPlanejamento(id_planejamento, usuario):
+        SessaoPG = ObterSessaoSqlServer()
+        try:
+            Cabecalho = SessaoPG.query(PlanejamentoCabecalho).get(id_planejamento)
+            if not Cabecalho: return False, "Planejamento não encontrado."
+
+            Cabecalho.Status = 'Cancelado'
+            # Poderia salvar log de quem cancelou se tiver campo na tabela ou log separado
+            
+            SessaoPG.commit()
+            return True, "Cancelado com sucesso."
+        except Exception as e:
+            SessaoPG.rollback()
+            LogService.Error("PlanejamentoService", "Erro ao cancelar", e)
+            return False, str(e)
+        finally:
+            SessaoPG.close()

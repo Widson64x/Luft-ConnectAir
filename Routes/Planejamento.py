@@ -51,15 +51,15 @@ def ApiCtcsHoje():
 def MontarPlanejamento(filial, serie, ctc):
     LogService.Info("Routes.Planejamento", f"Iniciando Montagem Planejamento: {filial}-{serie}-{ctc}")
     
-    # 1. Busca Dados do CTC (Mantido)
+    # 1. Busca Dados do CTC
     DadosCtc = PlanejamentoService.ObterCtcDetalhado(filial, serie, ctc)
     if not DadosCtc: return "Não encontrado", 404
 
-    # 2. Geografia (Mantido)
+    # 2. Geografia
     CoordOrigem = BuscarCoordenadasCidade(DadosCtc['origem_cidade'], DadosCtc['origem_uf'])
     CoordDestino = BuscarCoordenadasCidade(DadosCtc['destino_cidade'], DadosCtc['destino_uf'])
     
-    # 3. Consolidação (Mantido)
+    # 3. Consolidação e Unificação
     CtcsCandidatos = PlanejamentoService.BuscarCtcsConsolidaveis(
         DadosCtc['origem_cidade'], DadosCtc['origem_uf'],
         DadosCtc['destino_cidade'], DadosCtc['destino_uf'],
@@ -67,28 +67,29 @@ def MontarPlanejamento(filial, serie, ctc):
     )
     DadosUnificados = PlanejamentoService.UnificarConsolidacao(DadosCtc, CtcsCandidatos)
 
-    # 4. Aeroportos (ATUALIZADO PARA MÚLTIPLOS)
-    # Busca os 2 melhores aeroportos num raio aceitável (Mantido método legado para listagem visual)
+    # --- NOVO: VERIFICA SE JÁ EXISTE PLANEJAMENTO SALVO ---
+    PlanejamentoSalvo = PlanejamentoService.ObterPlanejamentoPorCtc(filial, serie, ctc)
+    
+    # Se já existe, nós ainda calculamos rotas (OpcoesRotas) caso ele queira "Recalcular",
+    # mas passamos o Salvo separadamente para o Front exibir primeiro.
+    
+    # 4. Aeroportos (Busca Padrão para cálculo de novas opções)
     ListaOrigem = BuscarTopAeroportos(CoordOrigem['lat'], CoordOrigem['lon'], limite=2)
     ListaDestino = BuscarTopAeroportos(CoordDestino['lat'], CoordDestino['lon'], limite=2)
-    
-    # Extrai apenas os códigos IATA para passar ao MalhaService
     IatasOrigem = [a['iata'] for a in ListaOrigem]
     IatasDestino = [a['iata'] for a in ListaDestino]
-
-    # Para a interface, vamos manter o principal como referência visual inicial (opcional)
+    
     AeroOrigemPrincipal = ListaOrigem[0] if ListaOrigem else None
     AeroDestinoPrincipal = ListaDestino[0] if ListaDestino else None
 
-    # 5. Busca de Rotas Inteligentes (Passando Listas)
+    # 5. Busca de Rotas (Sempre calcula para ter as opções de "Recalcular")
     OpcoesRotas = {}
     if IatasOrigem and IatasDestino:
         DataInicioBusca = DadosUnificados['data_busca'] 
         PesoTotal = float(DadosUnificados.get('peso_taxado', 0.0))
-        if PesoTotal <= 0: PesoTotal = float(DadosUnificados.get('peso_fisico', 10.0)) # Fallback seguro
+        if PesoTotal <= 0: PesoTotal = float(DadosUnificados.get('peso_fisico', 10.0))
         DataLimite = DataInicioBusca + timedelta(days=5) 
         
-        # Passa as listas de IATA
         OpcoesRotas = MalhaService.BuscarOpcoesDeRotas(
             DataInicioBusca, DataLimite, IatasOrigem, IatasDestino, PesoTotal
         )
@@ -96,9 +97,22 @@ def MontarPlanejamento(filial, serie, ctc):
     return render_template('Planejamento/Editor.html', 
                            Ctc=DadosUnificados, 
                            Origem=CoordOrigem, Destino=CoordDestino,
-                           AeroOrigem=AeroOrigemPrincipal, # Apenas para referência se precisar
+                           AeroOrigem=AeroOrigemPrincipal,
                            AeroDestino=AeroDestinoPrincipal,
-                           OpcoesRotas=OpcoesRotas)
+                           OpcoesRotas=OpcoesRotas,
+                           PlanejamentoSalvo=PlanejamentoSalvo) # <--- INJEÇÃO DO SALVO
+
+# --- NOVA ROTA: CANCELAR ---
+@PlanejamentoBp.route('/API/Cancelar', methods=['POST'])
+@login_required
+@RequerPermissao('planejamento.editar')
+def CancelarPlanejamentoRota():
+    dados = request.json
+    id_plan = dados.get('id_planejamento')
+    if not id_plan: return jsonify({'sucesso': False, 'msg': 'ID Inválido'})
+    
+    sucesso, msg = PlanejamentoService.CancelarPlanejamento(id_plan, current_user.id)
+    return jsonify({'sucesso': sucesso, 'msg': msg})
 
 @PlanejamentoBp.route('/API/Salvar', methods=['POST'])
 @login_required

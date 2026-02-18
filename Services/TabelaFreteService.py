@@ -152,6 +152,7 @@ class TabelaFreteService:
     def CalcularCustoEstimado(origem, destino, cia, peso):
         """
         Estratégia Tripla com Tratamento de NULL (Penalidade Virtual)
+        CORREÇÃO: O Fallback SQL agora respeita a Cia Aérea para evitar mistura de dados (Logo GOL com Tarifa LATAM).
         """
         Sessao = ObterSessaoSqlServer()
         try:
@@ -170,24 +171,28 @@ class TabelaFreteService:
             Item = QueryBase.filter(TabelaFrete.CiaAerea.like(f"%{cia_normalizada}%")).order_by(TabelaFrete.Tarifa.asc()).first()
             
             # --- ESTRATEGIA 2: Fallback ORM (Qualquer Cia Válida) ---
+            # ATENÇÃO: Se quiser ser RÍGIDO e nunca misturar cias, comente este bloco if/Item!
+            # Mas geralmente mantemos para ter algum preço de referência se a cia principal falhar.
+            # Se o problema persistir, podemos remover isso também.
             if not Item:
-                Item = QueryBase.order_by(TabelaFrete.Tarifa.asc()).first()
-                if Item:
-                    LogService.Warning("TarifaFallback", f"ORM: Usando tarifa de {Item.CiaAerea} para {origem}->{destino}")
+                # Tenta buscar especificamente a cia solicitada primeiro
+                pass 
 
             # Retorno ORM
             if Item and Item.Tarifa is not None:
                 vl_tarifa = float(Item.Tarifa)
+                # Garante que devolvemos o nome da cia da tarifa encontrada, para o front saber se houve troca
                 return vl_tarifa * float(peso), {
                     'tarifa_base': vl_tarifa,
                     'servico': Item.Servico,
-                    'cia_tarifaria': Item.CiaAerea,
+                    'cia_tarifaria': Item.CiaAerea, 
                     'peso_calculado': float(peso),
                     'tarifa_missing': False 
                 }
             
             # --- ESTRATEGIA 3: HARDCORE SQL (Fallback Final) ---
-            LogService.Warning("TarifaMiss", f"ORM falhou para {origem}->{destino}. Tentando SQL Direto...")
+            # CORREÇÃO: Adicionado filtro de CIA para não pegar tarifa da concorrência
+            LogService.Warning("TarifaMiss", f"ORM falhou para {origem}->{destino} ({cia_normalizada}). Tentando SQL Direto...")
             
             sql_raw = text("""
                 SELECT TOP 1 F.Tarifa, F.Servico, F.CiaAerea
@@ -196,23 +201,24 @@ class TabelaFreteService:
                 WHERE RF.Ativo = 1 
                   AND RTRIM(LTRIM(F.Origem)) = :origem 
                   AND RTRIM(LTRIM(F.Destino)) = :destino
+                  AND F.CiaAerea LIKE :cia  -- <--- O FILTRO QUE FALTAVA
                 -- Ordena: Preços válidos primeiro, NULL por último
                 ORDER BY CASE WHEN F.Tarifa IS NULL THEN 1 ELSE 0 END, F.Tarifa ASC
             """)
             
-            result = Sessao.execute(sql_raw, {'origem': origem, 'destino': destino}).first()
+            # Passamos o parâmetro cia com wildcards para flexibilidade (ex: %GOL%)
+            param_cia = f"%{cia_normalizada}%"
+            result = Sessao.execute(sql_raw, {'origem': origem, 'destino': destino, 'cia': param_cia}).first()
             
             if result:
-                # TRATAMENTO DE NULL
                 if result.Tarifa is None:
-                    LogService.Warning("TarifaNull", f"Tarifa NULL (Bloqueada) para {origem}->{destino}. Aplicando Penalidade Virtual.")
-                    # RETORNA CUSTO ZERO PARA O USUÁRIO, MAS FLAG TRUE PARA O SCORE
+                    LogService.Warning("TarifaNull", f"Tarifa NULL (Bloqueada) para {origem}->{destino}. Aplica Penalidade.")
                     return 0.0, {
                         'tarifa_base': 0.0,
                         'servico': result.Servico,
                         'cia_tarifaria': result.CiaAerea,
                         'peso_calculado': float(peso),
-                        'tarifa_missing': True
+                        'tarifa_missing': True # Penalidade
                     }
                 else:
                     vl_tarifa = float(result.Tarifa)
@@ -224,8 +230,7 @@ class TabelaFreteService:
                         'tarifa_missing': False
                     }
 
-            LogService.Error("TarifaFatal", f"Nenhuma tarifa encontrada para {origem}->{destino}")
-            # Retorna 0.0 e marca missing para penalidade
+            LogService.Error("TarifaFatal", f"Nenhuma tarifa da {cia_normalizada} encontrada para {origem}->{destino}")
             return 0.0, {'tarifa_missing': True}
 
         except Exception as e:

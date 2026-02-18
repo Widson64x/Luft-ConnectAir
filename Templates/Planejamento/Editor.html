@@ -12,6 +12,38 @@
 
 <link rel="stylesheet" href="{{ url_for('static', filename='CSS/Planejamento/Editor.css') }}">
 
+<style>
+    .status-alert {
+        background: rgba(16, 185, 129, 0.1);
+        border: 1px solid var(--cor-sucesso);
+        color: var(--cor-sucesso);
+        padding: 12px;
+        border-radius: 8px;
+        margin: 10px 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .hidden { display: none !important; }
+    
+    /* Botões Extras */
+    .btn-danger { 
+        background-color: #ef4444 !important; color: white !important; 
+        border: none; padding: 10px 20px; border-radius: 6px; 
+        cursor: pointer; display: inline-flex; align-items: center; gap: 8px; 
+        font-weight: 500; transition: 0.2s; 
+    }
+    .btn-danger:hover { background-color: #dc2626 !important; }
+    
+    .btn-secondary { 
+        background-color: #6b7280 !important; color: white !important; 
+        border: none; padding: 10px 20px; border-radius: 6px; 
+        cursor: pointer; display: inline-flex; align-items: center; gap: 8px; 
+        font-weight: 500; transition: 0.2s; 
+    }
+    .btn-secondary:hover { background-color: #4b5563 !important; }
+</style>
+
 <div class="map-wrapper">
     <div id="map"></div>
 
@@ -46,7 +78,15 @@
             </div>
         </div>
 
-        <div class="strategy-tabs">     
+        <div id="aviso-modo-visualizacao" class="status-alert hidden">
+            <i class="ph-bold ph-lock-key" style="font-size: 1.5em;"></i>
+            <div>
+                <strong>Planejamento Confirmado</strong>
+                <span style="font-size: 0.85em; display:block; opacity: 0.9;">Criado em <span id="lbl-data-criacao"></span></span>
+            </div>
+        </div>
+
+        <div class="strategy-tabs" id="container-estrategias">     
             <button class="tab-btn active" onclick="SelecionarEstrategia('recomendada')" id="tab-recomendada" title="Melhor Custo-Benefício">
                 <i class="ph-duotone ph-star"></i> <span>Recomendada</span>
             </button>
@@ -86,7 +126,16 @@
         </div>
 
         <div class="sidebar-editor-footer">
-            <a href="{{ url_for('Planejamento.Dashboard') }}" class="btn-cancel">Cancelar</a>
+            <a href="{{ url_for('Planejamento.Dashboard') }}" class="btn-cancel">Voltar</a>
+            
+            <button class="btn-danger hidden" id="btn-cancelar-plan" onclick="CancelarPlanejamentoExistente()">
+                <i class="ph-bold ph-trash"></i> Cancelar
+            </button>
+
+            <button class="btn-secondary hidden" id="btn-recalcular" onclick="AtivarModoEdicao()">
+                <i class="ph-bold ph-arrows-clockwise"></i> Recalcular
+            </button>
+
             <button class="btn-confirm" onclick="ConfirmarPlanejamento()" id="btn-confirmar">
                 <i class="ph-bold ph-check-circle"></i> Confirmar Rota
             </button>
@@ -142,9 +191,16 @@
     // Dados injetados pelo Backend
     window.opcoesRotas = {{ OpcoesRotas | tojson | safe }};
     window.ctc = {{ Ctc | tojson | safe }};
+    
+    // INJEÇÃO NOVA: Planejamento Salvo (se existir)
+    window.planejamentoSalvo = {{ PlanejamentoSalvo | tojson | safe }};
+
     window.origemCoords = { lat: {{ Origem.lat | default(0) }}, lon: {{ Origem.lon | default(0) }} };
     window.destinoCoords = { lat: {{ Destino.lat | default(0) }}, lon: {{ Destino.lon | default(0) }} };
+    
     const URL_GRAVAR_PLANEJAMENTO = "{{ url_for('Planejamento.SalvarPlanejamento') }}";
+    // NOVA URL para Cancelamento
+    const URL_CANCELAR_PLANEJAMENTO = "{{ url_for('Planejamento.CancelarPlanejamentoRota') }}";
 </script>
 <script src="{{ url_for('static', filename='JS/Planejamento/Editor.js') }}"></script>
 {% endblock %}
