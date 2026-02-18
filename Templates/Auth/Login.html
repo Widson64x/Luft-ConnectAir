@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Luft-ConnectAir | Terminal Access</title>
-    
+    <title>Luft-ConnectAir | Acesso ao Terminal</title>
+
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;600;800&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -44,7 +44,7 @@
             z-index: 0; opacity: 0.4;
             pointer-events: none;
         }
-        
+
         .radar-circle {
             position: absolute;
             border: 1px dashed rgba(0, 102, 204, 0.1);
@@ -77,7 +77,7 @@
             transition: transform 0.1s linear;
             will-change: transform, left, top;
         }
-        
+
         .cloud-obj {
             position: absolute;
             background: #fff;
@@ -227,7 +227,7 @@
             opacity: 0; transition: 0.3s;
         }
         .btn-takeoff:hover .runway-lights { opacity: 1; }
-        
+
         @keyframes runwayMove { from { background-position: 0 0; } to { background-position: 20px 0; } }
 
         .plane-takeoff-icon {
@@ -245,9 +245,10 @@
             animation: slideDown 0.3s ease-out;
         }
         @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-        
+
         .alert-error { background: #ffe3e3; color: #c92a2a; border-left: 4px solid #c92a2a; }
         .alert-success { background: #d3f9d8; color: #2b8a3e; border-left: 4px solid #2b8a3e; }
+        .alert-danger { background: #ffe3e3; color: #c92a2a; border-left: 4px solid #c92a2a; } /* Compatibilidade Flask Flash */
 
         /* Rodapé */
         .footer {
@@ -270,178 +271,173 @@
 </head>
 <body>
 
-    <div class="radar-container">
-        <div class="radar-circle rc-1"></div>
-        <div class="radar-circle rc-2"></div>
-        <div class="radar-circle rc-3"></div>
-        <div class="radar-sweep"></div>
+<div class="radar-container">
+    <div class="radar-circle rc-1"></div>
+    <div class="radar-circle rc-2"></div>
+    <div class="radar-circle rc-3"></div>
+    <div class="radar-sweep"></div>
+</div>
+
+<div id="sky-traffic"></div>
+
+<div class="login-interface" id="loginCard">
+    <div class="brand-header">
+        <div class="logo-icon-wrapper">
+            <i class="bi bi-airplane-engines"></i>
+        </div>
+        <h1>FLIGHT OPS</h1>
+        <span>Command Center</span>
     </div>
 
-    <div id="sky-traffic"></div>
-
-    <div class="login-interface" id="loginCard">
-        <div class="brand-header">
-            <div class="logo-icon-wrapper">
-                <i class="bi bi-airplane-engines"></i>
-            </div>
-            <h1>FLIGHT OPS</h1>
-            <span>Command Center</span>
+    <div class="alert-area">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ 'error' if category == 'danger' else 'success' }}">
+            <i class="bi bi-info-circle-fill"></i>
+            <span>{{ message }}</span>
         </div>
-
-        <div class="alert-area">
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ 'error' if category == 'error' else 'success' }}">
-                            <i class="bi bi-info-circle-fill"></i>
-                            <span>{{ message }}</span>
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
-        </div>
-
-        <form method="POST" id="loginForm">
-            <div class="input-group">
-                <label class="input-label">USUÁRIO LUFT</label>
-                <input type="text" class="form-control" name="username" placeholder="Usuário de Rede" 
-                       required autocomplete="username" autofocus>
-                <i class="bi bi-person-fill input-icon"></i>
-            </div>
-
-            <div class="input-group">
-                <label class="input-label">SENHA LUFT</label>
-                <input type="password" class="form-control" name="password" id="password" 
-                       placeholder="Senha do Usuário" required autocomplete="current-password">
-                <i class="bi bi-eye-slash-fill input-icon" id="togglePass" title="Ver Senha"></i>
-            </div>
-
-            <button type="submit" class="btn-takeoff" id="btnSubmit">
-                <div class="runway-lights"></div>
-                <span id="btnText">INICIAR OPERAÇÃO</span>
-                <i class="bi bi-airplane-fill plane-takeoff-icon"></i>
-            </button>
-        </form>
-
-        <div class="footer">
-            <i class="bi bi-shield-lock-fill"></i> Conexão Segura SSL<br>
-            © 2026 LuftFarma Logistics
-        </div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
     </div>
 
-    <script>
-        // 1. GERADOR DE TRÁFEGO AÉREO
-        const sky = document.getElementById('sky-traffic');
-        const planeIcons = ['bi-airplane-fill', 'bi-cursor-fill'];
-        
-        function createPlane() {
-            const plane = document.createElement('i');
-            plane.classList.add('bi', planeIcons[Math.floor(Math.random() * planeIcons.length)], 'plane-obj');
-            
-            // Randomização
-            const startY = Math.random() * window.innerHeight;
-            const size = Math.random() * 20 + 10; // 10px a 30px
-            const duration = Math.random() * 10 + 10; // 10s a 20s
-            const delay = Math.random() * 5;
-            
-            plane.style.fontSize = `${size}px`;
-            plane.style.top = `${startY}px`;
-            plane.style.left = `-50px`;
-            
-            // Animação CSS inline para performance
-            plane.style.transition = `transform ${duration}s linear`;
-            
-            sky.appendChild(plane);
+    <form method="POST" id="loginForm">
+        <div class="input-group">
+            <label class="input-label">USUÁRIO OU E-MAIL</label>
+            <input type="text" class="form-control" name="username" placeholder="Seu usuário de rede ou e-mail"
+                   required autocomplete="username" autofocus>
+            <i class="bi bi-person-fill input-icon"></i>
+        </div>
 
-            // Dispara voo
-            setTimeout(() => {
-                const endY = startY + (Math.random() * 200 - 100); // Variação leve de altitude
-                const rotate = Math.atan2(endY - startY, window.innerWidth) * (180 / Math.PI);
-                plane.style.transform = `translate(${window.innerWidth + 100}px, ${endY - startY}px) rotate(${rotate}deg)`;
-            }, 100);
+        <div class="input-group">
+            <label class="input-label">SENHA LUFT</label>
+            <input type="password" class="form-control" name="password" id="password"
+                   placeholder="Senha de rede" required autocomplete="current-password">
+            <i class="bi bi-eye-slash-fill input-icon" id="togglePass" title="Ver Senha"></i>
+        </div>
 
-            // Limpeza
-            setTimeout(() => { plane.remove(); }, duration * 1000 + 1000);
-        }
+        <button type="submit" class="btn-takeoff" id="btnSubmit">
+            <div class="runway-lights"></div>
+            <span id="btnText">INICIAR OPERAÇÃO</span>
+            <i class="bi bi-airplane-fill plane-takeoff-icon"></i>
+        </button>
+    </form>
 
-        // Gera nuvens
-        function createCloud() {
-            const cloud = document.createElement('div');
-            cloud.classList.add('cloud-obj');
-            
-            const width = Math.random() * 200 + 100;
-            const startY = Math.random() * window.innerHeight;
-            const duration = Math.random() * 30 + 20;
+    <div class="footer">
+        <i class="bi bi-shield-lock-fill"></i> Conexão Segura SSL<br>
+        © 2026 LuftFarma Logistics
+    </div>
+</div>
 
-            cloud.style.width = `${width}px`;
-            cloud.style.height = `${width * 0.4}px`;
-            cloud.style.top = `${startY}px`;
-            cloud.style.left = `-300px`;
-            cloud.style.transition = `transform ${duration}s linear`;
+<script>
+    // --- 1. GERADOR DE TRÁFEGO AÉREO (BACKGROUND) ---
+    const sky = document.getElementById('sky-traffic');
+    const planeIcons = ['bi-airplane-fill', 'bi-cursor-fill'];
 
-            sky.appendChild(cloud);
+    function createPlane() {
+        const plane = document.createElement('i');
+        plane.classList.add('bi', planeIcons[Math.floor(Math.random() * planeIcons.length)], 'plane-obj');
 
-            setTimeout(() => {
-                cloud.style.transform = `translateX(${window.innerWidth + 400}px)`;
-            }, 100);
+        // Randomização de posição e velocidade
+        const startY = Math.random() * window.innerHeight;
+        const size = Math.random() * 20 + 10;
+        const duration = Math.random() * 10 + 10;
 
-            setTimeout(() => { cloud.remove(); }, duration * 1000);
-        }
+        plane.style.fontSize = `${size}px`;
+        plane.style.top = `${startY}px`;
+        plane.style.left = `-50px`;
+        plane.style.transition = `transform ${duration}s linear`;
 
-        // Loop Infinito
-        setInterval(createPlane, 2000);
-        setInterval(createCloud, 5000);
-        
-        // Cria alguns iniciais
-        for(let i=0; i<5; i++) { createPlane(); createCloud(); }
+        sky.appendChild(plane);
 
-
-        // 2. TOGGLE SENHA
-        const togglePass = document.getElementById('togglePass');
-        const passInput = document.getElementById('password');
-
-        togglePass.addEventListener('click', () => {
-            const type = passInput.getAttribute('type') === 'password' ? 'text' : 'password';
-            passInput.setAttribute('type', type);
-            togglePass.classList.toggle('bi-eye-fill');
-            togglePass.classList.toggle('bi-eye-slash-fill');
-        });
-
-
-        // 3. ANIMAÇÃO DE SAÍDA (SUBMIT)
-        const form = document.getElementById('loginForm');
-        const card = document.getElementById('loginCard');
-        const btn = document.getElementById('btnSubmit');
-        const btnText = document.getElementById('btnText');
-
-        form.addEventListener('submit', (e) => {
-            // Efeito visual antes de enviar
-            // Nota: Se o form enviar muito rápido, o usuário não vê. 
-            // Mas em apps reais tem delay de rede.
-            
-            btnText.innerText = "DECOLANDO...";
-            btn.style.background = "#2b8a3e"; // Verde sucesso
-            
-            // Opcional: Adicionar delay artificial se quiser ver a animação
-            e.preventDefault();
-            card.classList.add('card-exit-anim');
-            setTimeout(() => form.submit(), 800);
-        });
-
-        // --- AUTO-REMOVE ALERTAS ---
+        // Iniciar movimento
         setTimeout(() => {
+            const endY = startY + (Math.random() * 200 - 100);
+            const rotate = Math.atan2(endY - startY, window.innerWidth) * (180 / Math.PI);
+            plane.style.transform = `translate(${window.innerWidth + 100}px, ${endY - startY}px) rotate(${rotate}deg)`;
+        }, 100);
+
+        // Limpeza de memória
+        setTimeout(() => { plane.remove(); }, duration * 1000 + 1000);
+    }
+
+    function createCloud() {
+        const cloud = document.createElement('div');
+        cloud.classList.add('cloud-obj');
+
+        const width = Math.random() * 200 + 100;
+        const startY = Math.random() * window.innerHeight;
+        const duration = Math.random() * 30 + 20;
+
+        cloud.style.width = `${width}px`;
+        cloud.style.height = `${width * 0.4}px`;
+        cloud.style.top = `${startY}px`;
+        cloud.style.left = `-300px`;
+        cloud.style.transition = `transform ${duration}s linear`;
+
+        sky.appendChild(cloud);
+
+        setTimeout(() => {
+            cloud.style.transform = `translateX(${window.innerWidth + 400}px)`;
+        }, 100);
+
+        setTimeout(() => { cloud.remove(); }, duration * 1000);
+    }
+
+    // Loop Infinito de animação
+    setInterval(createPlane, 2000);
+    setInterval(createCloud, 5000);
+
+    // Cria alguns elementos iniciais para não começar vazio
+    for(let i=0; i<5; i++) { createPlane(); createCloud(); }
+
+
+    // --- 2. MOSTRAR/OCULTAR SENHA ---
+    const togglePass = document.getElementById('togglePass');
+    const passInput = document.getElementById('password');
+
+    togglePass.addEventListener('click', () => {
+        const type = passInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        passInput.setAttribute('type', type);
+        togglePass.classList.toggle('bi-eye-fill');
+        togglePass.classList.toggle('bi-eye-slash-fill');
+    });
+
+
+    // --- 3. ANIMAÇÃO DE SUBMIT (DECOLAGEM) ---
+    const form = document.getElementById('loginForm');
+    const card = document.getElementById('loginCard');
+    const btn = document.getElementById('btnSubmit');
+    const btnText = document.getElementById('btnText');
+
+    form.addEventListener('submit', (e) => {
+        // Previne o envio imediato para rodar a animação
+        e.preventDefault();
+
+        btnText.innerText = "DECOLANDO...";
+        btn.style.background = "#2b8a3e";
+
+        // Anima o cartão subindo
+        card.classList.add('card-exit-anim');
+
+        // Envia o formulário após 800ms (tempo da animação)
+        setTimeout(() => {
+            form.submit();
+        }, 800);
+    });
+
+    // --- 4. AUTO-REMOVE ALERTAS ---
+    setTimeout(() => {
         const alerts = document.querySelectorAll('.alert');
         alerts.forEach(alert => {
-            // Animação de saída (Fade out + Slide Up)
             alert.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
             alert.style.opacity = '0';
             alert.style.transform = 'translateY(-20px)';
-            
-            // Remove do HTML depois da animação
             setTimeout(() => alert.remove(), 600);
         });
-    }, 5000); // 5000ms = 5 segundos
+    }, 5000);
 
-    </script>
+</script>
 </body>
 </html>
