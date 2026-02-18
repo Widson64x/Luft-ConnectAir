@@ -10,6 +10,22 @@
     --transition-speed: 0.3s;
 }
 
+
+.status-alert {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid var(--cor-sucesso);
+    color: var(--cor-sucesso);
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.hidden { display: none !important; }
+.btn-danger { background-color: #ef4444; color: white; /* estilos padrão de botão */ }
+.btn-secondary { background-color: #6b7280; color: white; /* estilos padrão de botão */ }
+
 /* --- ESTRUTURA BASE --- */
 .map-wrapper {
     position: relative;

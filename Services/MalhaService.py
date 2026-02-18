@@ -178,19 +178,51 @@ class MalhaService:
         if not os.path.exists(MalhaService.DIR_TEMP):
             os.makedirs(MalhaService.DIR_TEMP)
 
+    # --- NOVO MÉTODO AUXILIAR PARA CÁLCULO DE CUSTO ---
+    @staticmethod
+    def CalcularCustoRota(lista_voos, peso_total):
+        """
+        Percorre os voos da rota e calcula o custo individualmente, 
+        garantindo que a Cia Aérea do TRECHO seja respeitada.
+        """
+        custo_total = 0.0
+        detalhes_financeiros = []
+        sem_tarifa_flag = False
+
+        for i, voo in enumerate(lista_voos):
+            # Chama o serviço de Tabela de Frete para cada perna
+            #
+            custo_trecho, info_frete = TabelaFreteService.CalcularCustoEstimado(
+                voo.AeroportoOrigem, 
+                voo.AeroportoDestino, 
+                voo.CiaAerea, # <--- AQUI GARANTIMOS QUE USA A CIA DO VOO (DB)
+                peso_total
+            )
+
+            # Verifica se houve falha na tarifação (retorno da flag tarifa_missing)
+            if info_frete.get('tarifa_missing', False):
+                sem_tarifa_flag = True
+                LogService.Warning("MalhaDebug", f"[TARIFACAO MISS] {voo.AeroportoOrigem}->{voo.AeroportoDestino} ({voo.CiaAerea}): Penalidade Virtual")
+
+            # Armazena o custo calculado no info_frete para uso visual
+            info_frete['custo_calculado'] = custo_trecho
+            
+            custo_total += custo_trecho
+            detalhes_financeiros.append(info_frete)
+
+        return {
+            'custo_total': custo_total,
+            'detalhes': detalhes_financeiros,
+            'sem_tarifa': sem_tarifa_flag
+        }
+
+    # --- MÉTODO PRINCIPAL DE BUSCA ---
     @staticmethod
     def BuscarOpcoesDeRotas(data_inicio, data_fim, lista_origens, lista_destinos, peso_total=100.0):
-        """
-        Retorna dicionário expandido com as novas categorias.
-        """
         Sessao = ObterSessaoSqlServer()
         ResultadosFormatados = {
-            'recomendada': [], 
-            'direta': [],
-            'rapida': [], 
-            'economica': [], 
-            'conexao_mesma_cia': [],
-            'interline': []
+            'recomendada': [], 'direta': [], 'rapida': [], 
+            'economica': [], 'conexao_mesma_cia': [], 'interline': []
         }
         
         if isinstance(lista_origens, str): lista_origens = [lista_origens]
@@ -212,39 +244,44 @@ class MalhaService:
                 ).all()
 
             if not VoosDB: 
-                LogService.Error("MalhaDebug", "[CRÍTICO] Nenhum voo encontrado no banco para este período/remessa ativa.")
                 return ResultadosFormatados
             
-            # 2. Montagem do Grafo
+            # 2. Configurações de Parceria (Movido para antes do Grafo)
+            ScoresParceria = CiaAereaService.ObterDicionarioScores()
+            
+            # 3. Montagem do Grafo (Com Filtro de Parceria)
             G = nx.DiGraph()
             for Voo in VoosDB:
+                NomeCia = Voo.CiaAerea.strip().upper()
+                
+                # --- FILTRO DE PARCERIA ZERO ---
+                # Se o score for 0 (ou menor), a companhia é tratada como desativada
+                # e seus voos não entram no grafo de possibilidades.
+                if ScoresParceria.get(NomeCia, 50) <= 0:
+                    continue
+                # -------------------------------
+
                 OrigemNo = Voo.AeroportoOrigem.strip().upper()
                 DestinoNo = Voo.AeroportoDestino.strip().upper()
-
                 if G.has_edge(OrigemNo, DestinoNo):
                     G[OrigemNo][DestinoNo]['voos'].append(Voo)
                 else:
                     G.add_edge(OrigemNo, DestinoNo, voos=[Voo])
             
             ListaCandidatos = []
-            ScoresParceria = CiaAereaService.ObterDicionarioScores()
 
-            # 3. Processamento de Rotas
+            # 4. Processamento de Rotas
             for origem_iata in lista_origens:
                 for destino_iata in lista_destinos:
                     
-                    if not G.has_node(origem_iata) or not G.has_node(destino_iata):
-                        continue 
+                    if not G.has_node(origem_iata) or not G.has_node(destino_iata): continue 
 
                     try:
                         CaminhosNos = list(nx.all_simple_paths(G, source=origem_iata, target=destino_iata, cutoff=3))
-                    except Exception as e: 
-                        LogService.Error("MalhaDebug", f"Erro no algoritmo nx.all_simple_paths para {origem_iata}->{destino_iata}", e)
-                        continue 
+                    except: continue 
 
                     if not CaminhosNos: continue
 
-                    # CHECK 3: Validação de Horários (Cronologia)
                     for Caminho in CaminhosNos:
                         SequenciaVoos = MalhaService._ValidarCaminhoCronologico(G, Caminho, data_inicio)
                         
@@ -254,51 +291,36 @@ class MalhaService:
                         Duracao = MalhaService._CalcularDuracaoRota(SequenciaVoos)
                         TrocasCia = MalhaService._ContarTrocasCia(SequenciaVoos)
                         QtdEscalas = len(SequenciaVoos) - 1
-                        CustoTotal = 0.0
-                        ScoreParceriaAcumulado = 0 
-                        SemTarifaFlag = False
-                        DetalhesTarifarios = []
-                        IdRota = "->".join(Caminho)
                         
-                        for i, v in enumerate(SequenciaVoos):
-                            c, info_frete = TabelaFreteService.CalcularCustoEstimado(v.AeroportoOrigem, v.AeroportoDestino, v.CiaAerea, peso_total)
-                            
-                            # AQUI MUDOU: Verifica a flag retornada pelo serviço
-                            if info_frete.get('tarifa_missing', False):
-                                SemTarifaFlag = True
-                                LogService.Warning("MalhaDebug", f"[TARIFACAO MISS] {IdRota} Trecho {i+1} ({v.CiaAerea}): Penalidade Virtual")
-                            
-                            # 'c' agora é 0.0 se não tiver tarifa, então CustoTotal não explode visualmente
-                            info_frete['custo_calculado'] = c
-                            CustoTotal += c
-                            DetalhesTarifarios.append(info_frete)
-                            ScoreParceriaAcumulado += ScoresParceria.get(v.CiaAerea.strip().upper(), 50)
-                        
+                        DadosFinanceiros = MalhaService.CalcularCustoRota(SequenciaVoos, peso_total)
+
+                        # Cálculo de Parceria (Média)
+                        # Nota: Como filtramos Scores <= 0 antes, aqui a média será sempre > 0
+                        ScoreParceriaAcumulado = sum([ScoresParceria.get(v.CiaAerea.strip().upper(), 50) for v in SequenciaVoos])
                         MediaParceria = ScoreParceriaAcumulado / len(SequenciaVoos) if len(SequenciaVoos) > 0 else 50
                         
                         ListaCandidatos.append({
                             'rota': SequenciaVoos,
-                            'detalhes_tarifas': DetalhesTarifarios,
+                            'detalhes_tarifas': DadosFinanceiros['detalhes'],
                             'metricas': {
                                 'duracao': Duracao, 
-                                'custo': CustoTotal, 
+                                'custo': DadosFinanceiros['custo_total'], 
                                 'escalas': QtdEscalas, 
                                 'trocas_cia': TrocasCia, 
                                 'indice_parceria': MediaParceria,
-                                'sem_tarifa': SemTarifaFlag, # Flag repassada para Intelligence
+                                'sem_tarifa': DadosFinanceiros['sem_tarifa'],
                                 'score': 0
                             }
                         })
                     
             if not ListaCandidatos: 
-                LogService.Warning("MalhaDebug", "Finalizado sem candidatos válidos.")
                 return ResultadosFormatados
 
-            # 4. Inteligência
+            # 5. Inteligência
             LogService.Info("MalhaDebug", f"Aplicando Inteligência em {len(ListaCandidatos)} candidatos...")
             OpcoesBrutas = RouteIntelligenceService.OtimizarOpcoes(ListaCandidatos)
 
-            # 5. Formatação e Cache
+            # 6. Formatação e Cache
             DadosAeroportos = {}
             VoosParaCache = []
             for cat, val in OpcoesBrutas.items():
@@ -306,8 +328,10 @@ class MalhaService:
             
             MalhaService._CompletarCacheDestinos(Sessao, VoosParaCache, DadosAeroportos)
 
+            # Função auxiliar para formatação de cada candidato, reutilizando a lógica de formatação e enriquecimento com cache e métricas
             def formatar_candidato(candidato, tag):
                 if not candidato: return []
+                # Passa as métricas e detalhes de tarifas para formatação, para que possam ser incluídos no resultado final
                 return MalhaService._FormatarListaRotas(candidato['rota'], DadosAeroportos, tag, candidato['metricas'], candidato['detalhes_tarifas'])
 
             ResultadosFormatados['recomendada'] = formatar_candidato(OpcoesBrutas.get('recomendada'), 'Recomendada')
@@ -322,8 +346,6 @@ class MalhaService:
 
         except Exception as e:
             LogService.Error("MalhaService", "ERRO CRÍTICO em BuscarOpcoesDeRotas", e)
-            import traceback
-            LogService.Error("MalhaService", traceback.format_exc()) # Adiciona Traceback completo no log
             return ResultadosFormatados
         finally:
             Sessao.close()
@@ -336,8 +358,11 @@ class MalhaService:
             Origem, Destino = ListaNos[i], ListaNos[i+1]
             if Destino not in Grafo[Origem]: return None
             OpcoesVoos = sorted(Grafo[Origem][Destino]['voos'][:], key=lambda v: (v.DataPartida, v.HorarioSaida))
+            
+            # Prioriza mesma Cia anterior, mas não exclui outras (Lógica mantida)
             CiaPreferida = VoosEscolhidos[-1].CiaAerea if VoosEscolhidos else None
             if CiaPreferida: OpcoesVoos = [v for v in OpcoesVoos if v.CiaAerea == CiaPreferida] + [v for v in OpcoesVoos if v.CiaAerea != CiaPreferida]
+            
             VooViavel = None
             for Voo in OpcoesVoos:
                 SaidaVoo = datetime.combine(Voo.DataPartida, Voo.HorarioSaida)
@@ -358,10 +383,13 @@ class MalhaService:
     @staticmethod
     def _CalcularDuracaoRota(ListaVoos):
         if not ListaVoos: return 0
+        # Considera o tempo desde a partida do primeiro voo até a chegada do último, incluindo pernoites
         Primeiro, Ultimo = ListaVoos[0], ListaVoos[-1]
         Inicio = datetime.combine(Primeiro.DataPartida, Primeiro.HorarioSaida)
         Fim = datetime.combine(Ultimo.DataPartida, Ultimo.HorarioChegada)
+        # Ajuste para casos de pernoite: se a chegada for antes da saída, assume que é no dia seguinte
         if Ultimo.HorarioChegada < Ultimo.HorarioSaida: Fim += timedelta(days=1)
+        # Ajuste para casos onde a rota tem conexões e o horário de chegada é antes do horário de partida do primeiro voo (ex: partida dia 01 às 22h e chegada dia 02 às 01h)
         while Fim < Inicio: Fim += timedelta(days=1)
         return (Fim - Inicio).total_seconds() / 60
 
@@ -391,14 +419,25 @@ class MalhaService:
             duracao_fmt = f"{dias}d {horas:02}:{mins:02}" if dias > 0 else f"{horas:02}:{mins:02}"
             custo_fmt = f"R$ {Metricas['custo']:,.2f}"
             InfoAdicional = {'total_duracao': duracao_fmt, 'total_custo': custo_fmt, 'total_custo_fmt': custo_fmt, 'total_custo_raw': Metricas['custo']}
+        
         for i, Voo in enumerate(ListaVoos):
             Orig = Cache.get(Voo.AeroportoOrigem, {'nome': Voo.AeroportoOrigem})
             Dest = Cache.get(Voo.AeroportoDestino, {'nome': Voo.AeroportoDestino})
+            
+            # Garante que pega o detalhe correspondente ao índice
             dados_frete = DetalhesTarifas[i] if DetalhesTarifas and i < len(DetalhesTarifas) else {}
             custo_trecho = dados_frete.get('custo_calculado', 0.0)
+            
+            # Tratamento de fallback para exibição de Cia Tarifaria vs Cia Voo
+            cia_tabela = dados_frete.get('cia_tarifaria')
+            cia_voo = Voo.CiaAerea.strip()
+            # Se a tarifa foi encontrada usando fallback (Strategy 2 do TabelaFreteService),
+            # 'cia_tarifaria' virá correta (ex: LATAM). Se não, usa a do voo.
+            cia_final = cia_tabela if cia_tabela else cia_voo
+
             Resultado.append({
                 'tipo_resultado': Tipo,
-                'cia': Voo.CiaAerea.strip(),
+                'cia': cia_voo, # Cia que opera o voo (Visual)
                 'voo': Voo.NumeroVoo,
                 'data': Voo.DataPartida.strftime('%d/%m/%Y'),
                 'horario_saida': Voo.HorarioSaida.strftime('%H:%M'),
@@ -408,7 +447,7 @@ class MalhaService:
                 'base_calculo': {
                     'tarifa': dados_frete.get('tarifa_base', 0.0),
                     'servico': dados_frete.get('servico', 'STANDARD'),
-                    'cia_tabela': dados_frete.get('cia_tarifaria', Voo.CiaAerea),
+                    'cia_tarifaria': cia_final, # Usado para debug se precisar
                     'peso_usado': dados_frete.get('peso_calculado', 0),
                     'custo_trecho': custo_trecho,
                     'custo_trecho_fmt': f"R$ {custo_trecho:,.2f}"

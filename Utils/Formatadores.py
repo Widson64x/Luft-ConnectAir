@@ -8,7 +8,6 @@ def PadronizarData(Valor):
     if not Valor:
         return None
 
-    # CORREÇÃO IMPORTANTE AQUI:
     # Verifica primeiro se é datetime para extrair apenas a data (.date())
     if isinstance(Valor, datetime):
         return Valor.date()

@@ -20,9 +20,129 @@ const CIA_CONFIG = {
 
 document.addEventListener('DOMContentLoaded', () => {
     initMap();
-    // Inicia selecionando a estratégia recomendada
-    setTimeout(() => SelecionarEstrategia('recomendada'), 300);
+    
+    // VERIFICA SE EXISTE PLANEJAMENTO SALVO
+    if (window.planejamentoSalvo && window.planejamentoSalvo.id_planejamento) {
+        IniciarModoVisualizacao(window.planejamentoSalvo);
+    } else {
+        // Fluxo Normal (Novo Planejamento)
+        setTimeout(() => SelecionarEstrategia('recomendada'), 300);
+    }
 });
+
+function IniciarModoVisualizacao(plan) {
+    currentState.estrategia = 'salva';
+    currentState.rotaSelecionada = plan.rota;
+
+    EnriquecerRotaSalva(plan.rota);
+
+    RenderizarRotaNoMapa(plan.rota);
+    RenderizarTimeline(plan.rota);
+    
+    // --- ATUALIZAÇÃO AQUI ---
+    // Se o backend mandou métricas prontas, usamos elas
+    if (plan.metricas) {
+        document.querySelector('#strategy-metrics .metric-item:nth-child(1) .val').innerText = 
+            "R$ " + plan.metricas.custo.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+        
+        document.querySelector('#strategy-metrics .metric-item:nth-child(2) .val').innerText = 
+            plan.metricas.duracao_fmt || "--:--";
+            
+        document.querySelector('#strategy-metrics .metric-item:nth-child(3) .val').innerText = 
+            plan.metricas.escalas;
+    } else {
+        // Fallback antigo
+        AtualizarMetricas(plan.rota); 
+    }
+    // ------------------------
+
+    // Ajusta Interface (mantido)
+    document.getElementById('aviso-modo-visualizacao').classList.remove('hidden');
+    document.getElementById('lbl-data-criacao').innerText = plan.data_criacao;
+    document.getElementById('container-estrategias').style.display = 'none';
+    document.getElementById('btn-confirmar').style.display = 'none';
+    document.getElementById('btn-cancelar-plan').classList.remove('hidden');
+    document.getElementById('btn-recalcular').classList.remove('hidden');
+}
+
+function EnriquecerRotaSalva(rota) {
+    // Tenta encontrar lat/lon nos dados carregados de OpcoesRotas (que contém metadados de aeroportos)
+    // para que o mapa desenhe as linhas corretamente.
+    // Procura em todas as estratégias disponíveis
+    const cacheAeroportos = {};
+    
+    // Helper para varrer window.opcoesRotas e popular cache
+    Object.values(window.opcoesRotas).forEach(lista => {
+        lista.forEach(trecho => {
+            if(trecho.origem && trecho.origem.iata) cacheAeroportos[trecho.origem.iata] = trecho.origem;
+            if(trecho.destino && trecho.destino.iata) cacheAeroportos[trecho.destino.iata] = trecho.destino;
+        });
+    });
+
+    rota.forEach(t => {
+        // Origem
+        if (typeof t.origem === 'object' && cacheAeroportos[t.origem.iata]) {
+            t.origem = cacheAeroportos[t.origem.iata];
+        } else {
+             // Fallback severo: usa lat/lon da cidade origem/destino do CTC se nao achar o aero
+             // (Isso evita crash no Leaflet, mas a linha ficará reta cidade-cidade)
+             if(t === rota[0]) t.origem = { iata: t.origem.iata, lat: window.origemCoords.lat, lon: window.origemCoords.lon };
+        }
+
+        // Destino
+        if (typeof t.destino === 'object' && cacheAeroportos[t.destino.iata]) {
+            t.destino = cacheAeroportos[t.destino.iata];
+        } else {
+             if(t === rota[rota.length-1]) t.destino = { iata: t.destino.iata, lat: window.destinoCoords.lat, lon: window.destinoCoords.lon };
+        }
+    });
+}
+
+// --- AÇÕES DOS BOTÕES ---
+
+window.AtivarModoEdicao = function() {
+    if(!confirm('Deseja descartar a visualização atual e calcular novas rotas?')) return;
+
+    // Reseta UI
+    document.getElementById('aviso-modo-visualizacao').classList.add('hidden');
+    document.getElementById('container-estrategias').style.display = 'flex'; // Mostra abas
+    
+    document.getElementById('btn-confirmar').style.display = 'inline-block';
+    document.getElementById('btn-recalcular').classList.add('hidden');
+    
+    // Opcional: Manter o botão de cancelar visivel ou esconder. Vou esconder para forçar o fluxo de "Salvar Novo".
+    document.getElementById('btn-cancelar-plan').classList.add('hidden');
+
+    // Seleciona a primeira estratégia disponível
+    SelecionarEstrategia('recomendada');
+};
+
+window.CancelarPlanejamentoExistente = function() {
+    if(!confirm('Tem certeza que deseja CANCELAR este planejamento? O status voltará para pendente.')) return;
+
+    const id = window.planejamentoSalvo.id_planejamento;
+    const btn = document.getElementById('btn-cancelar-plan');
+    const txtOriginal = btn.innerHTML;
+    btn.innerHTML = '...';
+    btn.disabled = true;
+
+    fetch(URL_CANCELAR_PLANEJAMENTO, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ id_planejamento: id })
+    })
+    .then(r => r.json())
+    .then(d => {
+        if(d.sucesso) {
+            alert('Planejamento cancelado.');
+            window.location.href = '/Luft-ConnectAir/Planejamento/Dashboard';
+        } else {
+            alert('Erro: ' + d.msg);
+            btn.innerHTML = txtOriginal;
+            btn.disabled = false;
+        }
+    });
+};
 
 function getCiaConfig(ciaName) {
     if (!ciaName) return CIA_CONFIG['DEFAULT'];
