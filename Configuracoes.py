@@ -11,7 +11,9 @@ class ConfiguracaoBase:
     Configurações Base compartilhadas entre todos os ambientes.
     """
     DIR_BASE = os.path.dirname(os.path.abspath(__file__))
-    
+    # Nome da aplicação, usado para exibição e prefixo de rotas (pode ser personalizado via .env)
+    APP_NAME = os.getenv("APP_NAME", "Luft-ConnectAir")
+
     # Define o prefixo global das rotas (Ex: /Luft-ConnectAir)
     ROUTE_PREFIX = os.getenv("ROUTE_PREFIX", "/Luft-ConnectAir")
     
@@ -38,7 +40,10 @@ class ConfiguracaoBase:
     DIR_UPLOADS = os.path.join(DIR_BASE, "Data", "Uploads")
     DIR_TEMP    = os.path.join(DIR_BASE, "Data", "Temp")
     DIR_LOGS    = os.path.join(DIR_BASE, "Logs")
-    
+
+    HOST = os.getenv("HOST", "127.0.0.1")
+    PORT = int(os.getenv("PORT", "5000"))
+
     # --- Lógica de Segurança da SECRET_KEY ---
     _chave_env = os.getenv("APP_SECRET_KEY")
     

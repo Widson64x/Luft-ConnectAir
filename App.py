@@ -28,9 +28,10 @@ from Routes.Global.Configuracoes import ConfiguracoesBp
 Prefix = ConfiguracaoAtual.ROUTE_PREFIX
 
 # Define a aplicação Flask, configurando o caminho para arquivos estáticos com o prefixo
-app = Flask(__name__,
-            static_url_path=f'{Prefix}/Static', # Define o caminho de URL para arquivos estáticos, incluindo o prefixo
-            static_folder='Static') # Define a pasta onde os arquivos estáticos estão localizados (sem o prefixo, pois é apenas para organização interna)
+app = Flask(ConfiguracaoAtual.APP_NAME,
+            static_url_path=f'{Prefix}/Static',
+            static_folder='Static',
+            template_folder='templates') # Adicionado para garantir que ache o HTML
 
 # Chave secreta para sessões, criptografia ou outras operações sensíveis.
 app.secret_key = ConfiguracaoAtual.APP_SECRET_KEY # Trocar por algo seguro depois
@@ -116,5 +117,16 @@ def Dashboard():
 def IndexRoot():
     return redirect(url_for('Dashboard'))
 
-if __name__ == '__main__':
-    app.run(debug=True)
+if __name__ == '__main__': # Se rodar diretamente, inicia o servidor Flask (bom para desenvolvimento, em produção usar WSGI como Gunicorn ou uWSGI)
+    # Define a porta (padrão 5000 se não encontrar no .env)
+    PortaApp = int(os.getenv("PORT", 5000))
+
+    # Exibe no log qual configuração de DEBUG está sendo usada
+    print(f"[Sistema] Iniciando servidor Flask... Modo Debug: {ConfiguracaoAtual.DEBUG}")
+    print(f"[Sistema] Acessar via: http://{ConfiguracaoAtual.HOST}:{PortaApp}{Prefix}/")
+    print(f"[Sistema] Sistema {ConfiguracaoAtual.APP_NAME} versão {VersaoService.ObterVersaoAtual()}")
+    app.run(
+        host=ConfiguracaoAtual.HOST,                # '0.0.0.0' deixa o app visível na rede local (útil para testar de outros PCs)
+        port=ConfiguracaoAtual.PORT,                 # Porta definida
+        debug=ConfiguracaoAtual.DEBUG  # Pega True/False direto da sua classe de Configuração
+    )
