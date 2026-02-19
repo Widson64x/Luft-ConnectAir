@@ -91,7 +91,8 @@ jobs:
             
               # Roda o script Python usando a venv
               cmd /c ".\.venv\Scripts\python.exe Scripts/GestaoVersao.py nova --numero `"$VersionNum`" --estagio `"Alpha`" --msg `"$CleanMsg`" --dev `"$Author`" --hash `"$Hash`""
-              
+              Write-Error "A sua versão $VersionNum do usuário $Author com a mensagem '$CleanMsg' e hash $Hash foi registrada no banco de dados."
+        
               Write-Host "Versão $VersionNum registrada."
             } else {
               Write-Warning "Arquivo VERSION não encontrado. Pulei o registro de versão."
