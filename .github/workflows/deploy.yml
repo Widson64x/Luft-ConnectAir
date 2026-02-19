@@ -81,20 +81,20 @@ jobs:
             
             # Lê o arquivo VERSION da raiz (Crie este arquivo com o número, ex: 1.0.1)
             if (Test-Path "VERSION") {
-                $VersionNum = Get-Content "VERSION" -Raw
-                $VersionNum = $VersionNum.Trim() # Remove espaços extras
-                
-                # Limpa aspas da mensagem de commit para não quebrar o comando
-                $CleanMsg = $env:COMMIT_MSG -replace '"', ''
-                $Author = $env:COMMIT_AUTHOR
-                $Hash = $env:COMMIT_HASH
-
-                # Roda o script Python usando a venv
-                cmd /c ".\.venv\Scripts\python.exe Scripts/GestaoVersao.py nova --numero `"$VersionNum`" --estagio `"Alpha`" --msg `"$CleanMsg`" --dev `"$Author`" --hash `"$Hash`""
-                
-                Write-Host "Versão $VersionNum registrada."
+              $VersionNum = Get-Content "VERSION" -Raw
+              $VersionNum = $VersionNum.Trim() # Remove espaços extras
+            
+              # Limpa aspas e quebras de linha da mensagem de commit para não quebrar o comando CMD
+              $CleanMsg = $env:COMMIT_MSG -replace '"', '' -replace '[\r\n]+', ' | '
+              $Author = $env:COMMIT_AUTHOR
+              $Hash = $env:COMMIT_HASH
+            
+              # Roda o script Python usando a venv
+              cmd /c ".\.venv\Scripts\python.exe Scripts/GestaoVersao.py nova --numero `"$VersionNum`" --estagio `"Alpha`" --msg `"$CleanMsg`" --dev `"$Author`" --hash `"$Hash`""
+              
+              Write-Host "Versão $VersionNum registrada."
             } else {
-                Write-Warning "Arquivo VERSION não encontrado. Pulei o registro de versão."
+              Write-Warning "Arquivo VERSION não encontrado. Pulei o registro de versão."
             }
 
         } else {

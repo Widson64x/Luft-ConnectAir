@@ -17,7 +17,7 @@ except ImportError:
     print("Instale rodando: pip install waitress")
     sys.exit(1)
 
-if __name__ == "__main__":
+if __name__ == "__main__": # Méto python padrão para execução direta, se __name_ for "__main__", significa que este script está sendo executado diretamente, e não importado como módulo
     # Configurações do ambiente
     # Em produção com NGINX na frente, geralmente rodamos em localhost
     host = os.environ.get("HOST", "127.0.0.1")

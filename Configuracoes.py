@@ -1,10 +1,9 @@
-import os
+import os # Biblioteca para manipulação de caminhos e variáveis de ambiente
 import urllib.parse
 import secrets
 from dotenv import load_dotenv
 
-# Carrega as variáveis do arquivo .env
-load_dotenv()
+load_dotenv() # Carrega as variáveis de ambiente do arquivo .env para o ambiente de execução
 
 class ConfiguracaoBase:
     """
@@ -12,7 +11,7 @@ class ConfiguracaoBase:
     """
     DIR_BASE = os.path.dirname(os.path.abspath(__file__))
     # Nome da aplicação, usado para exibição e prefixo de rotas (pode ser personalizado via .env)
-    APP_NAME = os.getenv("APP_NAME", "Luft-ConnectAir")
+    APP_NAME = os.getenv("APP_NAME", "Luft-ConnectAir") # Obtém a variável APP_NAME, com a função getenv, que permite definir um valor padrão caso a variável não esteja presente. Se APP_NAME não estiver definido no .env, ele usará "Luft-ConnectAir" como nome da aplicação.
 
     # Define o prefixo global das rotas (Ex: /Luft-ConnectAir)
     ROUTE_PREFIX = os.getenv("ROUTE_PREFIX", "/Luft-ConnectAir")
@@ -76,6 +75,7 @@ class ConfiguracaoBase:
         """
         Gera a string de conexão para o PostgreSQL.
         """
+        # Se a senha estiver vazia, tenta conectar sem autenticação (útil para dev local com trust auth)
         SenhaCodificada = urllib.parse.quote_plus(self.PG_PASS)
         return f"postgresql+{self.PG_DRIVER}://{self.PG_USER}:{SenhaCodificada}@{self.PG_HOST}:{self.PG_PORT}/{self.PG_DB_NAME}"
 

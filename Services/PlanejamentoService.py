@@ -16,74 +16,80 @@ class PlanejamentoService:
     """
 
     # --- SQL BASE (Compartilhado entre os métodos para evitar repetição) ---
-# --- SQL BASE ATUALIZADO (Correção da lógica TM) ---
+    # --- SQL BASE ATUALIZADO (Correção da lógica TM) ---
     _QueryBase = """
-        SELECT 
+         SELECT DISTINCT
              c.filial as Filial
-            ,c.filialctc as CTC
-            ,c.seriectc as Serie
-            ,C.MODAL as Modal
-            ,c.motivodoc as MotivoCTC
-            ,c.data as DataEmissao
-            ,c.hora as HoraEmissao
-            ,c.volumes as Volumes
-            ,c.peso as PesoFisico
-            ,c.pesotax as PesoTaxado
-            ,c.valmerc as Valor
-            ,c.fretetotalbruto as FreteTotal
-            ,upper(c.remet_nome) as Remetente
-            ,upper(c.dest_nome) as Destinatario
-            ,c.cidade_orig as CidadeOrigem
-            ,c.uf_orig as UFOrigem
-            ,c.cidade_dest as CidadeDestino
-            ,c.uf_dest as UFDestino
-            ,c.rotafilialdest as UnidadeDestino
-            ,c.prioridade as Prioridade
-            ,cl.StatusCTC as StatusCTC
-            ,ISNULL(cl.TipoCarga, '') AS Tipo_carga
-            ,c.nfs as Notas
-        FROM intec.dbo.tb_ctc_esp c (nolock) 
-        INNER JOIN intec.dbo.tb_ctc_esp_cpl cl (nolock) on cl.filialctc = c.filialctc
-        INNER JOIN intec.dbo.tb_nf_esp n (nolock) on n.filialctc = c.filialctc
-        
-        -- Join AWB
-        LEFT JOIN intec.dbo.tb_airAWBnota B (NOLOCK) ON c.filialctc = b.filialctc AND n.numnf = b.nota collate database_default
-        LEFT JOIN intec.dbo.tb_airawb A (NOLOCK) ON A.codawb = B.codawb 
-        
-        -- Join Manifesto
-        LEFT JOIN intec.dbo.tb_manifesto m (nolock) on m.filialctc = c.filialctc
-        
-        -- Join Reversa
-        LEFT JOIN intec.dbo.Tb_PLN_ControleReversa rev (nolock) ON 
-            rev.Filial COLLATE DATABASE_DEFAULT = c.filial COLLATE DATABASE_DEFAULT AND 
-            rev.Serie COLLATE DATABASE_DEFAULT = c.seriectc COLLATE DATABASE_DEFAULT AND 
-            rev.Ctc COLLATE DATABASE_DEFAULT = c.filialctc COLLATE DATABASE_DEFAULT
+                       ,c.filialctc as CTC
+                       ,c.seriectc as Serie
+                       ,C.MODAL as Modal
+                       ,c.motivodoc as MotivoCTC
+                       ,c.data as DataEmissao
+                       ,c.hora as HoraEmissao
+                       ,c.volumes as Volumes
+                       ,c.peso as PesoFisico
+                       ,c.pesotax as PesoTaxado
+                       ,c.valmerc as Valor
+                       ,c.fretetotalbruto as FreteTotal
+                       ,upper(c.remet_nome) as Remetente
+                       ,upper(c.dest_nome) as Destinatario
+                       ,c.cidade_orig as CidadeOrigem
+                       ,c.uf_orig as UFOrigem
+                       ,c.cidade_dest as CidadeDestino
+                       ,c.uf_dest as UFDestino
+                       ,c.rotafilialdest as UnidadeDestino
+                       ,c.prioridade as Prioridade
+                       ,cl.StatusCTC as StatusCTC
+                       ,ISNULL(cl.TipoCarga, '') AS Tipo_carga
+                       ,c.nfs as Notas
+                       ,CAST(c.qtdenfs AS INT) as QtdNotas
+         FROM intec.dbo.tb_ctc_esp c (nolock)
+                  INNER JOIN intec.dbo.tb_ctc_esp_cpl cl (nolock) on cl.filialctc = c.filialctc
 
-        WHERE 
-            n.filialctc = c.filialctc
-            and a.codawb is null
-            and c.tipodoc <> 'COB'
-            and c.tem_ocorr not in ('C','0','1')
-            and left(c.respons_cgc,8) <> '02426290'
-            and (a.cancelado is null or a.cancelado = '') 
-            and (m.cancelado is null OR m.cancelado = 'S')
-            and (m.motivo NOT in ('TRA','RED') OR m.motivo IS NULL)
-            
-            -- LÓGICA DE MODAL E OCORRÊNCIA TM
-            AND (
-                -- CASO 1: É AÉREO NATIVO E NÃO TEM TM
-                (c.modal LIKE 'AEREO%' AND NOT EXISTS (
-                    SELECT 1 FROM intec.dbo.tb_ocorr cr (nolock) 
-                    WHERE cr.cod_ocorr = 'TM' AND cr.filialctc = c.filialctc
-                ))
-                OR
-                -- CASO 2: NÃO É AÉREO MAS TEM TM
-                (c.modal NOT LIKE 'AEREO%' AND EXISTS (
-                    SELECT 1 FROM intec.dbo.tb_ocorr cr (nolock) 
-                    WHERE cr.cod_ocorr = 'TM' AND cr.filialctc = c.filialctc
-                ))
-            )
-    """
+             -- REMOVIDO: INNER JOIN intec.dbo.tb_nf_esp n (Gera duplicidade)
+             -- REMOVIDO: JOINs diretos com tb_airAWBnota e tb_airawb (Substituídos por NOT EXISTS)
+
+             -- Join Manifesto
+                  LEFT JOIN intec.dbo.tb_manifesto m (nolock) on m.filialctc = c.filialctc
+
+             -- Join Reversa
+                  LEFT JOIN intec.dbo.Tb_PLN_ControleReversa rev (nolock) ON
+             rev.Filial COLLATE DATABASE_DEFAULT = c.filial COLLATE DATABASE_DEFAULT AND
+             rev.Serie COLLATE DATABASE_DEFAULT = c.seriectc COLLATE DATABASE_DEFAULT AND
+             rev.Ctc COLLATE DATABASE_DEFAULT = c.filialctc COLLATE DATABASE_DEFAULT
+
+         WHERE
+             c.tipodoc <> 'COB'
+           and c.tem_ocorr not in ('C','0','1')
+           and left(c.respons_cgc,8) <> '02426290'
+           and (m.cancelado is null OR m.cancelado = 'S')
+           and (m.motivo NOT in ('TRA','RED') OR m.motivo IS NULL)
+
+           -- FILTRO DE AWB (Novo método sem duplicar linhas)
+           -- Verifica se NÃO existe um AWB válido vinculado a este CTC
+           AND NOT EXISTS (
+             SELECT 1
+             FROM intec.dbo.tb_airAWBnota B (NOLOCK)
+                      INNER JOIN intec.dbo.tb_airawb A (NOLOCK) ON A.codawb = B.codawb
+             WHERE B.filialctc = c.filialctc
+               AND (A.cancelado IS NULL OR A.cancelado = '')
+         )
+
+           -- LÓGICA DE MODAL E OCORRÊNCIA TM
+           AND (
+             -- CASO 1: É AÉREO NATIVO E NÃO TEM TM
+             (c.modal LIKE 'AEREO%' AND NOT EXISTS (
+                 SELECT 1 FROM intec.dbo.tb_ocorr cr (nolock)
+                 WHERE cr.cod_ocorr = 'TM' AND cr.filialctc = c.filialctc
+             ))
+                 OR
+                 -- CASO 2: NÃO É AÉREO MAS TEM TM
+             (c.modal NOT LIKE 'AEREO%' AND EXISTS (
+                 SELECT 1 FROM intec.dbo.tb_ocorr cr (nolock)
+                 WHERE cr.cod_ocorr = 'TM' AND cr.filialctc = c.filialctc
+             ))
+             ) \
+         """
 
     @staticmethod
     def _ObterMapaCache():
@@ -126,11 +132,11 @@ class PlanejamentoService:
                 hora_fmt = h
 
             # Qtd Notas
-            qtd_notas = 0
-            if row.Notas:
-                s = str(row.Notas).replace('/', ',').replace(';', ',').replace('-', ',')
-                qtd_notas = len([n for n in s.split(',') if n.strip()])
-            if qtd_notas == 0 and to_int(row.Volumes) > 0: qtd_notas = 1
+            qtd_notas = to_int(row.QtdNotas)
+
+            # Mantendo a sua regra de fallback caso venha zerado mas tenha volume
+            if qtd_notas == 0 and to_int(row.Volumes) > 0:
+                qtd_notas = 1
 
             # Cache Planejamento
             chave = f"{to_str(row.Filial)}-{to_str(row.Serie)}-{to_str(row.CTC)}"

@@ -144,21 +144,21 @@
     }
 
     .table-custom tr:last-child td { border-bottom: none; }
-    .table-custom tr:hover { background-color: #f9fafb; cursor: pointer; } /* Cursor pointer para indicar clicável */
+    .table-custom tr:hover { background-color: #f9fafb; cursor: pointer; }
 
     /* Componentes da Tabela */
     .ctc-destaque { font-weight: 700; color: var(--cor-primaria, #2563eb); font-family: monospace; font-size: 0.95rem; }
-    
+
     .rota-badge {
-        display: inline-flex; 
-        align-items: center; 
+        display: inline-flex;
+        align-items: center;
         gap: 8px;
-        background: rgba(var(--cor-primaria-rgb), 0.08); 
-        color: var(--cor-primaria); 
+        background: rgba(var(--cor-primaria-rgb), 0.08);
+        color: var(--cor-primaria);
         border: 1px solid rgba(var(--cor-primaria-rgb), 0.2);
-        padding: 6px 12px; 
+        padding: 6px 12px;
         border-radius: 20px;
-        font-size: 0.75rem; 
+        font-size: 0.75rem;
         font-weight: 700;
     }
 
@@ -190,6 +190,7 @@
         border-color: var(--cor-primaria, #2563eb);
     }
     .custom-check:checked::before { transform: scale(1); }
+    .custom-check:disabled { opacity: 0.6; cursor: not-allowed; }
 
     /* Status Badges */
     .status-badge {
@@ -203,7 +204,7 @@
     /* Estado Vazio */
     .empty-state { text-align: center; padding: 60px 20px; }
     .empty-state i { font-size: 4rem; color: var(--cor-borda, #e5e7eb); margin-bottom: 16px; display: block; }
-    
+
     /* Responsividade */
     @media (max-width: 768px) {
         .toolbar { flex-direction: column; align-items: stretch; }
@@ -213,7 +214,7 @@
 </style>
 
 <div class="reversa-container">
-    
+
     <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 15px;">
         <div>
             <h2 style="font-weight: 800; color: var(--cor-texto-principal); margin: 0; display: flex; align-items: center; gap: 10px;">
@@ -277,106 +278,113 @@
         <div style="overflow-x: auto;">
             <table class="table-custom" id="mainTable">
                 <thead>
-                    <tr>
-                        <th class="text-center" style="width: 70px;">Liberar</th>
-                        <th>Detalhes do Documento</th>
-                        <th>Rota</th>
-                        <th>Remetente / Destinatário</th>
-                        <th class="text-center">Volumes</th>
-                        <th class="text-center">Peso</th>
-                        <th>Status / Responsável</th>
-                    </tr>
+                <tr>
+                    <th class="text-center" style="width: 80px;">
+                        <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                            <div class="checkbox-wrapper">
+                                <input type="checkbox" class="custom-check" id="chk-todos" onclick="toggleTodos(this)" title="Selecionar e salvar todos visíveis">
+                            </div>
+                            <span style="font-size: 0.65rem; color: var(--cor-texto-secundario);">TODOS</span>
+                        </div>
+                    </th>
+                    <th>Detalhes do Documento</th>
+                    <th>Rota</th>
+                    <th>Remetente / Destinatário</th>
+                    <th class="text-center">Volumes</th>
+                    <th class="text-center">Peso</th>
+                    <th>Status / Responsável</th>
+                </tr>
                 </thead>
                 <tbody>
-                    {% if Lista %}
-                        {% for item in Lista %}
-                        <tr class="data-row" 
-                            data-status="{{ 'liberado' if item.is_liberado else 'pendente' }}"
-                            data-search="{{ item.ctc }} {{ item.filial }} {{ item.remetente }} {{ item.destinatario }} {{ item.cidade_origem }} {{ item.cidade_destino }}"
-                            ondblclick="AbrirModalGlobal('{{ item.filial }}', '{{ item.serie }}', '{{ item.ctc }}')"
-                            title="Duplo clique para ver detalhes">
-                            
-                            <td class="text-center" onclick="event.stopPropagation()">
-                                <div class="checkbox-wrapper">
-                                    <input type="checkbox" class="custom-check chk-action"
-                                           id="chk-{{ item.filial }}-{{ item.ctc }}"
-                                           data-filial="{{ item.filial }}"
-                                           data-serie="{{ item.serie }}"
-                                           data-ctc="{{ item.ctc }}"
-                                           {% if item.is_liberado %}checked{% endif %}>
-                                </div>
-                            </td>
+                {% if Lista %}
+                {% for item in Lista %}
+                <tr class="data-row"
+                    data-status="{{ 'liberado' if item.is_liberado else 'pendente' }}"
+                    data-search="{{ item.ctc }} {{ item.filial }} {{ item.remetente }} {{ item.destinatario }} {{ item.cidade_origem }} {{ item.cidade_destino }}"
+                    ondblclick="AbrirModalGlobal('{{ item.filial }}', '{{ item.serie }}', '{{ item.ctc }}')"
+                    title="Duplo clique para ver detalhes">
 
-                            <td>
-                                <div class="ctc-destaque">{{ item.ctc }}</div>
-                                <div style="font-size: 0.75rem; color: #666; margin-top: 2px;">
-                                    Filial: {{ item.filial }} | Série: {{ item.serie }}
-                                </div>
-                                <div style="font-size: 0.75rem; color: #888; margin-top: 2px;">
-                                    <i class="ph-bold ph-calendar-blank"></i> {{ item.data_emissao }}
-                                </div>
-                            </td>
+                    <td class="text-center" onclick="event.stopPropagation()">
+                        <div class="checkbox-wrapper">
+                            <input type="checkbox" class="custom-check chk-action"
+                                   id="chk-{{ item.filial }}-{{ item.ctc }}"
+                                   data-filial="{{ item.filial }}"
+                                   data-serie="{{ item.serie }}"
+                                   data-ctc="{{ item.ctc }}"
+                                   {% if item.is_liberado %}checked{% endif %}>
+                        </div>
+                    </td>
 
-                            <td>
-                                <div class="rota-badge">
-                                    {{ item.cidade_origem }} 
-                                    <i class="ph-bold ph-arrow-right" style="font-size: 0.7rem; color: var(--cor-primaria);"></i> 
-                                    {{ item.cidade_destino }}
-                                </div>
-                            </td>
+                    <td>
+                        <div class="ctc-destaque">{{ item.ctc }}</div>
+                        <div style="font-size: 0.75rem; color: #666; margin-top: 2px;">
+                            Filial: {{ item.filial }} | Série: {{ item.serie }}
+                        </div>
+                        <div style="font-size: 0.75rem; color: #888; margin-top: 2px;">
+                            <i class="ph-bold ph-calendar-blank"></i> {{ item.data_emissao }}
+                        </div>
+                    </td>
 
-                            <td style="max-width: 250px;">
-                                <div style="font-weight: 600; font-size: 0.85rem; color: var(--cor-texto-principal); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ item.remetente }}">
-                                    <i class="ph-bold ph-package" style="color: #aaa;"></i> {{ item.remetente }}
-                                </div>
-                                <div style="font-size: 0.8rem; color: var(--cor-texto-secundario); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ item.destinatario }}">
-                                    <i class="ph-bold ph-user" style="color: #aaa;"></i> {{ item.destinatario }}
-                                </div>
-                            </td>
+                    <td>
+                        <div class="rota-badge">
+                            {{ item.cidade_origem }}
+                            <i class="ph-bold ph-arrow-right" style="font-size: 0.7rem; color: var(--cor-primaria);"></i>
+                            {{ item.cidade_destino }}
+                        </div>
+                    </td>
 
-                            <td class="text-center">
-                                <span style="font-weight: 700; color: var(--cor-texto-principal);">{{ item.volumes }}</span>
-                            </td>
+                    <td style="max-width: 250px;">
+                        <div style="font-weight: 600; font-size: 0.85rem; color: var(--cor-texto-principal); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ item.remetente }}">
+                            <i class="ph-bold ph-package" style="color: #aaa;"></i> {{ item.remetente }}
+                        </div>
+                        <div style="font-size: 0.8rem; color: var(--cor-texto-secundario); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ item.destinatario }}">
+                            <i class="ph-bold ph-user" style="color: #aaa;"></i> {{ item.destinatario }}
+                        </div>
+                    </td>
 
-                            <td class="text-center">
-                                <span style="font-weight: 600; color: #555;">{{ item.peso|round(1) }} Kg</span>
-                            </td>
+                    <td class="text-center">
+                        <span style="font-weight: 700; color: var(--cor-texto-principal);">{{ item.volumes }}</span>
+                    </td>
 
-                            <td>
-                                <div id="status-display-{{ item.filial }}-{{ item.ctc }}">
-                                    {% if item.is_liberado %}
-                                        <div class="status-badge status-liberado">Liberado</div>
-                                        <div style="font-size: 0.7rem; color: #666; margin-top: 4px;">
-                                            Por: {{ item.responsavel }}
-                                        </div>
-                                    {% else %}
-                                        <div class="status-badge status-pendente">Pendente</div>
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    {% else %}
-                        <tr id="no-data-row">
-                            <td colspan="7">
-                                <div class="empty-state">
-                                    <i class="ph-duotone ph-check-circle"></i>
-                                    <h3>Tudo Limpo!</h3>
-                                    <p>Nenhuma devolução pendente para o modal aéreo neste momento.</p>
-                                </div>
-                            </td>
-                        </tr>
-                    {% endif %}
-                    
-                    <tr id="no-search-results" style="display: none;">
-                        <td colspan="7">
-                            <div class="empty-state">
-                                <i class="ph-duotone ph-magnifying-glass"></i>
-                                <h3>Nenhum resultado</h3>
-                                <p>Não encontramos nada com os filtros atuais.</p>
+                    <td class="text-center">
+                        <span style="font-weight: 600; color: #555;">{{ item.peso|round(1) }} Kg</span>
+                    </td>
+
+                    <td>
+                        <div id="status-display-{{ item.filial }}-{{ item.ctc }}">
+                            {% if item.is_liberado %}
+                            <div class="status-badge status-liberado">Liberado</div>
+                            <div style="font-size: 0.7rem; color: #666; margin-top: 4px;">
+                                Por: {{ item.responsavel }}
                             </div>
-                        </td>
-                    </tr>
+                            {% else %}
+                            <div class="status-badge status-pendente">Pendente</div>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr id="no-data-row">
+                    <td colspan="7">
+                        <div class="empty-state">
+                            <i class="ph-duotone ph-check-circle"></i>
+                            <h3>Tudo Limpo!</h3>
+                            <p>Nenhuma devolução pendente para o modal aéreo neste momento.</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endif %}
+
+                <tr id="no-search-results" style="display: none;">
+                    <td colspan="7">
+                        <div class="empty-state">
+                            <i class="ph-duotone ph-magnifying-glass"></i>
+                            <h3>Nenhum resultado</h3>
+                            <p>Não encontramos nada com os filtros atuais.</p>
+                        </div>
+                    </td>
+                </tr>
                 </tbody>
             </table>
         </div>
@@ -388,16 +396,16 @@
 
 <script>
     // Variável global para o filtro atual (inicia em 'todos')
-    let currentFilter = 'todos'; 
+    let currentFilter = 'todos';
 
     document.addEventListener('DOMContentLoaded', () => {
         // Atualiza hora
         document.getElementById('last-update').innerText = new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
-        
+
         // Inicializa a tabela e contadores
         filtrarTabela();
 
-        // Adiciona listeners aos checkboxes de ação
+        // Adiciona listeners aos checkboxes de ação individuais
         const checkboxes = document.querySelectorAll('.chk-action');
         checkboxes.forEach(chk => {
             chk.addEventListener('change', handleCheck);
@@ -407,10 +415,14 @@
     // Função para alterar o botão ativo e disparar o filtro
     function setFilter(filterType, btnElement) {
         currentFilter = filterType;
-        
+
         // Atualiza visual dos botões
         document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
         btnElement.classList.add('active');
+
+        // Desmarca o checkbox "Todos" sempre que mudar de aba para evitar confusão
+        const chkTodos = document.getElementById('chk-todos');
+        if(chkTodos) chkTodos.checked = false;
 
         filtrarTabela();
     }
@@ -419,36 +431,28 @@
     function filtrarTabela() {
         const searchText = document.getElementById('searchInput').value.toLowerCase();
         const rows = document.querySelectorAll('.data-row');
-        
-        // Variáveis para contagem dinâmica
+
         let countTotal = 0;
         let countPendente = 0;
         let countLiberado = 0;
 
-        // Variáveis para controle da tabela
         let visibleCount = 0;
         let hasData = false;
 
         rows.forEach(row => {
-            const status = row.dataset.status; // 'pendente' ou 'liberado'
+            const status = row.dataset.status;
             const textContent = row.dataset.search.toLowerCase();
-            
-            // 1. Verificação de Busca (Search Input)
-            // A busca afeta os contadores globais. Se eu digito "SP", conto quantos pendentes/liberados existem em SP.
+
             const matchesSearch = textContent.includes(searchText);
 
             if (matchesSearch) {
-                // Incrementa os contadores baseados no resultado da BUSCA
                 countTotal++;
                 if (status === 'pendente') countPendente++;
                 if (status === 'liberado') countLiberado++;
             }
 
-            // 2. Verificação do Botão de Filtro (Abas)
-            // A aba decide se a linha aparece ou não na tela
             const matchesFilter = (currentFilter === 'todos') || (currentFilter === status);
 
-            // A linha só aparece se passar na BUSCA E no FILTRO DE ABA
             if (matchesSearch && matchesFilter) {
                 row.style.display = '';
                 visibleCount++;
@@ -458,39 +462,114 @@
             }
         });
 
-        // --- ATUALIZAÇÃO DO DOM ---
-
-        // Atualiza os Cards Superiores com os números calculados
         animateValue("count-total", countTotal);
         animateValue("count-pendente", countPendente);
         animateValue("count-liberado", countLiberado);
 
-        // Controle de mensagens de "vazio"
         const noSearchRow = document.getElementById('no-search-results');
         const noDataRow = document.getElementById('no-data-row');
 
-        // Se houver linhas no HTML mas nenhuma visível pelo filtro de busca
         if (noSearchRow) {
             noSearchRow.style.display = (!hasData && rows.length > 0) ? '' : 'none';
         }
-        
-        // Atualiza contador do rodapé da tabela
+
         document.getElementById('visible-count').innerText = visibleCount;
     }
 
-    // Função auxiliar para animar a troca de números (opcional, para visual suave)
     function animateValue(id, value) {
         const obj = document.getElementById(id);
         if(obj) obj.innerText = value;
     }
 
-    // --- FUNÇÃO DE SALVAR (AJAX) ---
+    // --- NOVO: FUNÇÃO PARA SELECIONAR E SALVAR TODOS EM LOTE ---
+    async function toggleTodos(source) {
+        const isChecked = source.checked;
+        const rows = document.querySelectorAll('.data-row');
+        const checkboxesToUpdate = [];
+
+        // 1. Identificar quais checkboxes estão visíveis e precisam ser alterados
+        rows.forEach(row => {
+            // Verifica se a linha está visível (passou nos filtros)
+            if (row.style.display !== 'none') {
+                const chk = row.querySelector('.chk-action');
+                // Se o estado atual do checkbox for diferente do desejado
+                if (chk && chk.checked !== isChecked) {
+                    chk.checked = isChecked;
+                    checkboxesToUpdate.push(chk);
+                }
+            }
+        });
+
+        // Se não há nada para atualizar, encerra
+        if (checkboxesToUpdate.length === 0) return;
+
+        // Desabilita o controle principal para evitar cliques repetidos
+        source.disabled = true;
+
+        // 2. Cria um array de Promises para enviar as requisições simultaneamente
+        const promises = checkboxesToUpdate.map(async (chk) => {
+            const payload = {
+                filial: chk.dataset.filial,
+                serie: chk.dataset.serie,
+                ctc: chk.dataset.ctc,
+                liberado: isChecked
+            };
+
+            const statusDisplay = document.getElementById(`status-display-${payload.filial}-${payload.ctc}`);
+            const originalHtml = statusDisplay.innerHTML;
+
+            // Feedback Visual de Carregamento
+            statusDisplay.innerHTML = `<div style="color:var(--cor-primaria); font-size:0.75rem; font-weight:600;"><i class="ph-bold ph-spinner ph-spin"></i> Salvando...</div>`;
+            chk.disabled = true;
+
+            try {
+                // Reutiliza a rota atual do seu backend
+                const response = await fetch('/Luft-ConnectAir/Reversa/AtualizarStatus', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const json = await response.json();
+
+                if (json.sucesso) {
+                    const row = chk.closest('tr');
+                    row.dataset.status = isChecked ? 'liberado' : 'pendente';
+
+                    if (isChecked) {
+                        statusDisplay.innerHTML = `
+                            <div class="status-badge status-liberado">Liberado</div>
+                            <div style="font-size: 0.7rem; color: #666; margin-top: 4px;">Lote</div>
+                        `;
+                    } else {
+                        statusDisplay.innerHTML = `<div class="status-badge status-pendente">Pendente</div>`;
+                    }
+                } else {
+                    throw new Error(json.msg);
+                }
+            } catch (error) {
+                console.error(error);
+                chk.checked = !isChecked; // Reverte visualmente
+                statusDisplay.innerHTML = originalHtml;
+            } finally {
+                chk.disabled = false;
+            }
+        });
+
+        // Aguarda todas as requisições finalizarem
+        await Promise.all(promises);
+
+        // Reabilita o botão principal e atualiza os contadores gerais
+        source.disabled = false;
+        filtrarTabela();
+    }
+
+    // --- FUNÇÃO DE SALVAR INDIVIDUAL (MANTIDA IGUAL) ---
     async function handleCheck(e) {
         const el = e.target;
         const isChecked = el.checked;
         const row = el.closest('tr');
-        
-        // Dados para envio
+
         const payload = {
             filial: el.dataset.filial,
             serie: el.dataset.serie,
@@ -501,7 +580,6 @@
         const statusDisplay = document.getElementById(`status-display-${payload.filial}-${payload.ctc}`);
         const originalHtml = statusDisplay.innerHTML;
 
-        // Feedback Visual
         statusDisplay.innerHTML = `<div style="color:var(--cor-primaria); font-size:0.75rem; font-weight:600;"><i class="ph-bold ph-spinner ph-spin"></i> Salvando...</div>`;
         el.disabled = true;
 
@@ -515,11 +593,9 @@
             const json = await response.json();
 
             if (json.sucesso) {
-                // Atualiza Dataset da linha para os filtros funcionarem imediatamente
                 const novoStatus = isChecked ? 'liberado' : 'pendente';
                 row.dataset.status = novoStatus;
-                
-                // Atualiza HTML do status
+
                 if (isChecked) {
                     statusDisplay.innerHTML = `
                         <div class="status-badge status-liberado">Liberado</div>
@@ -530,18 +606,15 @@
                         <div class="status-badge status-pendente">Pendente</div>
                     `;
                 }
-
-                // Recalcula todos os filtros e contadores para refletir a mudança de status
-                filtrarTabela(); 
-
+                filtrarTabela();
             } else {
                 throw new Error(json.msg);
             }
         } catch (error) {
             console.error(error);
             alert('Erro ao comunicar com o servidor: ' + error.message);
-            el.checked = !isChecked; // Reverte checkbox
-            statusDisplay.innerHTML = originalHtml; // Reverte visual
+            el.checked = !isChecked;
+            statusDisplay.innerHTML = originalHtml;
         } finally {
             el.disabled = false;
         }
