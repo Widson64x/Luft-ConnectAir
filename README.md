@@ -1,178 +1,192 @@
 ```markdown
 # ✈️ Luft-ConnectAir
 
-**Luft-ConnectAir** é um sistema web robusto de Operações de Voo, desenvolvido para gerenciar e planejar malhas aéreas, escalas, aeroportos e acompanhamento de cargas e voos. O sistema utiliza uma arquitetura modular baseada em Python (Flask), integrando-se com bancos de dados SQL Server e PostgreSQL para garantir integridade e eficiência operacional.
+**Luft-ConnectAir** é uma aplicação web robusta desenvolvida em Python (Flask) projetada para a gestão de malhas aéreas, planejamento de rotas, controle de AWBs (Air Waybills), aeroportos, tarifas e logística. A arquitetura é baseada na separação de responsabilidades (Rotas, Serviços e Modelos), com suporte a múltiplos bancos de dados (SQL Server e PostgreSQL).
 
 ---
 
-## 🛠️ Tecnologias Utilizadas
+## 🛠️ Stack Tecnológica e Pré-requisitos
 
-O projeto foi construído utilizando uma stack moderna e eficiente:
+### Tecnologias Principais
+* **Backend:** Python 3.9+, Flask
+* **ORM e Banco de Dados:** SQLAlchemy, Microsoft SQL Server, PostgreSQL
+* **Frontend:** HTML5, CSS3, JavaScript (Jinja2 Templates)
+* **CI/CD:** GitHub Actions
+* **Servidor Web:** WSGI (Gunicorn/Waitress dependendo do ambiente)
 
-* **Backend:** Python 3.13+, Flask 3.1.2
-* **Banco de Dados:** SQL Server (Legado/Corporativo) e PostgreSQL (Novos módulos)
-* **ORM & Dados:** SQLAlchemy 2.0, Pandas, OpenPyXL
-* **Frontend:** HTML5, CSS3, Jinja2 (Templates)
-* **Autenticação:** Flask-Login (Integração com AD/Usuários SQL)
-* **Serviços:** NetworkX (Grafos de rotas), Waitress (WSGI Production)
+### Pré-requisitos de Ambiente
+1. **Python 3.9** ou superior instalado.
+2. **Gerenciador de pacotes PIP**.
+3. **Drivers de Banco de Dados**:
+   * ODBC Driver for SQL Server (necessário para a conexão com o SQL Server).
+   * Cliente PostgreSQL (para conexões Postgres).
+4. Acesso aos bancos de dados com as credenciais configuradas corretamente nas variáveis de ambiente.
 
 ---
 
-## 📂 Estrutura do Projeto
+## 🚀 Passo a Passo para Instalação e Execução
 
-Abaixo segue a árvore de diretórios do projeto, detalhando a organização dos módulos, rotas e serviços.
-
-```text
-Luft-ConnectAir/
-├── .env                       # Variáveis de ambiente
-├── .gitignore                 # Arquivos ignorados pelo Git
-├── App.py                     # Ponto de entrada da aplicação (Flask App)
-├── Conexoes.py                # Gerenciamento de conexões com Banco de Dados
-├── Configuracoes.py           # Configurações globais do sistema
-├── LICENSE                    # Licença do projeto
-├── README.md                  # Documentação do projeto
-├── StatusAWB.sql              # Scripts SQL auxiliares
-├── VERSION                    # Arquivo de controle de versão
-├── WSGI.py                    # Entry point para servidor de produção
-├── requirements.txt           # Dependências do Python
-│
-├── Data/                      # Arquivos de dados estáticos (Carga inicial/Importação)
-│   ├── cidades.xlsx - Plan1.csv
-│   ├── iata-icao.csv
-│   └── malha-aerea.xlsx - MALHA AÉREA.csv
-│
-├── Models/                    # Modelos de Dados (ORM)
-│   ├── UsuarioModel.py        # Modelo de Usuário do Sistema
-│   ├── POSTGRES/              # Modelos mapeados para PostgreSQL
-│   │   ├── Aeroporto.py
-│   │   ├── Base.py
-│   │   ├── Cidade.py
-│   │   ├── MalhaAerea.py
-│   │   └── VersaoSistema.py
-│   └── SQL_SERVER/            # Modelos mapeados para SQL Server
-│       ├── Awb.py
-│       ├── Cadastros.py
-│       ├── Ctc.py
-│       ├── Manifesto.py
-│       └── Usuario.py
-│
-├── Routes/                    # Rotas (Blueprints) e Controladores
-│   ├── Acompanhamento.py
-│   ├── Aeroportos.py
-│   ├── Auth.py
-│   ├── Cidades.py
-│   ├── Escalas.py
-│   ├── Malha.py
-│   └── Planejamento.py
-│
-├── Scripts/                   # Scripts de manutenção e automação
-│   ├── AtualizarBanco.py
-│   ├── DiagnosticoTabelas.py
-│   ├── GerarRelatorioCidades.py
-│   ├── GestaoVersao.py
-│   ├── InicializarBanco.py
-│   ├── RecriarAeroportos.py
-│   └── Teste.py
-│
-├── Services/                  # Regras de Negócio e Serviços
-│   ├── AcompanhamentoService.py
-│   ├── AeroportosService.py
-│   ├── AuthService.py
-│   ├── CidadesService.py
-│   ├── MalhaService.py
-│   ├── PlanejamentoService.py
-│   ├── VersaoService.py
-│   └── Shared/                # Serviços compartilhados
-│       └── GeoService.py      # Cálculos geográficos e geometria
-│
-├── Static/                    # Arquivos Estáticos (Frontend)
-│   └── CSS/
-│       ├── Global.css
-│       └── Temas.css
-│
-├── Templates/                 # Templates HTML (Jinja2)
-│   ├── Base.html              # Layout base
-│   ├── Dashboard.html         # Página inicial
-│   ├── Acompanhamento/
-│   │   └── Index.html
-│   ├── Aeroportos/
-│   │   └── Manager.html
-│   ├── Auth/
-│   │   └── Login.html
-│   ├── Cidades/
-│   │   └── Manager.html
-│   ├── Components/            # Modais e componentes reutilizáveis
-│   │   ├── _ModalAwb.html
-│   │   └── _ModalCtc.html
-│   ├── Escalas/
-│   │   └── Index.html
-│   ├── Malha/
-│   │   └── Manager.html
-│   └── Planejamento/
-│       ├── Editor.html
-│       ├── Index.html
-│       └── Map.html
-│
-└── Utils/                     # Utilitários e Helpers
-    ├── Formatadores.py
-    ├── Geometria.py
-    └── Texto.py
+### 1. Clonar o Repositório
+```bash
+git clone [https://github.com/widson64x/luft-connectair.git](https://github.com/widson64x/luft-connectair.git)
+cd luft-connectair
 
 ```
 
-## 🚀 Instalação e Execução
+### 2. Configurar o Ambiente Virtual
 
-### Pré-requisitos
+É altamente recomendado isolar as dependências do projeto.
 
-Certifique-se de ter o Python instalado.
-
-1. **Clonar o repositório:**
 ```bash
-git clone https://seu-repositorio/Luft-ConnectAir.git
-cd Luft-ConnectAir
-
-```
-
-
-2. **Criar e ativar o ambiente virtual:**
-```bash
+# Criar o ambiente virtual
 python -m venv venv
-# Windows:
+
+# Ativar no Windows:
 venv\Scripts\activate
-# Linux/Mac:
+# Ativar no Linux/Mac:
 source venv/bin/activate
 
 ```
 
+### 3. Instalar Dependências
 
-3. **Instalar as dependências:**
 ```bash
 pip install -r requirements.txt
 
 ```
 
+### 4. Configurar as Variáveis de Ambiente
 
-4. **Configurar Variáveis de Ambiente:**
-Crie um arquivo `.env` na raiz baseado nas configurações necessárias (Banco de dados, Chaves secretas).
-5. **Executar o Projeto:**
+Crie um arquivo `.env` na raiz do projeto (ou exporte as variáveis no seu SO) contendo as strings de conexão e chaves secretas necessárias (ex.: `DB_HOST`, `DB_USER`, `DB_PASS`, `SECRET_KEY`). As configurações globais são lidas em `Configuracoes.py` e `Conexoes.py`.
+
+### 5. Execução em Ambiente de Desenvolvimento (Local)
+
 ```bash
 python App.py
 
 ```
 
+A aplicação iniciará o servidor de desenvolvimento do Flask.
 
-O sistema estará disponível em `http://127.0.0.1:5000/`.
+### 6. Execução em Produção
 
+Em produção, utilize o arquivo `WSGI.py` com um servidor WSGI adequado (ex.: Gunicorn no Linux ou Waitress no Windows).
 
+```bash
+gunicorn WSGI:app --bind 0.0.0.0:8000
 
-## 📋 Funcionalidades Principais
-
-* **Planejamento de Malha:** Criação e visualização de rotas aéreas e escalas.
-* **Gestão de Aeroportos e Cidades:** CRUD completo com dados geográficos.
-* **Acompanhamento:** Monitoramento de status de AWB e Manifestos.
-* **Mapas Interativos:** Visualização geográfica das operações (Planejamento).
-* **Relatórios e Diagnósticos:** Scripts dedicados para integridade de dados.
+```
 
 ---
 
-© 2026 Luft-ConnectAir. Todos os direitos reservados.
+## 🌍 Acesso à Aplicação
+
+Por padrão, a aplicação roda localmente na porta `5000` (ou a definida no seu ambiente).
+
+* **URL Base (Dev):** `http://localhost:5000`
+* **Rotas Principais:**
+* `/auth/login` - Autenticação de usuários.
+* `/dashboard` - Painel principal do sistema.
+* `/planejamento` - Módulo de inteligência e planejamento de rotas (Acesso ao mapa e editor).
+* `/malha` - Gerenciamento da malha aérea.
+* `/acompanhamento` - Tracking de AWBs e voos.
+* `/tabelas-frete` - Gerenciamento de custos e tarifas.
+* `/configuracoes` - Configurações de Cias Aéreas e Permissões.
+
+
+
+---
+
+## 🔄 Fluxo Geral do Sistema (Arquitetura)
+
+A aplicação segue um padrão arquitetural limpo e modular:
+
+1. **Frontend (Templates/Static):** O usuário interage com as telas renderizadas pelo Jinja2. O JavaScript realiza requisições assíncronas (AJAX/Fetch API) para os endpoints.
+2. **Controladores (Routes/):** Os *Blueprints* do Flask recebem as requisições HTTP, lidam com a sessão/autenticação e repassam os dados para a camada de Serviços.
+3. **Regras de Negócio (Services/):** Aqui reside o "coração" da aplicação. Toda validação, lógica de roteamento (`RouteIntelligenceService.py`), cálculo geométrico e transformações de dados acontecem nesta camada, mantendo as rotas limpas.
+4. **Camada de Dados (Models/ & Conexoes.py):** Os serviços utilizam as classes do SQLAlchemy para realizar consultas e persistência em bancos SQL Server ou PostgreSQL.
+
+---
+
+## 📂 Estrutura e Árvore do Projeto
+
+Abaixo detalhamos a organização do diretório raiz:
+
+```text
+Luft-ConnectAir/
+├── .github/workflows/          # Scripts de CI/CD para deploy e controle de versão (Actions)
+├── _DEV/                       # Scripts auxiliares para desenvolvedores (Diagnósticos, MockDB, etc.)
+│   ├── AtualizarBanco.py
+│   ├── InicializarBanco.py
+│   └── ...
+├── Data/                       # Arquivos estáticos de massa de dados (CSVs, Excel para cargas de malha, aeroportos, etc.)
+├── Models/                     # Mapeamento ORM (Object-Relational Mapping) usando SQLAlchemy
+│   ├── POSTGRES/               # Entidades exclusivas do banco PostgreSQL
+│   ├── SQL_SERVER/             # Entidades mapeadas para o banco principal SQL Server (Aeroporto, AWB, Manifesto, etc.)
+│   └── UsuarioModel.py         # Modelo geral de autenticação
+├── Routes/                     # Controladores/Endpoints (Flask Blueprints) organizados por domínio
+│   ├── Global/                 # APIs globais e endpoints utilitários
+│   ├── Acompanhamento.py       # Rotas de tracking
+│   ├── Auth.py                 # Login e gerenciamento de sessão
+│   ├── Planejamento.py         # Endpoints para elaboração de rotas e malhas
+│   └── ...
+├── Scripts/                    # Scripts de utilidade geral e automação do sistema (ex: GestaoVersao.py)
+├── Services/                   # Camada de Regras de Negócio
+│   ├── Logic/                  # Inteligência de negócio complexa (ex: RouteIntelligenceService.py)
+│   ├── Shared/                 # Serviços compartilhados (Geolocalização, Voos, AWB)
+│   ├── PlanejamentoService.py  # Lógica de criação de planos de voo
+│   └── ...
+├── SQL/                        # Consultas SQL puras (Raw SQL) separadas para relatórios e views complexas
+├── Static/                     # Arquivos públicos front-end
+│   ├── CSS/                    # Folhas de estilo modulares (Global, Temas, componentes)
+│   ├── Img/                    # Assets visuais e logotipos das companhias (AZUL, GOL, LATAM)
+│   └── JS/                     # Lógica front-end dividida por contexto (Base, Planejamento, Aeroportos)
+├── Templates/                  # Views em HTML renderizadas pelo Jinja2
+│   ├── Components/             # Modais e fragmentos HTML reutilizáveis (ex: _ModalAwb.html)
+│   ├── Layouts base e pastas divididas por domínio (Dashboard, Planejamento, Configurações)
+│   └── Base.html               # Master page herdada pelos demais templates
+├── Utils/                      # Funções helpers genéricas (Formatação, Texto, Geometria)
+├── App.py                      # Arquivo de entrada para Desenvolvimento (App Factory/Setup)
+├── Conexoes.py                 # Gerenciamento central das instâncias de conexão e Session Makers
+├── Configuracoes.py            # Carregamento de variáveis de ambiente e setup da aplicação
+├── requirements.txt            # Lista de dependências e bibliotecas Python
+├── VERSION                     # Arquivo de controle estrito da versão atual do software
+└── WSGI.py                     # Entrypoint de execução para ambiente de Produção
+
+```
+
+### Detalhamento dos Diretórios Chave
+
+* **`_DEV/`**: Utilize esta pasta exclusivamente em ambiente local. Contém scripts destrutivos ou de setup, como o `InicializarBanco.py`. **Nunca** execute estes scripts em produção.
+* **`Services/Logic/RouteIntelligenceService.py`**: Principal motor da aplicação. É aqui que algoritmos de definição de rotas e interseções de malha aérea operam.
+* **`Templates/Components/`**: Mantenha a componentização visual aqui para evitar redundância de código nos templates principais.
+
+---
+
+## 🛡️ Boas Práticas e Observações para Desenvolvedores
+
+1. **Separação de Responsabilidades (SoC):**
+* **NÃO** escreva regras de negócio nas `Routes/`. As rotas devem apenas receber o Request, chamar uma função dentro de `Services/` e retornar o Response (JSON ou HTML).
+* **NÃO** faça consultas de banco de dados diretamente nos arquivos de Rota. Use os métodos criados nos *Services*.
+
+
+2. **Gerenciamento de Banco de Dados:**
+* A aplicação lida com dois SGBDs distintos (`POSTGRES` e `SQL_SERVER`). Certifique-se de importar e usar a conexão correta dependendo do contexto do dado. Referencie as pastas adequadas dentro de `Models/`.
+
+
+3. **Arquivos Estáticos e Cache:**
+* Caso faça alterações em `/Static/JS` ou `/Static/CSS`, garanta que os manipuladores de cache do navegador sejam atualizados, utilizando "cache busting" se necessário ou forçando recarregamento com `Ctrl+F5`.
+
+
+4. **Tratamento de Exceções:**
+* O fluxo de `Services/` deve levantar exceções (Raise) customizadas. O tratamento visual (mensagens de erro ao usuário) deve ser resolvido pelas `Routes/` e `Templates/`.
+
+
+5. **Versionamento:**
+* Qualquer nova release deve ter a numeração ajustada no arquivo `VERSION` e gerida através do script `Scripts/GestaoVersao.py`, que dispara os hooks corretos no `.github/workflows`.
+
+
+
+---
+
+*Documentação gerada para orientar novos desenvolvedores na manutenção e evolução contínua da plataforma Luft-ConnectAir.*
