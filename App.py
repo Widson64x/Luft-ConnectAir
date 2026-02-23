@@ -1,7 +1,6 @@
 from flask import Flask, render_template, redirect, url_for
 from flask_login import LoginManager, login_required, current_user
 import os 
-# Teste de atualizaçao
 
 from Conexoes import ObterSessaoSqlServer
 from Models.SQL_SERVER.Usuario import Usuario, UsuarioGrupo
