@@ -21,6 +21,7 @@ from Routes.TabelasFrete import FreteBp
 from Routes.Reversa import ReversaBp
 from Routes.Cortes import CortesBp
 from Routes.Global.Configuracoes import ConfiguracoesBp
+from Routes.ServicosClientes import ServicosClientesBp
 
 
 # --- REGISTRO DE ROTAS (BLUEPRINTS) ---
@@ -103,6 +104,7 @@ app.register_blueprint(ReversaBp, url_prefix=f'{Prefix}/Reversa')
 app.register_blueprint(MalhaBp, url_prefix=f'{Prefix}/Malha')
 app.register_blueprint(AeroportoBp, url_prefix=f'{Prefix}/Aeroportos')
 app.register_blueprint(CidadeBp, url_prefix=f'{Prefix}/Cidades')
+app.register_blueprint(ServicosClientesBp, url_prefix=f'{Prefix}/Servicos') # Exemplo de rota específica para um módulo
 app.register_blueprint(GlobalBp, url_prefix=f'{Prefix}/Global')
 
 

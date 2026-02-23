@@ -88,6 +88,10 @@
                            <span class="link-text">Horários de Corte</span>
                         </a>
                         {% endif %}
+                        <a href="{{ url_for('ServicosClientes.Gerenciar') }}" 
+                           class="menu-link {{ 'ativo' if request.endpoint and 'ServicosClientes' in request.endpoint else '' }}">
+                           <span class="link-text">Serviços dos Clientes</span>
+                        </a>
                     </div>
                 </div>
                 {% endif %}
