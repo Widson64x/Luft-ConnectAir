@@ -12,6 +12,23 @@ class CtcService:
     Acessível por qualquer módulo (Planejamento, Reversa, Monitoramento).
     """
 
+from datetime import datetime, date, time
+from decimal import Decimal
+from Conexoes import ObterSessaoSqlServer
+from Models.SQL_SERVER.Ctc import CtcEsp, CtcEspCpl
+from Models.SQL_SERVER.NfEsp import NfEsp       
+from Models.SQL_SERVER.Ocorrencia import Ocorrencia 
+from Services.LogService import LogService
+
+# Importe para buscar as regras do cliente dinamicamente
+from Services.PlanejamentoService import PlanejamentoService
+
+class CtcService:
+    """
+    Serviço Compartilhado para operações globais de CTC.
+    Acessível por qualquer módulo (Planejamento, Reversa, Monitoramento).
+    """
+
     @staticmethod
     def ObterCtcCompleto(filial, serie, ctc_num):
         """
@@ -61,6 +78,12 @@ class CtcService:
             else:
                 dados_completos['StatusCTC'] = 'N/A'
                 dados_completos['TipoCarga'] = 'N/A'
+
+            # ---------------------------------------------------------
+            # 3.1. NOVO: Captura as Regras do Cliente e Serviço Contratado
+            # ---------------------------------------------------------
+            cnpj_alvo = getattr(Ctc, 'respons_cgc', None) or getattr(Ctc, 'remet_cgc', None)
+            dados_completos['servico_contratado'] = PlanejamentoService.BuscarServicoContratadoCliente(cnpj_alvo)
 
             # ---------------------------------------------------------
             # 4. Busca e Serializa NOTAS FISCAIS (tb_nf_esp)

@@ -25,7 +25,7 @@ class ServicoClienteService:
                 and_(
                     Cliente.CNPJ_Cliente.isnot(None), # Filtro para remover clientes sem CNPJ
                     Cliente.CNPJ_Cliente.notlike('04.019.475%'), # Filtro para remover clientes com CNPJ específico
-                    ClienteServicoContratado.Data_FimOperacao.is_(None), # Data de fim nula indica serviço ativo
+                    # ClienteServicoContratado.Data_FimOperacao.is_(None), # Data de fim nula indica serviço ativo
                     ClienteServicoContratado.Opcao_ServicoContratado == 't' # Filtro de ativo da query
                 )
             ).order_by(Cliente.Nome_RazaoSocialCliente).all()

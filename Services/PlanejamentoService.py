@@ -8,6 +8,9 @@ from Models.SQL_SERVER.TabelaFrete import TabelaFrete, RemessaFrete
 from Models.SQL_SERVER.Aeroporto import Aeroporto, RemessaAeroportos
 from Models.SQL_SERVER.Cidade import Cidade, RemessaCidade
 from Models.SQL_SERVER.MalhaAerea import VooMalha , RemessaMalha
+from Models.SQL_SERVER.Cadastros import Cliente
+from Models.SQL_SERVER.ServicoCliente import ServicoCliente
+import re
 from Services.LogService import LogService 
 
 class PlanejamentoService:
@@ -285,6 +288,31 @@ class PlanejamentoService:
         return ListaDiario + ListaReversa + ListaBacklog
 
     @staticmethod
+    def BuscarServicoContratadoCliente(cnpj):
+        """
+        Busca o serviço contratado na Tb_PLN_ServicoCliente usando o CNPJ da tabela Cliente.
+        """
+        if not cnpj: return "PADRÃO"
+        Sessao = ObterSessaoSqlServer()
+        try:
+            # Limpa o CNPJ (remove pontos, traços e barras) para garantir o match
+            cnpj_limpo = re.sub(r'[^0-9]', '', str(cnpj))
+            
+            # Faz o JOIN lógico entre ServicoCliente e Cliente pelo Codigo_Cliente
+            res = Sessao.query(ServicoCliente.ServicoContratado)\
+                .join(Cliente, Cliente.Codigo_Cliente == ServicoCliente.CodigoCliente)\
+                .filter(
+                    func.replace(func.replace(func.replace(Cliente.CNPJ_Cliente, '.', ''), '/', ''), '-', '') == cnpj_limpo
+                ).first()
+            
+            return res[0] if res and res[0] else "PADRÃO"
+        except Exception as e:
+            LogService.Error("PlanejamentoService", "Erro em BuscarServicoContratadoCliente", e)
+            return "PADRÃO"
+        finally:
+            Sessao.close()
+
+    @staticmethod
     def ObterCtcDetalhado(Filial, Serie, Numero):
         """
         Captura detalhes completos do CTC a partir da Filial, Série e Número.
@@ -345,6 +373,11 @@ class PlanejamentoService:
             # 2. Captura o Tipo de Carga
             TipoCargaValor = CplEncontrado.TipoCarga if CplEncontrado else None
 
+            # 3. NOVO: Captura o CNPJ e o Serviço Contratado
+            # Tenta pegar o CNPJ do responsável pelo frete ou do remetente
+            cnpj_alvo = getattr(CtcEncontrado, 'remet_cgc', None) or getattr(CtcEncontrado, 'remet_cgc', None)
+            servico_contratado = PlanejamentoService.BuscarServicoContratadoCliente(cnpj_alvo)
+
             return {
                 'filial': CtcEncontrado.filial,
                 'serie': CtcEncontrado.seriectc,
@@ -363,7 +396,10 @@ class PlanejamentoService:
                 'valor': (CtcEncontrado.valmerc or 0),
                 'remetente': str(CtcEncontrado.remet_nome).strip(),
                 'destinatario': str(CtcEncontrado.dest_nome).strip(),
-                'tipo_carga': TipoCargaValor 
+                'tipo_carga': TipoCargaValor,
+
+                'cnpj_cliente': cnpj_alvo,
+                'servico_contratado': servico_contratado
             }
         except Exception as e:
             LogService.Error("PlanejamentoService", "Erro em ObterCtcDetalhado", e)
@@ -375,7 +411,7 @@ class PlanejamentoService:
     def BuscarCtcsConsolidaveis(cidade_origem, uf_origem, cidade_destino, uf_destino, data_base, filial_excluir=None, ctc_excluir=None, tipo_carga=None):
         """
         Busca CTCs do mesmo dia/rota/tipo.
-        CORREÇÃO: Agora retorna 'origem_uf' e 'destino_uf' para evitar erro no salvamento.
+        CORREÇÃO: Agora retorna 'origem_uf', 'destino_uf' e 'cnpj_cliente' para propagação no Lote.
         """
         Sessao = ObterSessaoSqlServer()
         try:
@@ -426,6 +462,9 @@ class PlanejamentoService:
                     h_raw = str(c.hora).strip().replace(':', '').zfill(4)
                     if len(h_raw) >= 4: str_hora = f"{h_raw[:2]}:{h_raw[2:]}"
 
+                # --- NOVO: Captura CNPJ ---
+                cnpj_alvo = getattr(c, 'remet_cgc', None) or getattr(c, 'remet_cgc', None)
+
                 ListaConsolidados.append({
                     'filial': to_str(c.filial),
                     'ctc': to_str(c.filialctc),
@@ -439,13 +478,13 @@ class PlanejamentoService:
                     'data_emissao': c.data,
                     'hora_emissao': str_hora,
                     
-                    # --- CORREÇÃO AQUI: Incluindo as UFs ---
                     'origem_cidade': to_str(c.cidade_orig),
                     'origem_uf': to_str(c.uf_orig),
                     'destino_cidade': to_str(c.cidade_dest),
                     'destino_uf': to_str(c.uf_dest),
                     
-                    'tipo_carga': tipo_candidato
+                    'tipo_carga': tipo_candidato,
+                    'cnpj_cliente': to_str(cnpj_alvo) # <--- Propagando o CNPJ
                 })
 
             return ListaConsolidados
@@ -459,7 +498,7 @@ class PlanejamentoService:
     def UnificarConsolidacao(ctc_principal, lista_candidatos):
         """
         Gera o Lote Virtual.
-        CORREÇÃO: Propaga Cidades, UFs, Data e Hora para os itens da lista 'lista_docs'.
+        CORREÇÃO: Propaga Cidades, UFs, Data, Hora, CNPJ e Serviço para os itens da lista 'lista_docs'.
         """
         try:
             if not lista_candidatos:
@@ -469,8 +508,10 @@ class PlanejamentoService:
                 return ctc_principal
 
             unificado = ctc_principal.copy()
+            unificado['servico_contratado'] = ctc_principal.get('servico_contratado', 'PADRÃO')
+            unificado['cnpj_cliente'] = ctc_principal.get('cnpj_cliente', '')
             
-            # 1. Garante que o item PRINCIPAL tenha os dados de Data/Hora e Local na lista
+            # 1. Garante que o item PRINCIPAL tenha os dados de Data/Hora, Local, CNPJ e Serviço na lista
             docs = [{
                 'filial': ctc_principal['filial'],
                 'serie': ctc_principal['serie'],
@@ -482,6 +523,10 @@ class PlanejamentoService:
                 'remetente': ctc_principal['remetente'],
                 'destinatario': ctc_principal['destinatario'],
                 'tipo_carga': ctc_principal['tipo_carga'],
+                
+                # --- NOVO: Garantindo CNPJ e Serviço no principal ---
+                'cnpj_cliente': ctc_principal.get('cnpj_cliente', ''),
+                'servico_contratado': ctc_principal.get('servico_contratado', 'PADRÃO'),
                 
                 # Dados de Data e Hora (Originais do Principal)
                 'data_emissao_real': ctc_principal.get('data_emissao_real'),
@@ -500,6 +545,9 @@ class PlanejamentoService:
             total_valor = docs[0]['valor']
 
             for c in lista_candidatos:
+                # --- NOVO: Busca serviço dinamicamente ---
+                serv_filho = PlanejamentoService.BuscarServicoContratadoCliente(c.get('cnpj_cliente', ''))
+
                 c_doc = {
                     'filial': c['filial'],
                     'serie': c['serie'],
@@ -511,6 +559,10 @@ class PlanejamentoService:
                     'remetente': c['remetente'],
                     'destinatario': c['destinatario'],
                     'tipo_carga': c['tipo_carga'],
+
+                    # --- NOVO: Propagando CNPJ e Serviço para os filhos ---
+                    'cnpj_cliente': c.get('cnpj_cliente', ''),
+                    'servico_contratado': serv_filho,
 
                     # Dados de Data e Hora (Vindos da busca de consolidados)
                     'data_emissao': c.get('data_emissao'),

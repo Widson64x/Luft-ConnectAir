@@ -357,12 +357,16 @@
         </div>
 
         <div class="col-4 box-card">
-            <div class="box-header"><i class="bi bi-box-arrow-up"></i> Remetente</div>
+            <div class="box-header"><i class="bi bi-star-fill" style="color:#f59e0b;"></i> Tomador & Regras de Serviço</div>
             <div class="box-body">
-                <div class="field-row">${kv('Razão Social', d.remet_nome, 'lg')}</div>
-                <div class="field-row">${kv('CNPJ', d.remet_cgc, 'mono')}</div>
+                <div class="field-row">${kv('Cliente / Pagador', d.respons_nome || d.remet_nome)}</div>
+                <div class="field-row">${kv('CNPJ', d.respons_cgc || d.remet_cgc, 'mono')}</div>
                 <hr style="margin:8px 0; border:0; border-top:1px dashed #e2e8f0;">
-                <div class="field-row">${kv('Endereço', `${ck(d.remet_cidade)} - ${ck(d.remet_uf)}`)}</div>
+                
+                <div class="field-row" style="background:#f0fdf4; padding:10px; border-radius:6px; border:1px solid #bbf7d0;">
+                    ${kv('Serviço Contratado', d.servico_contratado || 'PADRÃO', 'lg status-ok')}
+                    ${kv('Tipo de Carga', d.TipoCarga || 'N/A', 'lg')}
+                </div>
             </div>
         </div>
 
