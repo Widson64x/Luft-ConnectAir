@@ -1,15 +1,19 @@
 # ✈️ Luft-ConnectAir
 
-![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)
+![Python](https://img.shields.io/badge/python-3.9%2B-blue)
 ![Flask](https://img.shields.io/badge/Flask-black?logo=flask)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-D71F00?logo=sqlalchemy&logoColor=white)
 ![SQL Server](https://img.shields.io/badge/SQL_Server-CC292B?logo=microsoftsqlserver&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?logo=javascript&logoColor=black)
+![HTML5](https://img.shields.io/badge/HTML5-E34F26?logo=html5&logoColor=white)
+![CSS3](https://img.shields.io/badge/CSS3-1572B6?logo=css3&logoColor=white)
+
 [![Deploy Automatico](https://github.com/widson64x/luft-connectair/actions/workflows/deploy.yml/badge.svg)](https://github.com/widson64x/luft-connectair/actions/workflows/deploy.yml)
+![GitHub last commit](https://img.shields.io/github/last-commit/widson64x/luft-connectair)
+![GitHub repo size](https://img.shields.io/github/repo-size/widson64x/luft-connectair)
 ![License](https://img.shields.io/github/license/widson64x/luft-connectair)
 
 **Luft-ConnectAir** é uma aplicação web robusta desenvolvida em Python (Flask) projetada para a gestão de malhas aéreas, planejamento de rotas, controle de AWBs (Air Waybills), aeroportos, tarifas e logística. A arquitetura é baseada na separação de responsabilidades (Rotas, Serviços e Modelos), com suporte a múltiplos bancos de dados (SQL Server e PostgreSQL).
-
----
 
 ## 🛠️ Stack Tecnológica e Pré-requisitos
 
@@ -27,8 +31,6 @@
    * ODBC Driver for SQL Server (necessário para a conexão com o SQL Server).
    * Cliente PostgreSQL (para conexões Postgres).
 4. Acesso aos bancos de dados com as credenciais configuradas corretamente nas variáveis de ambiente.
-
----
 
 ## 🚀 Passo a Passo para Instalação e Execução
 
@@ -83,8 +85,6 @@ gunicorn WSGI:app --bind 0.0.0.0:8000
 
 ```
 
----
-
 ## 🌍 Acesso à Aplicação
 
 Por padrão, a aplicação roda localmente na porta `5000` (ou a definida no seu ambiente).
@@ -101,7 +101,6 @@ Por padrão, a aplicação roda localmente na porta `5000` (ou a definida no seu
 
 
 
----
 
 ## 🔄 Fluxo Geral do Sistema (Arquitetura)
 
@@ -112,7 +111,6 @@ A aplicação segue um padrão arquitetural limpo e modular:
 3. **Regras de Negócio (Services/):** Aqui reside o "coração" da aplicação. Toda validação, lógica de roteamento (`RouteIntelligenceService.py`), cálculo geométrico e transformações de dados acontecem nesta camada, mantendo as rotas limpas.
 4. **Camada de Dados (Models/ & Conexoes.py):** Os serviços utilizam as classes do SQLAlchemy para realizar consultas e persistência em bancos SQL Server ou PostgreSQL.
 
----
 
 ## 📂 Estrutura e Árvore do Projeto
 
@@ -167,7 +165,6 @@ Luft-ConnectAir/
 * **`Services/Logic/RouteIntelligenceService.py`**: Principal motor da aplicação. É aqui que algoritmos de definição de rotas e interseções de malha aérea operam.
 * **`Templates/Components/`**: Mantenha a componentização visual aqui para evitar redundância de código nos templates principais.
 
----
 
 ## 🛡️ Boas Práticas e Observações para Desenvolvedores
 
