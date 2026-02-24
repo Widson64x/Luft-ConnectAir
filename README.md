@@ -2,11 +2,10 @@
 
 ![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)
 ![Flask](https://img.shields.io/badge/Flask-black?logo=flask)
-![SQL_ALCHEMY]()
+![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-D71F00?logo=sqlalchemy&logoColor=white)
+![SQL Server](https://img.shields.io/badge/SQL_Server-CC292B?logo=microsoftsqlserver&logoColor=white)
 [![Deploy Automatico](https://github.com/widson64x/luft-connectair/actions/workflows/deploy.yml/badge.svg)](https://github.com/widson64x/luft-connectair/actions/workflows/deploy.yml)
 ![License](https://img.shields.io/github/license/widson64x/luft-connectair)
-
-```markdown
 
 **Luft-ConnectAir** é uma aplicação web robusta desenvolvida em Python (Flask) projetada para a gestão de malhas aéreas, planejamento de rotas, controle de AWBs (Air Waybills), aeroportos, tarifas e logística. A arquitetura é baseada na separação de responsabilidades (Rotas, Serviços e Modelos), com suporte a múltiplos bancos de dados (SQL Server e PostgreSQL).
 
