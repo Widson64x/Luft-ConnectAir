@@ -50,8 +50,8 @@ class AcompanhamentoService:
         session = AcompanhamentoService._ObterSessaoSql()
         try:
             # Inicia a query base unindo com a tabela de Cia Aérea para pegar o nome fantasia
-            query = session.query(Awb, CompanhiaAerea.fantasia)\
-                .outerjoin(CompanhiaAerea, Awb.cia.collate('DATABASE_DEFAULT') == CompanhiaAerea.codcia.collate('DATABASE_DEFAULT'))
+            query = session.query(Awb, CompanhiaAerea.Fantasia)\
+                .outerjoin(CompanhiaAerea, Awb.cia.collate('DATABASE_DEFAULT') == CompanhiaAerea.CodCia.collate('DATABASE_DEFAULT'))
 
             # --- APLICAÇÃO DOS FILTROS ---
             if filtros:

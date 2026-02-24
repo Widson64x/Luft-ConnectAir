@@ -180,23 +180,24 @@ class MalhaService:
 
     # --- NOVO MÉTODO AUXILIAR PARA CÁLCULO DE CUSTO ---
     @staticmethod
-    def CalcularCustoRota(lista_voos, peso_total):
+    def CalcularCustoRota(lista_voos, peso_total, lista_servicos_alvo=None): # <--- ADICIONAR AQUI
         """
         Percorre os voos da rota e calcula o custo individualmente, 
-        garantindo que a Cia Aérea do TRECHO seja respeitada.
+        garantindo que a Cia Aérea do TRECHO seja respeitada e o 
+        Serviço Contratado force a tabela correta.
         """
         custo_total = 0.0
         detalhes_financeiros = []
         sem_tarifa_flag = False
 
         for i, voo in enumerate(lista_voos):
-            # Chama o serviço de Tabela de Frete para cada perna
-            #
+            # Passa a lista_servicos_alvo em vez do servico_contratado genérico
             custo_trecho, info_frete = TabelaFreteService.CalcularCustoEstimado(
                 voo.AeroportoOrigem, 
                 voo.AeroportoDestino, 
-                voo.CiaAerea, # <--- AQUI GARANTIMOS QUE USA A CIA DO VOO (DB)
-                peso_total
+                voo.CiaAerea, 
+                peso_total,
+                lista_servicos_preferenciais=lista_servicos_alvo 
             )
 
             # Verifica se houve falha na tarifação (retorno da flag tarifa_missing)
@@ -215,10 +216,24 @@ class MalhaService:
             'detalhes': detalhes_financeiros,
             'sem_tarifa': sem_tarifa_flag
         }
-
+    
     # --- MÉTODO PRINCIPAL DE BUSCA ---
     @staticmethod
-    def BuscarOpcoesDeRotas(data_inicio, data_fim, lista_origens, lista_destinos, peso_total=100.0):
+    def BuscarOpcoesDeRotas(data_inicio, data_fim, lista_origens, lista_destinos, peso_total=100.0, tipo_carga=None, servico_contratado=None):
+        """Rota inteligente que busca opções de rotas na malha aérea, calcula métricas, e aplica inteligência para categorização.
+
+        Args:
+            data_inicio (_type_): Recebe a data de início para filtro dos voos (pode ser datetime ou date)
+            data_fim (_type_): Recebe a data de fim para filtro dos voos (pode ser datetime ou date)
+            lista_origens (_type_): Recebe uma lista de IATAs de origem ou um único IATA como string
+            lista_destinos (_type_): Recebe uma lista de IATAs de destino ou um único IATA como string
+            peso_total (float, optional): Recebe o peso total da carga para cálculo de custo. Defaults to 100.0.
+            tipo_carga (_type_, optional): Recebe o tipo de carga (ex: PERECIVEL, GERAL). Defaults to None.
+            servico_contratado (_type_, optional): Recebe o serviço contratado pelo cliente (ex: EXPRESSO, PADRÃO). Defaults to None.
+
+        Returns:
+            dict: Retorna um dicionário com as categorias de rotas e suas respectivas opções formatadas para exibição.
+        """
         Sessao = ObterSessaoSqlServer()
         ResultadosFormatados = {
             'recomendada': [], 'direta': [], 'rapida': [], 
@@ -269,6 +284,7 @@ class MalhaService:
                     G.add_edge(OrigemNo, DestinoNo, voos=[Voo])
             
             ListaCandidatos = []
+            lista_servicos_alvo = RouteIntelligenceService._DeParaServicoIdeal(servico_contratado, tipo_carga)
 
             # 4. Processamento de Rotas
             for origem_iata in lista_origens:
@@ -292,7 +308,7 @@ class MalhaService:
                         TrocasCia = MalhaService._ContarTrocasCia(SequenciaVoos)
                         QtdEscalas = len(SequenciaVoos) - 1
                         
-                        DadosFinanceiros = MalhaService.CalcularCustoRota(SequenciaVoos, peso_total)
+                        DadosFinanceiros = MalhaService.CalcularCustoRota(SequenciaVoos, peso_total, lista_servicos_alvo)
 
                         # Cálculo de Parceria (Média)
                         # Nota: Como filtramos Scores <= 0 antes, aqui a média será sempre > 0
@@ -318,7 +334,13 @@ class MalhaService:
 
             # 5. Inteligência
             LogService.Info("MalhaDebug", f"Aplicando Inteligência em {len(ListaCandidatos)} candidatos...")
-            OpcoesBrutas = RouteIntelligenceService.OtimizarOpcoes(ListaCandidatos)
+            
+            # --- AQUI: Repassando os novos parâmetros para o Otimizador ---
+            OpcoesBrutas = RouteIntelligenceService.OtimizarOpcoes(
+                ListaCandidatos, 
+                tipo_carga=tipo_carga, 
+                servico_contratado=servico_contratado
+            )
 
             # 6. Formatação e Cache
             DadosAeroportos = {}

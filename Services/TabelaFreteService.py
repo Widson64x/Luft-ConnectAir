@@ -149,34 +149,30 @@ class TabelaFreteService:
             Sessao.close()
             
     @staticmethod
-    def CalcularCustoEstimado(origem, destino, cia, peso):
-        """
-        Estratégia Tripla com Tratamento de NULL (Penalidade Virtual)
-        CORREÇÃO: O Fallback SQL agora respeita a Cia Aérea para evitar mistura de dados (Logo GOL com Tarifa LATAM).
-        """
+    def CalcularCustoEstimado(origem, destino, cia, peso, lista_servicos_preferenciais=None):
         Sessao = ObterSessaoSqlServer()
         try:
             cia_normalizada = TabelaFreteService._NormalizarNomeCia(cia)
             origem = origem.strip().upper()
             destino = destino.strip().upper()
 
-            # --- ESTRATEGIA 1: ORM Match Exato (Ignorando NULLs) ---
+            # --- ESTRATEGIA 1: ORM Match na Lista de Inteligência ---
             QueryBase = Sessao.query(TabelaFrete).join(RemessaFrete).filter(
                 RemessaFrete.Ativo == True,
                 func.upper(func.trim(TabelaFrete.Origem)) == origem,
                 func.upper(func.trim(TabelaFrete.Destino)) == destino,
                 TabelaFrete.Tarifa != None 
-            )
+            ).filter(TabelaFrete.CiaAerea.like(f"%{cia_normalizada}%"))
 
-            Item = QueryBase.filter(TabelaFrete.CiaAerea.like(f"%{cia_normalizada}%")).order_by(TabelaFrete.Tarifa.asc()).first()
+            Item = None
             
-            # --- ESTRATEGIA 2: Fallback ORM (Qualquer Cia Válida) ---
-            # ATENÇÃO: Se quiser ser RÍGIDO e nunca misturar cias, comente este bloco if/Item!
-            # Mas geralmente mantemos para ter algum preço de referência se a cia principal falhar.
-            # Se o problema persistir, podemos remover isso também.
+            # Tenta buscar qualquer serviço que esteja na lista ideal (IN do SQL)
+            if lista_servicos_preferenciais:
+                Item = QueryBase.filter(TabelaFrete.Servico.in_(lista_servicos_preferenciais)).order_by(TabelaFrete.Tarifa.asc()).first()
+
+            # --- ESTRATEGIA 2: Fallback ORM (Mais barato) ---
             if not Item:
-                # Tenta buscar especificamente a cia solicitada primeiro
-                pass 
+                Item = QueryBase.order_by(TabelaFrete.Tarifa.asc()).first()
 
             # Retorno ORM
             if Item and Item.Tarifa is not None:

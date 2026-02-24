@@ -13,8 +13,11 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='CSS/Planejamento/Editor.css') }}">
 
 <style>
+    /* ========================================================
+       ADAPTADO PARA O THEME.CSS (MODO CLARO E ESCURO)
+       ======================================================== */
     .status-alert {
-        background: rgba(16, 185, 129, 0.1);
+        background: rgba(var(--cor-sucesso-rgb), 0.1);
         border: 1px solid var(--cor-sucesso);
         color: var(--cor-sucesso);
         padding: 12px;
@@ -26,22 +29,64 @@
     }
     .hidden { display: none !important; }
     
-    /* Botões Extras */
+    /* Botões Extras (Adaptados) */
     .btn-danger { 
-        background-color: #ef4444 !important; color: white !important; 
+        background-color: var(--cor-erro) !important; 
+        color: #ffffff !important; /* Texto branco mantém o contraste no perigo */
         border: none; padding: 10px 20px; border-radius: 6px; 
         cursor: pointer; display: inline-flex; align-items: center; gap: 8px; 
         font-weight: 500; transition: 0.2s; 
     }
-    .btn-danger:hover { background-color: #dc2626 !important; }
+    .btn-danger:hover { filter: brightness(0.9); }
     
     .btn-secondary { 
-        background-color: #6b7280 !important; color: white !important; 
+        background-color: var(--cor-texto-secundario) !important; 
+        color: var(--cor-fundo-painel) !important; /* Inverte a cor para dar contraste */
         border: none; padding: 10px 20px; border-radius: 6px; 
         cursor: pointer; display: inline-flex; align-items: center; gap: 8px; 
         font-weight: 500; transition: 0.2s; 
     }
-    .btn-secondary:hover { background-color: #4b5563 !important; }
+    .btn-secondary:hover { filter: brightness(0.9); }
+
+    /* Badges Inteligência (Cores baseadas no Tema) */
+    .badge-inteligencia {
+        padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; 
+        display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+    }
+    
+    .bg-carga { 
+        background: rgba(var(--cor-info-rgb), 0.15); 
+        color: var(--cor-info); 
+        border: 1px solid rgba(var(--cor-info-rgb), 0.3); 
+    }
+    
+    .bg-servico { 
+        background: rgba(var(--cor-sucesso-rgb), 0.15); 
+        color: var(--cor-sucesso); 
+        border: 1px solid rgba(var(--cor-sucesso-rgb), 0.3); 
+    }
+    
+    .bg-cliente { 
+        background: var(--cor-fundo-principal); 
+        color: var(--cor-texto-principal); 
+        border: 1px solid var(--cor-borda); 
+        max-width: 250px; overflow: hidden; text-overflow: ellipsis; 
+    }
+
+    /* Modal Extra Largo compatível com Dark Mode */
+    .glass-modal-xl {
+        background: var(--cor-fundo-painel);
+        border: 1px solid var(--cor-borda);
+        color: var(--cor-texto-principal);
+        border-radius: 12px;
+        width: 95%; 
+        max-width: 1600px;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+        box-shadow: var(--sombra-card);
+        overflow: hidden;
+    }
 </style>
 
 <div class="map-wrapper">
@@ -75,6 +120,18 @@
                 <span>{{ Ctc.filial }}-{{ Ctc.serie }}-{{ Ctc.ctc }}</span> • 
                 <span>Fís: {{ Ctc.peso_fisico|float|round(2) }} | Tax: <strong>{{ Ctc.peso_taxado|float|round(2) }} kg</strong></span> • 
                 <span>R$ {{ "{:,.2f}".format(Ctc.valor) }}</span>
+            </div>
+
+            <div style="margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap;">
+                <span class="badge-inteligencia bg-carga" title="Tipo de Carga">
+                    <i class="ph-bold ph-package"></i> {{ Ctc.tipo_carga or 'GERAL' }}
+                </span>
+                <span class="badge-inteligencia bg-servico" title="Serviço Contratado">
+                    <i class="ph-bold ph-handshake"></i> {{ Ctc.servico_contratado or 'PADRÃO' }}
+                </span>
+                <span class="badge-inteligencia bg-cliente" title="{{ Ctc.remetente }} - {{ Ctc.cnpj_cliente or Ctc.remet_cgc }}">
+                    <i class="ph-bold ph-user"></i> {{ Ctc.remetente[:15] }}... ({{ Ctc.cnpj_cliente or Ctc.remet_cgc }})
+                </span>
             </div>
         </div>
 
@@ -145,40 +202,69 @@
 
 {% if Ctc.is_consolidado %}
 <div id="modal-lote-backdrop" class="modal-backdrop hidden" onclick="FecharModalLote(event)">
-    <div class="glass-modal-large">
+    <div class="glass-modal-xl">
         <div class="modal-header">
-            <h3><i class="ph-duotone ph-stack"></i> Composição do Lote</h3>
+            <h3 style="color: var(--cor-texto-principal); margin: 0;"><i class="ph-duotone ph-stack"></i> Composição do Lote ({{ Ctc.qtd_docs }} docs)</h3>
             <button class="btn-close" onclick="FecharModalLote(null)"><i class="ph-bold ph-x"></i></button>
         </div>
         
         <div class="modal-body-scroll">
-            <table class="glass-table">
+            <table class="glass-table" style="font-size: 0.85rem; width: 100%;">
                 <thead>
                     <tr>
-                        <th>Documento</th>
-                        <th>Destinatário</th>
-                        <th class="text-center">Vol</th>
-                        <th class="text-right">Peso</th>
-                        <th class="text-right">Valor</th>
+                        <th style="width: 12%;">Documento</th>
+                        <th style="width: 15%;">CNPJ Cliente</th>
+                        <th style="width: 20%;">Remetente</th>
+                        <th style="width: 20%;">Destinatário</th>
+                        <th style="width: 10%;">Tipo Carga</th>
+                        <th style="width: 12%;">Serviço</th>
+                        <th class="text-center" style="width: 5%;">Vol</th>
+                        <th class="text-right" style="width: 8%;">Peso</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for doc in Ctc.lista_docs %}
                     <tr>
-                        <td class="fw-bold">{{ doc.filial }}-{{ doc.serie }}-{{ doc.ctc }}</td>
-                        <td>{{ doc.destinatario[:25] }}...</td>
-                        <td class="text-center">{{ doc.volumes }}</td>
-                        <td class="text-right">{{ doc.peso_fisico|float|round(2) }} kg</td>
-                        <td class="text-right">R$ {{ "{:,.2f}".format(doc.valor) }}</td>
+                        <td class="fw-bold" style="color: var(--cor-texto-principal);">{{ doc.filial }}-{{ doc.serie }}-{{ doc.ctc }}</td>
+                        
+                        <td style="font-family: monospace; color: var(--cor-texto-secundario);">
+                            {{ doc.cnpj_cliente or doc.remet_cgc }}
+                        </td>
+
+                        <td title="{{ doc.remetente }}">
+                            <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; color: var(--cor-texto-principal);">
+                                <i class="ph-bold ph-user" style="color: var(--cor-texto-secundario);"></i> {{ doc.remetente }}
+                            </div>
+                        </td>
+
+                        <td title="{{ doc.destinatario }}">
+                             <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; color: var(--cor-texto-principal);">
+                                <i class="ph-bold ph-map-pin" style="color: var(--cor-texto-secundario);"></i> {{ doc.destinatario }}
+                             </div>
+                        </td>
+
+                        <td>
+                            <span class="badge-inteligencia bg-carga">
+                                {{ doc.tipo_carga or 'GERAL' }}
+                            </span>
+                        </td>
+
+                        <td>
+                            <span class="badge-inteligencia bg-servico">
+                                {{ doc.servico_contratado or 'PADRÃO' }}
+                            </span>
+                        </td>
+
+                        <td class="text-center" style="color: var(--cor-texto-principal);">{{ doc.volumes }}</td>
+                        <td class="text-right" style="color: var(--cor-texto-principal);">{{ doc.peso_fisico|float|round(2) }} kg</td>
                     </tr>
                     {% endfor %}
                 </tbody>
                 <tfoot>
                     <tr>
-                        <td colspan="2" class="text-right fw-bold">TOTAL DO LOTE:</td>
-                        <td class="text-center fw-bold">{{ Ctc.volumes }}</td>
-                        <td class="text-right fw-bold">{{ Ctc.peso_fisico|float|round(2) }} kg</td>
-                        <td class="text-right fw-bold">R$ {{ "{:,.2f}".format(Ctc.valor) }}</td>
+                        <td colspan="6" class="text-right fw-bold" style="padding-right: 15px; color: var(--cor-texto-principal);">TOTAL DO LOTE:</td>
+                        <td class="text-center fw-bold" style="color: var(--cor-texto-principal);">{{ Ctc.volumes }}</td>
+                        <td class="text-right fw-bold" style="color: var(--cor-texto-principal);">{{ Ctc.peso_fisico|float|round(2) }} kg</td>
                     </tr>
                 </tfoot>
             </table>

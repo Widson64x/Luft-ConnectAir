@@ -90,8 +90,15 @@ def MontarPlanejamento(filial, serie, ctc):
         if PesoTotal <= 0: PesoTotal = float(DadosUnificados.get('peso_fisico', 10.0))
         DataLimite = DataInicioBusca + timedelta(days=5) 
         
+        # Repassando os novos parâmetros para a busca na malha e inteligência
         OpcoesRotas = MalhaService.BuscarOpcoesDeRotas(
-            DataInicioBusca, DataLimite, IatasOrigem, IatasDestino, PesoTotal
+            DataInicioBusca, 
+            DataLimite, 
+            IatasOrigem, 
+            IatasDestino, 
+            PesoTotal,
+            tipo_carga=DadosUnificados.get('tipo_carga'),
+            servico_contratado=DadosUnificados.get('servico_contratado')
         )
 
     return render_template('Planejamento/Editor.html', 
