@@ -1,8 +1,12 @@
 from datetime import datetime, date, time, timedelta
 from decimal import Decimal
+import pandas as pd
+import io
+from sqlalchemy.orm import joinedload
 from sqlalchemy import desc, func, text
 from Conexoes import ObterSessaoSqlServer, ObterSessaoSqlServer
 from Models.SQL_SERVER.Ctc import CtcEsp, CtcEspCpl
+from Models.SQL_SERVER.NfEsp import NfEsp
 from Models.SQL_SERVER.Planejamento import PlanejamentoCabecalho, PlanejamentoItem, PlanejamentoTrecho
 from Models.SQL_SERVER.TabelaFrete import TabelaFrete, RemessaFrete
 from Models.SQL_SERVER.Aeroporto import Aeroporto, RemessaAeroportos
@@ -67,6 +71,7 @@ class PlanejamentoService:
            and left(c.respons_cgc,8) <> '02426290'
            and (m.cancelado is null OR m.cancelado = 'S')
            and (m.motivo NOT in ('TRA','RED') OR m.motivo IS NULL)
+           and cl.StatusCTC NOT IN ('CTC CANCELADO')
 
            -- FILTRO DE AWB (Novo método sem duplicar linhas)
            -- Verifica se NÃO existe um AWB válido vinculado a este CTC
@@ -368,8 +373,9 @@ class PlanejamentoService:
                 except: pass
 
             DataEmissaoReal = datetime.combine(DataBase.date(), HoraFinal)
-            DataBuscaVoos = DataEmissaoReal + timedelta(hours=10)
-
+            # Pegar o dia de hoje para comparação
+            # DataBuscaVoos = DataEmissaoReal + timedelta(hours=10)
+            DataBuscaVoos = datetime.now() + timedelta(hours=10) # Busca dinâmica a partir do momento atual, não mais atrelada à data de emissão
             # 2. Captura o Tipo de Carga
             TipoCarga = CplEncontrado.TipoCarga if CplEncontrado else None
 
@@ -600,11 +606,14 @@ class PlanejamentoService:
                               aero_origem=None, aero_destino=None, lista_trechos=None):
         SessaoPG = ObterSessaoSqlServer()
         if not SessaoPG: 
-            LogService.Error("PlanejamentoService", "Falha de conexão com Postgres ao tentar RegistrarPlanejamento.")
+            LogService.Error("PlanejamentoService", "Falha de conexão com banco ao tentar RegistrarPlanejamento.")
             return None
 
         try:
             LogService.Info("PlanejamentoService", f"Iniciando Gravação de Planejamento. Usuário: {usuario}")
+
+            # --- Importação local da NfEsp (Caso não tenha colocado no topo do arquivo) ---
+            from Models.SQL_SERVER.NfEsp import NfEsp
 
             # --- HELPER FUNCTIONS (Lookup) ---
             def buscar_id_cidade(nome, uf):
@@ -726,14 +735,14 @@ class PlanejamentoService:
                 dados_ctc_principal['IndConsolidado'] = False
                 todos_docs.append(dados_ctc_principal)
 
-            # Salva os Itens (Cada CTC com sua Data/Hora/Peso Individuais)
+            # Salva os Itens (Desmembrando por NF)
             for doc in todos_docs:
                 cidade_orig = str(doc.get('origem_cidade', ''))
                 uf_orig = str(doc.get('origem_uf') or doc.get('uf_orig', ''))
                 cidade_dest = str(doc.get('destino_cidade', ''))
                 uf_dest = str(doc.get('destino_uf') or doc.get('uf_dest', ''))
                 
-                # --- AQUI: Extraindo Data/Hora de CADA doc individualmente ---
+                # Extraindo Data/Hora
                 data_doc = doc.get('data_emissao_real') 
                 if not data_doc: 
                     data_doc = doc.get('data_emissao')
@@ -741,7 +750,6 @@ class PlanejamentoService:
                 hora_doc = doc.get('hora_formatada')
                 if not hora_doc:
                     hora_doc = doc.get('hora_emissao')
-                # -------------------------------------------------------------
 
                 id_cid_orig = buscar_id_cidade(cidade_orig, uf_orig)
                 id_cid_dest = buscar_id_cidade(cidade_dest, uf_dest)
@@ -749,24 +757,57 @@ class PlanejamentoService:
                 if not id_cid_orig: raise Exception(f"Cidade Origem '{cidade_orig}-{uf_orig}' não encontrada/inativa para CTC {doc.get('ctc')}")
                 if not id_cid_dest: raise Exception(f"Cidade Destino '{cidade_dest}-{uf_dest}' não encontrada/inativa para CTC {doc.get('ctc')}")
 
-                SessaoPG.add(PlanejamentoItem(
-                    IdPlanejamento=Cabecalho.IdPlanejamento,
-                    Filial=str(doc['filial']),
-                    Serie=str(doc['serie']),
-                    Ctc=str(doc['ctc']),
-                    DataEmissao=data_doc,   # Data específica deste CTC
-                    Hora=str(hora_doc),     # Hora específica deste CTC
-                    Remetente=str(doc.get('remetente',''))[:100],
-                    Destinatario=str(doc.get('destinatario',''))[:100],
-                    OrigemCidade=cidade_orig[:50],
-                    DestinoCidade=cidade_dest[:50],
-                    IdCidadeOrigem=id_cid_orig,
-                    IdCidadeDestino=id_cid_dest,
-                    Volumes=int(doc.get('volumes', 0)),
-                    PesoTaxado=float(doc.get('peso_taxado', 0) or doc.get('peso', 0)), 
-                    ValMercadoria=float(doc.get('valor', 0) or doc.get('val_mercadoria', 0)),
-                    IndConsolidado=doc.get('IndConsolidado', False)
-                ))
+                # --- NOVO: BUSCA AS NFs DO CTC NA TABELA ESPELHO ---
+                NfsBanco = SessaoPG.query(NfEsp).filter(
+                    NfEsp.filialctc == str(doc['ctc'])
+                ).all()
+
+                if NfsBanco and len(NfsBanco) > 0:
+                    QtdNotas = len(NfsBanco)
+                    # Cria um registro na tabela PlanejamentoItem para CADA NF
+                    for nf_obj in NfsBanco:
+                        SessaoPG.add(PlanejamentoItem(
+                            IdPlanejamento=Cabecalho.IdPlanejamento,
+                            Filial=str(doc['filial']),
+                            Serie=str(doc['serie']),
+                            Ctc=str(doc['ctc']),
+                            NotaFiscal=str(nf_obj.numnf).strip() if nf_obj.numnf else '',
+                            DataEmissao=data_doc,   
+                            Hora=str(hora_doc),     
+                            Remetente=str(doc.get('remetente',''))[:100],
+                            Destinatario=str(doc.get('destinatario',''))[:100],
+                            OrigemCidade=cidade_orig[:50],
+                            DestinoCidade=cidade_dest[:50],
+                            IdCidadeOrigem=id_cid_orig,
+                            IdCidadeDestino=id_cid_dest,
+                            
+                            # Rateio dos valores do CTC entre as notas para não duplicar somatórios
+                            Volumes=int(doc.get('volumes', 0)) // QtdNotas,
+                            PesoTaxado=float(doc.get('peso_taxado', 0) or doc.get('peso', 0)) / QtdNotas, 
+                            ValMercadoria=float(doc.get('valor', 0) or doc.get('val_mercadoria', 0)) / QtdNotas,
+                            IndConsolidado=doc.get('IndConsolidado', False)
+                        ))
+                else:
+                    # Fallback (Garantia de segurança): Se o CTC não tiver NF no banco, salva preenchendo o CTC na coluna
+                    SessaoPG.add(PlanejamentoItem(
+                        IdPlanejamento=Cabecalho.IdPlanejamento,
+                        Filial=str(doc['filial']),
+                        Serie=str(doc['serie']),
+                        Ctc=str(doc['ctc']),
+                        NotaFiscal=str(doc['ctc']),
+                        DataEmissao=data_doc,
+                        Hora=str(hora_doc),
+                        Remetente=str(doc.get('remetente',''))[:100],
+                        Destinatario=str(doc.get('destinatario',''))[:100],
+                        OrigemCidade=cidade_orig[:50],
+                        DestinoCidade=cidade_dest[:50],
+                        IdCidadeOrigem=id_cid_orig,
+                        IdCidadeDestino=id_cid_dest,
+                        Volumes=int(doc.get('volumes', 0)),
+                        PesoTaxado=float(doc.get('peso_taxado', 0) or doc.get('peso', 0)), 
+                        ValMercadoria=float(doc.get('valor', 0) or doc.get('val_mercadoria', 0)),
+                        IndConsolidado=doc.get('IndConsolidado', False)
+                    ))
 
             # 2. GRAVA OS TRECHOS
             if lista_trechos and len(lista_trechos) > 0:
@@ -953,5 +994,81 @@ class PlanejamentoService:
             SessaoPG.rollback()
             LogService.Error("PlanejamentoService", "Erro ao cancelar", e)
             return False, str(e)
+        finally:
+            SessaoPG.close()
+
+    @staticmethod
+    def GerarExcelPlanejamentos():
+        SessaoPG = ObterSessaoSqlServer()
+        try:
+            # Busca os itens de planejamento otimizada para evitar múltiplas consultas
+            ItensPlanejados = SessaoPG.query(PlanejamentoItem).options(
+                joinedload(PlanejamentoItem.Cabecalho).joinedload(PlanejamentoCabecalho.Trechos),
+                joinedload(PlanejamentoItem.CidadeOrigemObj),
+                joinedload(PlanejamentoItem.CidadeDestinoObj)
+            ).join(PlanejamentoCabecalho).filter(
+                PlanejamentoCabecalho.Status != 'Cancelado'
+            ).all()
+
+            DadosPlanilha = []
+
+            for Item in ItensPlanejados:
+                Cabecalho = Item.Cabecalho
+                TrechoPrincipal = None
+                
+                # Identifica o primeiro trecho do planejamento para compor os dados aéreos
+                if Cabecalho.Trechos:
+                    TrechosOrdenados = sorted(Cabecalho.Trechos, key=lambda t: t.Ordem)
+                    if TrechosOrdenados:
+                        TrechoPrincipal = TrechosOrdenados[0]
+
+                # Tenta resgatar a UF das entidades de Cidade, se estiverem preenchidas
+                UfOrigem = Item.CidadeOrigemObj.Uf if Item.CidadeOrigemObj and hasattr(Item.CidadeOrigemObj, 'Uf') else ''
+                UfDestino = Item.CidadeDestinoObj.Uf if Item.CidadeDestinoObj and hasattr(Item.CidadeDestinoObj, 'Uf') else ''
+                
+                # Formatação dos horários
+                CorteFmt = TrechoPrincipal.HorarioCorte.strftime('%H:%M') if TrechoPrincipal and TrechoPrincipal.HorarioCorte else ''
+                DataPartidaFmt = TrechoPrincipal.DataPartida.strftime('%d/%m/%Y %H:%M') if TrechoPrincipal and TrechoPrincipal.DataPartida else ''
+
+                Linha = {
+                    'UF ORIGEM': UfOrigem,
+                    'UNIDADE RESPONSÁVEL LAST MILE': '', # Vazio conforme solicitado
+                    'TIPO': '', # Vazio por enquanto
+                    'CIA': TrechoPrincipal.CiaAerea if TrechoPrincipal else '',
+                    'SERVIÇO': TrechoPrincipal.TipoServico if TrechoPrincipal else '',
+                    'CORTE': CorteFmt,
+                    'NOTA FISCAL': Item.NotaFiscal if Item.NotaFiscal else Item.Ctc,
+                    'CLIENTE': Item.Remetente,
+                    'RAZÃO SOCIAL DESTINATÁRIO': Item.Destinatario,
+                    'CIDADE DESTINO': Item.DestinoCidade,
+                    'UF DESTINO': UfDestino,
+                    'VOLUMES': Item.Volumes,
+                    'PESO': float(Item.PesoTaxado) if Item.PesoTaxado else 0.0,
+                    'VALOR NF': float(Item.ValMercadoria) if Item.ValMercadoria else 0.0,
+                    
+                    # Colunas Extras Valiosas
+                    'ID PLANEJAMENTO': Cabecalho.IdPlanejamento,
+                    'STATUS': Cabecalho.Status,
+                    'FILIAL': Item.Filial,
+                    'SÉRIE': Item.Serie,
+                    'CTC': Item.Ctc,
+                    'VOO': TrechoPrincipal.NumeroVoo if TrechoPrincipal else '',
+                    'DATA PARTIDA': DataPartidaFmt
+                }
+                DadosPlanilha.append(Linha)
+
+            # Geração do DataFrame e exportação via BytesIO (não grava em disco)
+            DfPlanilha = pd.DataFrame(DadosPlanilha)
+            ArquivoMemoria = io.BytesIO()
+            
+            with pd.ExcelWriter(ArquivoMemoria, engine='openpyxl') as EscritorExcel:
+                DfPlanilha.to_excel(EscritorExcel, index=False, sheet_name='Planejamentos')
+            
+            ArquivoMemoria.seek(0)
+            return ArquivoMemoria
+
+        except Exception as ErroProcessamento:
+            LogService.Error("PlanejamentoService", "Erro ao Gerar Excel dos Planejamentos", ErroProcessamento)
+            return None
         finally:
             SessaoPG.close()

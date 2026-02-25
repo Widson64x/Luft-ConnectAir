@@ -39,6 +39,7 @@ class PlanejamentoItem(Base):
     Filial = Column(String(10))
     Serie = Column(String(5))
     Ctc = Column(String(20))
+    NotaFiscal = Column(String(50))
     DataEmissao = Column(DateTime)
     Hora = Column(String(5))
     Remetente = Column(String(100))

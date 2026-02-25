@@ -17,6 +17,10 @@
             </div>
         </div>
         <div class="user-area">
+            <a href="{{ url_for('Planejamento.ExportarPlanejamentosExcel') }}" class="btn-icon-only" title="Exportar Excel" style="background-color: #217346; color: white; border: none; margin-right: 8px;">
+                <i class="ph-bold ph-microsoft-excel-logo"></i>
+            </a>
+            
             <a href="{{ url_for('Planejamento.MapaGlobal') }}" class="btn-icon-only" title="Mapa Global"><i class="ph-bold ph-globe-hemisphere-west"></i></a>
         </div>
     </div>

@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, jsonify, request
+from flask import Blueprint, render_template, jsonify, request, send_file
 from flask_login import login_required, current_user
 from datetime import timedelta, datetime, date
 
@@ -186,7 +186,27 @@ def SalvarPlanejamento():
     except Exception as e:
         LogService.Error("Routes.Planejamento", "Exceção não tratada ao salvar planejamento", e)
         return jsonify({'sucesso': False, 'msg': str(e)}), 500
+
+@PlanejamentoBp.route('/API/Exportar')
+@login_required
+@RequerPermissao('planejamento.visualizar')
+def ExportarPlanejamentosExcel():
+    LogService.Info("Routes.Planejamento", f"Usuário {current_user.id} solicitou exportação de planejamento.")
     
+    ArquivoGerado = PlanejamentoService.GerarExcelPlanejamentos()
+    
+    if not ArquivoGerado:
+        return "Erro ao gerar o arquivo de planejamento.", 500
+
+    NomeArquivo = f'Planejamento_Aereo_{datetime.now().strftime("%Y%m%d_%H%M")}.xlsx'
+    
+    return send_file(
+        ArquivoGerado,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=NomeArquivo
+    )
+
 @PlanejamentoBp.route('/Mapa-Global')
 @login_required
 @RequerPermissao('planejamento.mapa')
