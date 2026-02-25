@@ -177,8 +177,8 @@ class TabelaFreteService:
             # Retorno ORM
             if Item and Item.Tarifa is not None:
                 vl_tarifa = float(Item.Tarifa)
-                # Garante que devolvemos o nome da cia da tarifa encontrada, para o front saber se houve troca
                 return vl_tarifa * float(peso), {
+                    'id_frete': Item.Id, # <--- ADICIONADO AQUI
                     'tarifa_base': vl_tarifa,
                     'servico': Item.Servico,
                     'cia_tarifaria': Item.CiaAerea, 
@@ -187,22 +187,20 @@ class TabelaFreteService:
                 }
             
             # --- ESTRATEGIA 3: HARDCORE SQL (Fallback Final) ---
-            # CORREÇÃO: Adicionado filtro de CIA para não pegar tarifa da concorrência
             LogService.Warning("TarifaMiss", f"ORM falhou para {origem}->{destino} ({cia_normalizada}). Tentando SQL Direto...")
             
+            # <--- ADICIONADO F.Id NO SELECT ABAIXO
             sql_raw = text("""
-                SELECT TOP 1 F.Tarifa, F.Servico, F.CiaAerea
+                SELECT TOP 1 F.Id, F.Tarifa, F.Servico, F.CiaAerea
                 FROM intec.dbo.Tb_PLN_Frete F
                 INNER JOIN intec.dbo.Tb_PLN_RemessaFrete RF ON F.IdRemessa = RF.Id
                 WHERE RF.Ativo = 1 
                   AND RTRIM(LTRIM(F.Origem)) = :origem 
                   AND RTRIM(LTRIM(F.Destino)) = :destino
-                  AND F.CiaAerea LIKE :cia  -- <--- O FILTRO QUE FALTAVA
-                -- Ordena: Preços válidos primeiro, NULL por último
+                  AND F.CiaAerea LIKE :cia  
                 ORDER BY CASE WHEN F.Tarifa IS NULL THEN 1 ELSE 0 END, F.Tarifa ASC
             """)
             
-            # Passamos o parâmetro cia com wildcards para flexibilidade (ex: %GOL%)
             param_cia = f"%{cia_normalizada}%"
             result = Sessao.execute(sql_raw, {'origem': origem, 'destino': destino, 'cia': param_cia}).first()
             
@@ -210,15 +208,17 @@ class TabelaFreteService:
                 if result.Tarifa is None:
                     LogService.Warning("TarifaNull", f"Tarifa NULL (Bloqueada) para {origem}->{destino}. Aplica Penalidade.")
                     return 0.0, {
+                        'id_frete': result.Id, # <--- ADICIONADO AQUI
                         'tarifa_base': 0.0,
                         'servico': result.Servico,
                         'cia_tarifaria': result.CiaAerea,
                         'peso_calculado': float(peso),
-                        'tarifa_missing': True # Penalidade
+                        'tarifa_missing': True
                     }
                 else:
                     vl_tarifa = float(result.Tarifa)
                     return vl_tarifa * float(peso), {
+                        'id_frete': result.Id, # <--- ADICIONADO AQUI
                         'tarifa_base': vl_tarifa,
                         'servico': result.Servico,
                         'cia_tarifaria': result.CiaAerea,

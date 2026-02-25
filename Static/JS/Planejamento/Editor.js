@@ -264,6 +264,7 @@ function RenderizarRotaNoMapa(listaTrechos) {
 
         // -- DADOS FINANCEIROS (Backend) --
         const baseCalc = trecho.base_calculo || {};
+        const idFrete = baseCalc.id_frete || 'N/A'; 
         const tarifa = baseCalc.tarifa || 0;
         const servico = baseCalc.servico || 'STD';
         
@@ -298,8 +299,8 @@ function RenderizarRotaNoMapa(listaTrechos) {
         });
         const planeMarker = L.marker([midLat, midLon], { icon: planeIcon }).addTo(routeLayerGroup);
 
-        // Popup Rico
-        const popupContent = `
+    // Popup Rico
+    const popupContent = `
             <div class="flight-popup-card">
                 <div class="popup-header" style="border-left: 4px solid ${ciaInfo.color}">
                     <div class="cia-info">
@@ -328,6 +329,9 @@ function RenderizarRotaNoMapa(listaTrechos) {
                     </div>
 
                     <div class="popup-finance-grid">
+                        <div class="fin-item">
+                            <span class="label">ID Frete</span>
+                            <span class="value">#${idFrete}</span> </div>
                         <div class="fin-item">
                             <span class="label">Serviço</span>
                             <span class="value">${servico}</span>
@@ -406,6 +410,7 @@ function RenderizarTimeline(listaTrechos) {
         
         // -- DADOS FINANCEIROS (Backend) --
         const baseCalc = trecho.base_calculo || {};
+        const idFrete = baseCalc.id_frete || 'N/A'; // <--- RESGATANDO O ID AQUI
         const tarifa = baseCalc.tarifa || 0;
         const servico = baseCalc.servico || 'STD';
         // Uso direto
@@ -438,6 +443,11 @@ function RenderizarTimeline(listaTrechos) {
                 </div>
 
                 <div class="flight-footer">
+                    <div class="info-badge">
+                        <span class="label">ID Frete</span>
+                        <br>
+                        <span class="value">#${idFrete}</span>
+                    </div>
                     <div class="info-badge">
                         <span class="label">Serviço</span>
                         <br>
@@ -512,10 +522,10 @@ window.ConfirmarPlanejamento = function() {
             chegada_iso: InverterData(trecho.data) + 'T' + trecho.horario_chegada + ':00',
             
             // Mapeando dados para salvar
-            servico: base.servico || null,
+            id_frete: base.id_frete || null,         // <--- ENVIANDO O ID PARA O BACKEND
+            tipo_servico: base.servico || null,      // <--- ATUALIZADO A CHAVE PARA tipo_servico
             valor_tarifa: base.tarifa || 0,
             peso_cobrado: base.peso_usado || 0,
-            // (Opcional) Passar o custo calculado se o backend de salvamento precisar
             custo_calculado: base.custo_trecho || 0
         };
     });

@@ -12,7 +12,12 @@ class CorteService:
         sessao = ObterSessaoSqlServer()
         try:
             filiais = sessao.query(Filial).filter(Filial.filial != None).order_by(Filial.filial).all()
-            return [{'id': f.id, 'codigo': f.filial, 'nome': f.nomefilial, 'uf': f.uf} for f in filiais]
+            lista = [{'id': f.id, 'codigo': f.filial, 'nome': f.nomefilial, 'uf': f.uf} for f in filiais]
+            
+            # Adiciona a opção "Todas" no início da lista
+            lista.insert(0, {'id': 0, 'codigo': 'TODAS', 'nome': 'TODAS AS FILIAIS', 'uf': '*'})
+            
+            return lista
         except Exception as e:
             LogService.Error("CorteService", "Erro ao listar filiais", e)
             return []
@@ -81,61 +86,68 @@ class CorteService:
             sessao.close()
 
     @staticmethod
-    def _GerarSequenciaCorte(sessao, cod_filial):
+    def _GerarSequenciaCorte(sessao, filial_str):
         """
         Gera o próximo número de corte para uma filial específica.
-        Se já existir corte 1 e 2, retorna 3.
         """
+        # Usando text() para FORÇAR a busca na coluna de texto 'Filial',
+        # impedindo que o ORM converta a busca para o 'CodFilial' sem querermos.
         max_corte = sessao.query(func.max(CortePlanejamento.Corte))\
-            .filter(CortePlanejamento.CodFilial == cod_filial, CortePlanejamento.Ativo == True)\
+            .filter(text("Filial = :filial"), CortePlanejamento.Ativo == True)\
+            .params(filial=filial_str)\
             .scalar()
         
         return (max_corte or 0) + 1
 
     @staticmethod
     def SalvarCortePlanejamento(dados, usuario_responsavel):
-        """
-        usuario_responsavel: String com o login/nome do usuário logado
-        """
         sessao = ObterSessaoSqlServer()
         try:
             id_corte = dados.get('id')
             cod_filial_str = dados.get('filial')
             descricao = dados.get('descricao')
             horario_str = dados.get('horario')
-
             horario_obj = datetime.strptime(horario_str, '%H:%M').time()
-            filial_obj = sessao.query(Filial).filter(Filial.filial == cod_filial_str).first()
-            
-            if not filial_obj: raise Exception("Filial não encontrada")
 
-            if id_corte:
-                # --- EDIÇÃO ---
-                entidade = sessao.query(CortePlanejamento).get(id_corte)
-                if not entidade: raise Exception("Corte não encontrado")
-                
-                # Atualiza auditoria
-                entidade.UsuarioAlteracao = usuario_responsavel
-                entidade.DataAlteracao = datetime.now()
+            # Identifica se é para todas as filiais (Apenas na criação)
+            if cod_filial_str == 'TODAS' and not id_corte:
+                filiais_processar = sessao.query(Filial).filter(Filial.filial != None).all()
             else:
-                # --- CRIAÇÃO ---
-                entidade = CortePlanejamento()
-                
-                # Gera o sequencial (1, 2, 3) apenas na criação
-                entidade.Corte = CorteService._GerarSequenciaCorte(sessao, filial_obj.codfilial)
-                
-                # Auditoria de criação
-                entidade.UsuarioCriacao = usuario_responsavel
-                entidade.DataCriacao = datetime.now()
-                
-                sessao.add(entidade)
+                filial_obj = sessao.query(Filial).filter(Filial.filial == cod_filial_str).first()
+                if not filial_obj: raise Exception("Filial não encontrada")
+                filiais_processar = [filial_obj]
 
-            # Campos comuns
-            entidade.Filial = filial_obj.filial
-            entidade.CodFilial = filial_obj.codfilial
-            entidade.Descricao = descricao
-            entidade.HorarioCorte = horario_obj
-            entidade.Ativo = True
+            # Dicionário para rastrear os cortes em memória. Muito mais rápido e evita bug de insert em lote!
+            sequencias_memoria = {}
+
+            for f in filiais_processar:
+                if id_corte:
+                    # --- EDIÇÃO ---
+                    entidade = sessao.query(CortePlanejamento).get(id_corte)
+                    if not entidade: continue
+                    entidade.UsuarioAlteracao = usuario_responsavel
+                    entidade.DataAlteracao = datetime.now()
+                else:
+                    # --- CRIAÇÃO ---
+                    entidade = CortePlanejamento()
+                    
+                    # Checa o dicionário primeiro: se a filial não está lá, busca no banco. Se está, apenas soma +1.
+                    if f.filial not in sequencias_memoria:
+                        sequencias_memoria[f.filial] = CorteService._GerarSequenciaCorte(sessao, f.filial)
+                    else:
+                        sequencias_memoria[f.filial] += 1
+                        
+                    entidade.Corte = sequencias_memoria[f.filial]
+                    
+                    entidade.UsuarioCriacao = usuario_responsavel
+                    entidade.DataCriacao = datetime.now()
+                    sessao.add(entidade)
+
+                entidade.Filial = f.filial
+                entidade.CodFilial = f.codfilial
+                entidade.Descricao = descricao
+                entidade.HorarioCorte = horario_obj
+                entidade.Ativo = True
 
             sessao.commit()
             return True, "Salvo com sucesso"
@@ -153,31 +165,33 @@ class CorteService:
             id_corte = dados.get('id')
             cod_filial_str = dados.get('filial')
             horario_str = dados.get('horario')
-            # Pega a nova descrição da emissão (pode ser opcional)
-            descricao = dados.get('descricao') 
-
+            descricao = dados.get('descricao')
             horario_obj = datetime.strptime(horario_str, '%H:%M').time()
-            filial_obj = sessao.query(Filial).filter(Filial.filial == cod_filial_str).first()
-            
-            if not filial_obj: raise Exception("Filial não encontrada")
 
-            if id_corte:
-                # --- EDIÇÃO ---
-                entidade = sessao.query(CorteEmissao).get(id_corte)
-                entidade.UsuarioAlteracao = usuario_responsavel
-                entidade.DataAlteracao = datetime.now()
+            if cod_filial_str == 'TODAS' and not id_corte:
+                filiais_processar = sessao.query(Filial).filter(Filial.filial != None).all()
             else:
-                # --- CRIAÇÃO ---
-                entidade = CorteEmissao()
-                entidade.UsuarioCriacao = usuario_responsavel
-                entidade.DataCriacao = datetime.now()
-                sessao.add(entidade)
+                filial_obj = sessao.query(Filial).filter(Filial.filial == cod_filial_str).first()
+                if not filial_obj: raise Exception("Filial não encontrada")
+                filiais_processar = [filial_obj]
 
-            entidade.Filial = filial_obj.filial
-            entidade.CodFilial = filial_obj.codfilial
-            entidade.HorarioLimite = horario_obj
-            entidade.Descricao = descricao # Novo campo
-            entidade.Ativo = True
+            for f in filiais_processar:
+                if id_corte:
+                    entidade = sessao.query(CorteEmissao).get(id_corte)
+                    if not entidade: continue
+                    entidade.UsuarioAlteracao = usuario_responsavel
+                    entidade.DataAlteracao = datetime.now()
+                else:
+                    entidade = CorteEmissao()
+                    entidade.UsuarioCriacao = usuario_responsavel
+                    entidade.DataCriacao = datetime.now()
+                    sessao.add(entidade)
+
+                entidade.Filial = f.filial
+                entidade.CodFilial = f.codfilial
+                entidade.HorarioLimite = horario_obj
+                entidade.Descricao = descricao
+                entidade.Ativo = True
 
             sessao.commit()
             return True, "Salvo com sucesso"

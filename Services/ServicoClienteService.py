@@ -24,7 +24,7 @@ class ServicoClienteService:
             ).filter(
                 and_(
                     Cliente.CNPJ_Cliente.isnot(None), # Filtro para remover clientes sem CNPJ
-                    Cliente.CNPJ_Cliente.notlike('04.019.475%'), # Filtro para remover clientes com CNPJ específico
+                    #Cliente.CNPJ_Cliente.notlike('04.019.475%'), # Filtro para remover clientes com CNPJ específico
                     # ClienteServicoContratado.Data_FimOperacao.is_(None), # Data de fim nula indica serviço ativo
                     ClienteServicoContratado.Opcao_ServicoContratado == 't' # Filtro de ativo da query
                 )
@@ -64,7 +64,7 @@ class ServicoClienteService:
                 Cliente.Nome_RazaoSocialCliente,
                 Cliente.Nome_FantasiaCliente,
                 ClienteGrupo.Descricao_ClienteGrupo.label('Grupo')
-            ).join(
+            ).outerjoin( # <--- MUDE DE .join PARA .outerjoin AQUI
                 ClienteGrupo, Cliente.Codigo_ClienteGrupo == ClienteGrupo.Codigo_ClienteGrupo
             ).filter(
                 Cliente.Codigo_Cliente == CodigoCliente
@@ -78,7 +78,7 @@ class ServicoClienteService:
                 "Cnpj": ClienteEncontrado.CNPJ_Cliente,
                 "RazaoSocial": ClienteEncontrado.Nome_RazaoSocialCliente,
                 "Fantasia": ClienteEncontrado.Nome_FantasiaCliente,
-                "Grupo": ClienteEncontrado.Grupo
+                "Grupo": ClienteEncontrado.Grupo if ClienteEncontrado.Grupo else "Z_Sem Grupo" # Prevenção extra
             }
         finally:
             Db.close()

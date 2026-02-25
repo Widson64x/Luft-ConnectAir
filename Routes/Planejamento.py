@@ -63,7 +63,8 @@ def MontarPlanejamento(filial, serie, ctc):
     CtcsCandidatos = PlanejamentoService.BuscarCtcsConsolidaveis(
         DadosCtc['origem_cidade'], DadosCtc['origem_uf'],
         DadosCtc['destino_cidade'], DadosCtc['destino_uf'],
-        DadosCtc['data_emissao_real'], filial, ctc, DadosCtc['tipo_carga']
+        DadosCtc['data_emissao_real'], filial, ctc, DadosCtc['tipo_carga'],
+        servico_alvo=DadosCtc.get('servico_contratado') # <--- BLINDAGEM ATIVADA AQUI
     )
     DadosUnificados = PlanejamentoService.UnificarConsolidacao(DadosCtc, CtcsCandidatos)
 
@@ -143,7 +144,8 @@ def SalvarPlanejamento():
             DadosCtc['origem_cidade'], DadosCtc['origem_uf'],
             DadosCtc['destino_cidade'], DadosCtc['destino_uf'],
             DadosCtc['data_emissao_real'], filial, ctc,
-            DadosCtc['tipo_carga']
+            DadosCtc['tipo_carga'],
+            servico_alvo=DadosCtc.get('servico_contratado') # <--- BLINDAGEM ATIVADA AQUI TAMBÉM
         )
         DadosUnificados = PlanejamentoService.UnificarConsolidacao(DadosCtc, CtcsCandidatos)
         

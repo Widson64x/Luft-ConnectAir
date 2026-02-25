@@ -1,5 +1,6 @@
 from datetime import datetime, date, time, timedelta
 from decimal import Decimal
+import random
 import pandas as pd
 import io
 from sqlalchemy.orm import joinedload
@@ -50,6 +51,9 @@ class PlanejamentoService:
                        ,ISNULL(cl.TipoCarga, '') AS Tipo_carga
                        ,c.nfs as Notas
                        ,CAST(c.qtdenfs AS INT) as QtdNotas
+                       ,c.remet_cgc as RemetCGC   -- <--- ADICIONAR ESSA LINHA
+                       ,c.dest_cgc as DestCGC     -- <--- ADICIONAR ESSA LINHA
+                       ,c.respons_cgc as ResponsCGC
          FROM intec.dbo.tb_ctc_esp c (nolock)
                   INNER JOIN intec.dbo.tb_ctc_esp_cpl cl (nolock) on cl.filialctc = c.filialctc
 
@@ -150,11 +154,14 @@ class PlanejamentoService:
             chave = f"{to_str(row.Filial)}-{to_str(row.Serie)}-{to_str(row.CTC)}"
             info = MapaCache.get(chave)
             
+            # --- NOVA LÓGICA DE INVERSÃO PARA DEV ---
+            is_dev = to_str(row.MotivoCTC) == 'DEV'
+            remetente_final = to_str(row.Destinatario) if is_dev else to_str(row.Remetente)
+            destinatario_final = to_str(row.Remetente) if is_dev else to_str(row.Destinatario)
             
-            #print(f"Cabeçalho Row: {row} | Chave: {chave} | Info Cache: {info}")  # Log de debug para verificar a chave e o cache
             Lista.append({
                 'id_unico': f"{to_str(row.Filial)}-{to_str(row.CTC)}",
-                'origem_dados': NomeBloco,  # <--- IMPORTANTE: DIARIO, REVERSA ou BACKLOG
+                'origem_dados': NomeBloco,
                 'filial': to_str(row.Filial),
                 'ctc': to_str(row.CTC),
                 'serie': to_str(row.Serie),
@@ -166,8 +173,11 @@ class PlanejamentoService:
                 'origem': f"{to_str(row.CidadeOrigem)}/{to_str(row.UFOrigem)}",
                 'destino': f"{to_str(row.CidadeDestino)}/{to_str(row.UFDestino)}",
                 'unid_lastmile': to_str(row.UnidadeDestino),
-                'remetente': to_str(row.Remetente),
-                'destinatario': to_str(row.Destinatario),
+                
+                # Nomes aplicados com a lógica DEV
+                'remetente': remetente_final,
+                'destinatario': destinatario_final,
+                
                 'volumes': to_int(row.Volumes),
                 'peso_fisico': to_float(row.PesoFisico), # Novo campo para display
                 'peso_taxado': to_float(row.PesoTaxado), # Campo MESTRE para cálculo
@@ -293,27 +303,55 @@ class PlanejamentoService:
         return ListaDiario + ListaReversa + ListaBacklog
 
     @staticmethod
-    def BuscarServicoContratadoCliente(cnpj):
+    def BuscarServicoContratadoCliente(*cnpjs):
         """
-        Busca o serviço contratado na Tb_PLN_ServicoCliente usando o CNPJ da tabela Cliente.
+        Busca o serviço verificando Remetente, Destinatário e Responsável ao mesmo tempo.
+        Retorna o serviço EXPRESSO se qualquer um deles tiver o contrato.
         """
-        if not cnpj: return "PADRÃO"
         Sessao = ObterSessaoSqlServer()
         try:
-            # Limpa o CNPJ (remove pontos, traços e barras) para garantir o match
-            cnpj_limpo = re.sub(r'[^0-9]', '', str(cnpj))
+            from sqlalchemy import or_ # Import local para não dar erro
             
-            # Faz o JOIN lógico entre ServicoCliente e Cliente pelo Codigo_Cliente
-            res = Sessao.query(ServicoCliente.ServicoContratado)\
-                .join(Cliente, Cliente.Codigo_Cliente == ServicoCliente.CodigoCliente)\
-                .filter(
-                    func.replace(func.replace(func.replace(Cliente.CNPJ_Cliente, '.', ''), '/', ''), '-', '') == cnpj_limpo
-                ).first()
+            lista_cnpjs_limpos = []
+            for cnpj in cnpjs:
+                if cnpj:
+                    limpo = re.sub(r'[^0-9]', '', str(cnpj))
+                    if len(limpo) >= 8 and limpo[:8] not in lista_cnpjs_limpos:
+                        lista_cnpjs_limpos.append(limpo[:8])
             
-            return res[0] if res and res[0] else "PADRÃO"
+            if not lista_cnpjs_limpos:
+                return "STANDARD"
+
+            print(f"\n--- DEBUG DE SERVIÇO (MÚLTIPLOS CNPJS) ---")
+            print(f"Buscando pelas raízes no banco: {lista_cnpjs_limpos}")
+            
+            filtros = []
+            for raiz in lista_cnpjs_limpos:
+                filtros.append(Cliente.CNPJ_Cliente.like(f"{raiz[:2]}.{raiz[2:5]}.{raiz[5:8]}%"))
+                filtros.append(Cliente.CNPJ_Cliente.like(f"{raiz}%"))
+                
+            ClientesEncontrados = Sessao.query(Cliente.Codigo_Cliente).filter(or_(*filtros)).all()
+
+            if not ClientesEncontrados:
+                return "STANDARD"
+                
+            lista_codigos = [cli.Codigo_Cliente for cli in ClientesEncontrados]
+            
+            # Busca se tem algum serviço diferente de STANDARD para qualquer um dos CNPJs envolvidos
+            Servico = Sessao.query(ServicoCliente).filter(
+                ServicoCliente.CodigoCliente.in_(lista_codigos),
+                ServicoCliente.ServicoContratado != 'STANDARD' 
+            ).first()
+            
+            if Servico:
+                print(f"-> SUCESSO! Serviço Master Encontrado: {Servico.ServicoContratado}\n")
+                return Servico.ServicoContratado
+            else:
+                return "STANDARD"
+
         except Exception as e:
             LogService.Error("PlanejamentoService", "Erro em BuscarServicoContratadoCliente", e)
-            return "PADRÃO"
+            return "STANDARD"
         finally:
             Sessao.close()
 
@@ -379,9 +417,20 @@ class PlanejamentoService:
             # 2. Captura o Tipo de Carga
             TipoCarga = CplEncontrado.TipoCarga if CplEncontrado else None
 
-            # 3. NOVO: Captura o CNPJ e o Serviço Contratado
-            # Tenta pegar o CNPJ do responsável pelo frete ou do remetente
-            cnpj_alvo = getattr(CtcEncontrado, 'remet_cgc', None) or getattr(CtcEncontrado, 'remet_cgc', None)
+            # --- CORREÇÃO E NOVA LÓGICA DE INVERSÃO (CNPJ e Nomes) ---
+            is_dev = CtcEncontrado.motivodoc == 'DEV'
+            
+            if is_dev:
+                # Na Reversa: Tenta pegar o Responsável primeiro, se não tiver, pega o Destino
+                cnpj_alvo = getattr(CtcEncontrado, 'respons_cgc', None) or getattr(CtcEncontrado, 'dest_cgc', None)
+                remetente_nome = str(CtcEncontrado.dest_nome).strip()
+                destinatario_nome = str(CtcEncontrado.remet_nome).strip()
+            else:
+                # Processo Normal: Tenta pegar o Responsável (ex: Astellas), se não tiver, pega o Remetente
+                cnpj_alvo = getattr(CtcEncontrado, 'respons_cgc', None) or getattr(CtcEncontrado, 'remet_cgc', None)
+                remetente_nome = str(CtcEncontrado.remet_nome).strip()
+                destinatario_nome = str(CtcEncontrado.dest_nome).strip()
+
             servico_contratado = PlanejamentoService.BuscarServicoContratadoCliente(cnpj_alvo)
 
             return {
@@ -397,11 +446,13 @@ class PlanejamentoService:
                 'destino_uf': str(CtcEncontrado.uf_dest).strip(),
                 
                 'peso_fisico': float(CtcEncontrado.peso or 0),
-                'peso_taxado': float(CtcEncontrado.pesotax or 0), # Prioridade Aérea
+                'peso_taxado': float(CtcEncontrado.pesotax or 0),
                 'volumes': int(CtcEncontrado.volumes or 0),
                 'valor': (CtcEncontrado.valmerc or 0),
-                'remetente': str(CtcEncontrado.remet_nome).strip(),
-                'destinatario': str(CtcEncontrado.dest_nome).strip(),
+                
+                # Retorna os nomes já tratados
+                'remetente': remetente_nome,
+                'destinatario': destinatario_nome,
                 'tipo_carga': TipoCarga,
 
                 'cnpj_cliente': cnpj_alvo,
@@ -414,83 +465,100 @@ class PlanejamentoService:
             Sessao.close()
 
     @staticmethod
-    def BuscarCtcsConsolidaveis(cidade_origem, uf_origem, cidade_destino, uf_destino, data_base, filial_excluir=None, ctc_excluir=None, tipo_carga=None):
+    def BuscarCtcsConsolidaveis(cidade_origem, uf_origem, cidade_destino, uf_destino, data_base, filial_excluir=None, ctc_excluir=None, tipo_carga=None, servico_alvo=None):
         """
-        Busca CTCs do mesmo dia/rota/tipo.
-        Agora retorna 'origem_uf', 'destino_uf' e 'cnpj_cliente' para propagação no Lote.
+        Busca CTCs da mesma Rota/Tipo, IGNORANDO a Data de Emissão.
+        Varre todo o 'pool' pendente (Diário, Backlog, Reversa) validado pela _QueryBase.
+        AGORA FILTRA:
+        - CTCs que já possuem planejamento ativo.
+        - CTCs que possuem Serviço Contratado diferente do alvo (EXPRESSO vs ECONÔMICO/STANDARD).
         """
         Sessao = ObterSessaoSqlServer()
         try:
-            LogService.Debug("PlanejamentoService", f"Busca consolidação (Inc. TM). Rota: {cidade_origem} -> {cidade_destino}")
-
-            if isinstance(data_base, datetime): data_base = data_base.date()
-            Inicio = datetime.combine(data_base, time.min)
-            Fim = datetime.combine(data_base, time.max)
+            LogService.Debug("PlanejamentoService", f"Busca consolidação GLOBAL. Rota: {cidade_origem} -> {cidade_destino}")
             
+            # 1. Traz o cache de planejamentos para não incluir quem já está planejado
+            mapa_cache = PlanejamentoService._ObterMapaCache()
+
             cidade_origem = str(cidade_origem).strip().upper()
             uf_origem = str(uf_origem).strip().upper()
             cidade_destino = str(cidade_destino).strip().upper()
             uf_destino = str(uf_destino).strip().upper()
 
-            # Subquery TM
-            subquery_tm = text("SELECT 1 FROM intec.dbo.tb_ocorr O (NOLOCK) WHERE O.filialctc = C.filialctc AND O.cod_ocorr = 'TM'")
-
-            Query = Sessao.query(CtcEsp, CtcEspCpl).outerjoin(
-                CtcEspCpl, CtcEsp.filialctc == CtcEspCpl.filialctc
-            ).filter(
-                CtcEsp.data >= Inicio, CtcEsp.data <= Fim,
-                CtcEsp.tipodoc != 'COB',
-                func.upper(func.trim(CtcEsp.cidade_orig)) == cidade_origem,
-                func.upper(func.trim(CtcEsp.uf_orig)) == uf_origem,
-                func.upper(func.trim(CtcEsp.cidade_dest)) == cidade_destino,
-                func.upper(func.trim(CtcEsp.uf_dest)) == uf_destino
-            )
+            # --- LÓGICA SEM DATA ---
+            FiltroSQL = f"""
+                AND UPPER(LTRIM(RTRIM(c.cidade_orig))) = '{cidade_origem}'
+                AND UPPER(LTRIM(RTRIM(c.uf_orig))) = '{uf_origem}'
+                AND UPPER(LTRIM(RTRIM(c.cidade_dest))) = '{cidade_destino}'
+                AND UPPER(LTRIM(RTRIM(c.uf_dest))) = '{uf_destino}'
+            """
             
-            # Filtros de Modal/TM
-            Query = Query.filter(
-                (CtcEsp.modal.like('AEREO%')) | (text("EXISTS (SELECT 1 FROM intec.dbo.tb_ocorr O WHERE O.filialctc = tb_ctc_esp.filialctc AND O.cod_ocorr = 'TM')"))
-            )
+            if tipo_carga: 
+                FiltroSQL += f" AND cl.TipoCarga = '{str(tipo_carga).strip()}'"
+            if filial_excluir and ctc_excluir: 
+                FiltroSQL += f" AND NOT (c.filial = '{str(filial_excluir).strip()}' AND c.filialctc = '{str(ctc_excluir).strip()}')"
             
-            if tipo_carga: Query = Query.filter(CtcEspCpl.TipoCarga == str(tipo_carga).strip())
-            if filial_excluir and ctc_excluir: Query = Query.filter(~((CtcEsp.filial == str(filial_excluir).strip()) & (CtcEsp.filialctc == str(ctc_excluir).strip())))
-            
-            Resultados = Query.order_by(desc(CtcEsp.data), desc(CtcEsp.hora)).all()
+            Query = text(PlanejamentoService._QueryBase + FiltroSQL + " ORDER BY c.data DESC, c.hora DESC")
+            Resultados = Sessao.execute(Query).fetchall()
             
             ListaConsolidados = []
-            for c, cpl in Resultados:
-                tipo_candidato = cpl.TipoCarga if cpl else "N/A"
+            for row in Resultados:
                 def to_float(val): return float(val) if val else 0.0
                 def to_int(val): return int(val) if val else 0
                 def to_str(val): return str(val).strip() if val else ''
-                
+
+                # --- REGRA 1: Ignorar se já tiver planejamento ativo ---
+                chave = f"{to_str(row.Filial)}-{to_str(row.Serie)}-{to_str(row.CTC)}"
+                info_plan = mapa_cache.get(chave)
+                if info_plan and str(info_plan.get('status', '')).upper() != 'CANCELADO':
+                    continue # Já tem planejamento, então pula (ignora este pacote)
+
                 str_hora = "00:00"
-                if c.hora:
-                    h_raw = str(c.hora).strip().replace(':', '').zfill(4)
+                if row.HoraEmissao:
+                    h_raw = str(row.HoraEmissao).strip().replace(':', '').zfill(4)
                     if len(h_raw) >= 4: str_hora = f"{h_raw[:2]}:{h_raw[2:]}"
 
-                # --- NOVO: Captura CNPJ ---
-                cnpj_alvo = getattr(c, 'remet_cgc', None) or getattr(c, 'remet_cgc', None)
+                # Lógica de CNPJ (Reversa vs Normal) PRIORIZANDO O RESPONSÁVEL
+                is_dev = to_str(row.MotivoCTC) == 'DEV'
+                if is_dev:
+                    cnpj_alvo = getattr(row, 'ResponsCGC', None) or getattr(row, 'DestCGC', None)
+                    remetente_nome = to_str(row.Destinatario)
+                    destinatario_nome = to_str(row.Remetente)
+                else:
+                    cnpj_alvo = getattr(row, 'ResponsCGC', None) or getattr(row, 'RemetCGC', None)
+                    remetente_nome = to_str(row.Remetente)
+                    destinatario_nome = to_str(row.Destinatario)
+
+                # --- REGRA 2: Validar o Serviço Contratado ---
+                servico_cand = PlanejamentoService.BuscarServicoContratadoCliente(
+                    getattr(row, 'ResponsCGC', None), 
+                    getattr(row, 'RemetCGC', None), 
+                    getattr(row, 'DestCGC', None)
+                )
+                if servico_alvo and str(servico_cand).strip().upper() != str(servico_alvo).strip().upper():
+                    continue # Pula se o serviço for diferente (Ex: EXPRESSO vs STANDARD)
 
                 ListaConsolidados.append({
-                    'filial': to_str(c.filial),
-                    'ctc': to_str(c.filialctc),
-                    'serie': to_str(c.seriectc),
-                    'volumes': to_int(c.volumes),
-                    'peso_fisico': to_float(c.peso),
-                    'peso_taxado': to_float(c.pesotax),
-                    'val_mercadoria': to_float(c.valmerc),
-                    'remetente': to_str(c.remet_nome),
-                    'destinatario': to_str(c.dest_nome),
-                    'data_emissao': c.data,
+                    'filial': to_str(row.Filial),
+                    'ctc': to_str(row.CTC),
+                    'serie': to_str(row.Serie),
+                    'volumes': to_int(row.Volumes),
+                    'peso_fisico': to_float(row.PesoFisico),
+                    'peso_taxado': to_float(row.PesoTaxado),
+                    'val_mercadoria': to_float(row.Valor),
+                    'remetente': remetente_nome,
+                    'destinatario': destinatario_nome,
+                    'data_emissao': row.DataEmissao,
                     'hora_emissao': str_hora,
                     
-                    'origem_cidade': to_str(c.cidade_orig),
-                    'origem_uf': to_str(c.uf_orig),
-                    'destino_cidade': to_str(c.cidade_dest),
-                    'destino_uf': to_str(c.uf_dest),
+                    'origem_cidade': to_str(row.CidadeOrigem),
+                    'origem_uf': to_str(row.UFOrigem),
+                    'destino_cidade': to_str(row.CidadeDestino),
+                    'destino_uf': to_str(row.UFDestino),
                     
-                    'tipo_carga': tipo_candidato,
-                    'cnpj_cliente': to_str(cnpj_alvo) # <--- Propagando o CNPJ
+                    'tipo_carga': to_str(row.Tipo_carga),
+                    'cnpj_cliente': to_str(cnpj_alvo),
+                    'servico_contratado': servico_cand # Já enviamos resolvido
                 })
 
             return ListaConsolidados
@@ -514,7 +582,7 @@ class PlanejamentoService:
                 return ctc_principal
 
             unificado = ctc_principal.copy()
-            unificado['servico_contratado'] = ctc_principal.get('servico_contratado', 'PADRÃO')
+            unificado['servico_contratado'] = ctc_principal.get('servico_contratado', 'STANDARD')
             unificado['cnpj_cliente'] = ctc_principal.get('cnpj_cliente', '')
             
             # 1. Garante que o item PRINCIPAL tenha os dados de Data/Hora, Local, CNPJ e Serviço na lista
@@ -532,7 +600,7 @@ class PlanejamentoService:
                 
                 # --- NOVO: Garantindo CNPJ e Serviço no principal ---
                 'cnpj_cliente': ctc_principal.get('cnpj_cliente', ''),
-                'servico_contratado': ctc_principal.get('servico_contratado', 'PADRÃO'),
+                'servico_contratado': ctc_principal.get('servico_contratado', 'STANDARD'),
                 
                 # Dados de Data e Hora (Originais do Principal)
                 'data_emissao_real': ctc_principal.get('data_emissao_real'),
@@ -612,8 +680,10 @@ class PlanejamentoService:
         try:
             LogService.Info("PlanejamentoService", f"Iniciando Gravação de Planejamento. Usuário: {usuario}")
 
-            # --- Importação local da NfEsp (Caso não tenha colocado no topo do arquivo) ---
+            # --- Importações locais ---
             from Models.SQL_SERVER.NfEsp import NfEsp
+            from Models.SQL_SERVER.Cortes import CortePlanejamento
+            from datetime import datetime, time
 
             # --- HELPER FUNCTIONS (Lookup) ---
             def buscar_id_cidade(nome, uf):
@@ -675,6 +745,37 @@ class PlanejamentoService:
                 if not dt_str: return None
                 try: return datetime.fromisoformat(str(dt_str).replace('Z', ''))
                 except: return None
+
+            # --- NOVO HELPER: Buscar Corte pelo momento atual da gravação ---
+            def buscar_info_corte(filial):
+                """
+                Busca o IdCortePln, número do Corte e HorarioCorte com base na Filial 
+                e na HORA ATUAL (momento em que o planejamento está sendo salvo).
+                """
+                if not filial: return None, None, None
+                try:
+                    # Hora exata da ação de gravar o planejamento
+                    hora_atual = datetime.now().time()
+
+                    # Busca todos os cortes ativos da filial, ordenados do mais cedo para o mais tarde
+                    cortes = SessaoPG.query(CortePlanejamento).filter(
+                        CortePlanejamento.Filial == str(filial).strip(),
+                        CortePlanejamento.Ativo == True
+                    ).order_by(CortePlanejamento.HorarioCorte).all()
+
+                    if not cortes: return None, None, None
+
+                    # Procura o primeiro corte onde a hora atual seja menor ou igual ao horário limite do corte
+                    for c in cortes:
+                        if hora_atual <= c.HorarioCorte:
+                            return c.IdCortePln, c.Corte, c.HorarioCorte
+
+                    # Se a hora atual já passou do último corte do dia, 
+                    # significa que este planejamento entra no primeiro corte do dia seguinte.
+                    return cortes[0].IdCortePln, cortes[0].Corte, cortes[0].HorarioCorte
+                except Exception as e:
+                    LogService.Error("PlanejamentoService", f"Erro buscar_info_corte: {e}", e)
+                    return None, None, None
             # --- FIM HELPERS ---
 
             # 1. VALIDAÇÃO CABEÇALHO
@@ -683,6 +784,10 @@ class PlanejamentoService:
 
             if not id_aero_orig_cab: raise Exception(f"Aeroporto de Origem '{aero_origem}' inválido ou inativo.")
             if not id_aero_dest_cab: raise Exception(f"Aeroporto de Destino '{aero_destino}' inválido ou inativo.")
+
+            # --- DEFINE O CORTE DO LOTE INTEIRO ---
+            # Como a gravação ocorre toda no mesmo momento, validamos a hora atual contra a filial principal uma única vez
+            id_corte_pln, num_corte, horario_corte = buscar_info_corte(dados_ctc_principal.get('filial'))
 
             # Verifica ou Cria Cabeçalho
             item_existente = SessaoPG.query(PlanejamentoItem).join(PlanejamentoCabecalho).filter(
@@ -699,6 +804,9 @@ class PlanejamentoService:
                 Cabecalho.IdAeroportoOrigem = id_aero_orig_cab
                 Cabecalho.AeroportoDestino = aero_destino
                 Cabecalho.IdAeroportoDestino = id_aero_dest_cab
+                
+                # Atualiza com o corte definido no momento da gravação
+                Cabecalho.IdCortePln = id_corte_pln
                 
                 # Atualiza totais (Soma)
                 def get_val(key): return float(dados_ctc_principal.get(key, 0) or 0)
@@ -719,7 +827,8 @@ class PlanejamentoService:
                     IdAeroportoDestino=id_aero_dest_cab,
                     TotalVolumes=int(get_val('volumes')),
                     TotalPeso=get_val('peso_taxado'), 
-                    TotalValor=get_val('valor')       
+                    TotalValor=get_val('valor'),
+                    IdCortePln=id_corte_pln # Grava o corte no momento da criação
                 )
                 SessaoPG.add(Cabecalho)
                 SessaoPG.flush()
@@ -742,7 +851,7 @@ class PlanejamentoService:
                 cidade_dest = str(doc.get('destino_cidade', ''))
                 uf_dest = str(doc.get('destino_uf') or doc.get('uf_dest', ''))
                 
-                # Extraindo Data/Hora
+                # Extraindo Data/Hora do Documento (usado apenas como metadado da NF agora, não afeta o corte)
                 data_doc = doc.get('data_emissao_real') 
                 if not data_doc: 
                     data_doc = doc.get('data_emissao')
@@ -757,7 +866,7 @@ class PlanejamentoService:
                 if not id_cid_orig: raise Exception(f"Cidade Origem '{cidade_orig}-{uf_orig}' não encontrada/inativa para CTC {doc.get('ctc')}")
                 if not id_cid_dest: raise Exception(f"Cidade Destino '{cidade_dest}-{uf_dest}' não encontrada/inativa para CTC {doc.get('ctc')}")
 
-                # --- NOVO: BUSCA AS NFs DO CTC NA TABELA ESPELHO ---
+                # --- BUSCA AS NFs DO CTC NA TABELA ESPELHO ---
                 NfsBanco = SessaoPG.query(NfEsp).filter(
                     NfEsp.filialctc == str(doc['ctc'])
                 ).all()
@@ -773,7 +882,12 @@ class PlanejamentoService:
                             Ctc=str(doc['ctc']),
                             NotaFiscal=str(nf_obj.numnf).strip() if nf_obj.numnf else '',
                             DataEmissao=data_doc,   
-                            Hora=str(hora_doc),     
+                            Hora=str(hora_doc),
+
+                            # --- CAMPOS DE CORTE ÚNICOS CALCULADOS LÁ EM CIMA ---
+                            Corte=num_corte,
+                            HorarioCorte=horario_corte,
+                            
                             Remetente=str(doc.get('remetente',''))[:100],
                             Destinatario=str(doc.get('destinatario',''))[:100],
                             OrigemCidade=cidade_orig[:50],
@@ -797,6 +911,11 @@ class PlanejamentoService:
                         NotaFiscal=str(doc['ctc']),
                         DataEmissao=data_doc,
                         Hora=str(hora_doc),
+
+                        # --- CAMPOS DE CORTE ÚNICOS CALCULADOS LÁ EM CIMA ---
+                        Corte=num_corte,
+                        HorarioCorte=horario_corte,
+
                         Remetente=str(doc.get('remetente',''))[:100],
                         Destinatario=str(doc.get('destinatario',''))[:100],
                         OrigemCidade=cidade_orig[:50],
@@ -822,17 +941,32 @@ class PlanejamentoService:
                     id_aero_orig = buscar_id_aeroporto(origem_iata)
                     id_aero_dest = buscar_id_aeroporto(destino_iata)
                     id_voo = buscar_id_voo(cia, trecho.get('voo'), dt_partida, origem_iata)
-                    id_frete, tipo_servico_frete = buscar_frete_info(origem_iata, destino_iata, cia)
+
+                    # --- NOVA LÓGICA DE FRETE ---
+                    id_frete = trecho.get('id_frete')
+                    tipo_servico = trecho.get('tipo_servico')
+
+                    # Se o front não mandou o ID, usamos a velha busca cega como fallback de segurança
+                    if not id_frete:
+                        id_frete_fallback, tipo_servico_frete_fallback = buscar_frete_info(origem_iata, destino_iata, cia)
+                        id_frete = id_frete_fallback
+                        if not tipo_servico:
+                            tipo_servico = tipo_servico_frete_fallback
+
+                        if not id_frete:
+                            LogService.Warning("PlanejamentoService", f"Trecho {idx+1}: Tabela de Frete não encontrada para {cia} ({origem_iata}->{destino_iata}). Usando padrão sem tarifa.")
 
                     if not id_aero_orig: raise Exception(f"Trecho {idx+1}: Aeroporto Origem '{origem_iata}' inválido.")
                     if not id_aero_dest: raise Exception(f"Trecho {idx+1}: Aeroporto Destino '{destino_iata}' inválido.")
                     if not id_voo: raise Exception(f"Trecho {idx+1}: Voo {cia} {trecho.get('voo')} não encontrado na malha ativa.")
-                    if not id_frete: raise Exception(f"Trecho {idx+1}: Tabela de Frete não encontrada para {cia} ({origem_iata}->{destino_iata}).")
-
-                    tipo_servico = trecho.get('tipo_servico', tipo_servico_frete)
-                    horario_corte = None
+                    
+                    if not tipo_servico:
+                        servicos = ['STANDARD']
+                        tipo_servico = random.choice(servicos) if servicos else 'STANDARD'
+                        
+                    horario_corte_trecho = None
                     if trecho.get('horario_corte'):
-                        try: horario_corte = datetime.strptime(trecho.get('horario_corte'), '%H:%M').time()
+                        try: horario_corte_trecho = datetime.strptime(trecho.get('horario_corte'), '%H:%M').time()
                         except: pass
                     data_corte = parse_dt(trecho.get('data_corte'))
 
@@ -846,9 +980,9 @@ class PlanejamentoService:
                         IdAeroportoOrigem=id_aero_orig,
                         IdAeroportoDestino=id_aero_dest,
                         IdVoo=id_voo,
-                        IdFrete=id_frete,
-                        TipoServico=tipo_servico,
-                        HorarioCorte=horario_corte,
+                        IdFrete=id_frete, # Agora garantido
+                        TipoServico=tipo_servico, # Agora garantido
+                        HorarioCorte=horario_corte_trecho,
                         DataCorte=data_corte,
                         DataPartida=dt_partida,
                         DataChegada=dt_chegada
@@ -865,7 +999,7 @@ class PlanejamentoService:
             raise e 
         finally:
             SessaoPG.close()
-            
+
     @staticmethod
     def ObterPlanejamentoPorCtc(filial, serie, ctc):
         SessaoPG = ObterSessaoSqlServer()
@@ -933,6 +1067,7 @@ class PlanejamentoService:
                     'origem': {'iata': t.AeroportoOrigem, 'lat': 0, 'lon': 0}, 
                     'destino': {'iata': t.AeroportoDestino, 'lat': 0, 'lon': 0},
                     'base_calculo': {
+                        'id_frete': t.IdFrete,
                         'servico': nm_servico,
                         'tarifa': val_tarifa,
                         'peso_usado': PesoTotal,
@@ -1001,18 +1136,36 @@ class PlanejamentoService:
     def GerarExcelPlanejamentos():
         SessaoPG = ObterSessaoSqlServer()
         try:
-            # Busca os itens de planejamento otimizada para evitar múltiplas consultas
-            ItensPlanejados = SessaoPG.query(PlanejamentoItem).options(
+            # Busca os itens de planejamento fazendo join com a CtcEsp 
+            # para capturar rotafilialdest (Unidade Last Mile) e motivodoc (Reversa)
+            # UTILIZANDO collate('DATABASE_DEFAULT') para evitar erro 42000 do SQL Server
+            Resultados = SessaoPG.query(
+                PlanejamentoItem,
+                CtcEsp.rotafilialdest,
+                CtcEsp.motivodoc
+            ).join(
+                PlanejamentoCabecalho, PlanejamentoItem.IdPlanejamento == PlanejamentoCabecalho.IdPlanejamento
+            ).outerjoin(
+                CtcEsp,
+                (PlanejamentoItem.Filial.collate('DATABASE_DEFAULT') == CtcEsp.filial.collate('DATABASE_DEFAULT')) &
+                (PlanejamentoItem.Serie.collate('DATABASE_DEFAULT') == CtcEsp.seriectc.collate('DATABASE_DEFAULT')) &
+                (PlanejamentoItem.Ctc.collate('DATABASE_DEFAULT') == CtcEsp.filialctc.collate('DATABASE_DEFAULT'))
+            ).options(
                 joinedload(PlanejamentoItem.Cabecalho).joinedload(PlanejamentoCabecalho.Trechos),
                 joinedload(PlanejamentoItem.CidadeOrigemObj),
                 joinedload(PlanejamentoItem.CidadeDestinoObj)
-            ).join(PlanejamentoCabecalho).filter(
+            ).filter(
                 PlanejamentoCabecalho.Status != 'Cancelado'
             ).all()
 
             DadosPlanilha = []
+            Hoje = date.today()
 
-            for Item in ItensPlanejados:
+            for Row in Resultados:
+                Item = Row.PlanejamentoItem
+                RotaLastMile = Row.rotafilialdest if Row.rotafilialdest else ''
+                MotivoDoc = Row.motivodoc if Row.motivodoc else ''
+
                 Cabecalho = Item.Cabecalho
                 TrechoPrincipal = None
                 
@@ -1026,14 +1179,30 @@ class PlanejamentoService:
                 UfOrigem = Item.CidadeOrigemObj.Uf if Item.CidadeOrigemObj and hasattr(Item.CidadeOrigemObj, 'Uf') else ''
                 UfDestino = Item.CidadeDestinoObj.Uf if Item.CidadeDestinoObj and hasattr(Item.CidadeDestinoObj, 'Uf') else ''
                 
-                # Formatação dos horários
-                CorteFmt = TrechoPrincipal.HorarioCorte.strftime('%H:%M') if TrechoPrincipal and TrechoPrincipal.HorarioCorte else ''
+                # --- LÓGICA DO TIPO (Diário, Backlog, Reversa) ---
+                TipoClassificacao = "DIÁRIO"
+                if MotivoDoc == 'DEV':
+                    TipoClassificacao = "REVERSA"
+                elif Item.DataEmissao and Item.DataEmissao.date() < Hoje:
+                    TipoClassificacao = "BACKLOG"
+
+                # --- LÓGICA DO CORTE ---
+                # Pega as colunas recém-adicionadas no próprio Item (Corte e HorarioCorte)
+                CorteFmt = ''
+                if Item.Corte and Item.HorarioCorte:
+                    CorteFmt = f"{Item.Corte}° Corte - ({Item.HorarioCorte.strftime('%H:%M')})"
+                elif Item.HorarioCorte:
+                    CorteFmt = Item.HorarioCorte.strftime('%H:%M')
+                elif TrechoPrincipal and TrechoPrincipal.HorarioCorte:
+                    # Fallback para planejamentos antigos
+                    CorteFmt = TrechoPrincipal.HorarioCorte.strftime('%H:%M')
+
                 DataPartidaFmt = TrechoPrincipal.DataPartida.strftime('%d/%m/%Y %H:%M') if TrechoPrincipal and TrechoPrincipal.DataPartida else ''
 
                 Linha = {
                     'UF ORIGEM': UfOrigem,
-                    'UNIDADE RESPONSÁVEL LAST MILE': '', # Vazio conforme solicitado
-                    'TIPO': '', # Vazio por enquanto
+                    'UNIDADE RESPONSÁVEL LAST MILE': RotaLastMile, # Valor vindo de rotafilialdest
+                    'TIPO': TipoClassificacao, # DIÁRIO, BACKLOG, ou REVERSA
                     'CIA': TrechoPrincipal.CiaAerea if TrechoPrincipal else '',
                     'SERVIÇO': TrechoPrincipal.TipoServico if TrechoPrincipal else '',
                     'CORTE': CorteFmt,

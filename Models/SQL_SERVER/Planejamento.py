@@ -19,6 +19,8 @@ class PlanejamentoCabecalho(Base):
     IdAeroportoOrigem = Column(Integer, ForeignKey('intec.dbo.Tb_PLN_Aeroporto.Id'), nullable=True)
     IdAeroportoDestino = Column(Integer, ForeignKey('intec.dbo.Tb_PLN_Aeroporto.Id'), nullable=True)
 
+    IdCortePln = Column(Integer, ForeignKey('intec.dbo.Tb_PLN_CortePlanejamento.IdCortePln'), nullable=True)
+
     TotalVolumes = Column(Integer, default=0)
     TotalPeso = Column(Numeric(10,2), default=0.00)
     TotalValor = Column(Numeric(15,2), default=0.00)
@@ -51,6 +53,9 @@ class PlanejamentoItem(Base):
     # IDs vinculados
     IdCidadeOrigem = Column(Integer, ForeignKey('intec.dbo.Tb_PLN_Cidade.Id'), nullable=True)
     IdCidadeDestino = Column(Integer, ForeignKey('intec.dbo.Tb_PLN_Cidade.Id'), nullable=True)
+
+    Corte = Column(Integer, nullable=True)
+    HorarioCorte = Column(Time, nullable=True)
 
     Volumes = Column(Integer)
     PesoTaxado = Column(Numeric(10,3))

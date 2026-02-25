@@ -298,7 +298,7 @@ class MalhaService:
 
             Resultado.append({
                 'tipo_resultado': Tipo,
-                'cia': cia_voo, # Cia que opera o voo (Visual)
+                'cia': cia_voo, 
                 'voo': Voo.NumeroVoo,
                 'data': Voo.DataPartida.strftime('%d/%m/%Y'),
                 'horario_saida': Voo.HorarioSaida.strftime('%H:%M'),
@@ -306,9 +306,10 @@ class MalhaService:
                 'origem': {'iata': Voo.AeroportoOrigem, 'nome': Orig.get('nome'), 'lat': Orig.get('lat'), 'lon': Orig.get('lon')},
                 'destino': {'iata': Voo.AeroportoDestino, 'nome': Dest.get('nome'), 'lat': Dest.get('lat'), 'lon': Dest.get('lon')},
                 'base_calculo': {
+                    'id_frete': dados_frete.get('id_frete'),
                     'tarifa': dados_frete.get('tarifa_base', 0.0),
                     'servico': dados_frete.get('servico', 'STANDARD'),
-                    'cia_tarifaria': cia_final, # Usado para debug se precisar
+                    'cia_tarifaria': cia_final, 
                     'peso_usado': dados_frete.get('peso_calculado', 0),
                     'custo_trecho': custo_trecho,
                     'custo_trecho_fmt': f"R$ {custo_trecho:,.2f}"

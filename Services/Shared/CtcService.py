@@ -83,7 +83,11 @@ class CtcService:
             # 3.1. NOVO: Captura as Regras do Cliente e Serviço Contratado
             # ---------------------------------------------------------
             cnpj_alvo = getattr(Ctc, 'respons_cgc', None) or getattr(Ctc, 'remet_cgc', None)
-            dados_completos['servico_contratado'] = PlanejamentoService.BuscarServicoContratadoCliente(cnpj_alvo)
+            dados_completos['servico_contratado'] = PlanejamentoService.BuscarServicoContratadoCliente(
+                getattr(Ctc, 'respons_cgc', None),
+                getattr(Ctc, 'remet_cgc', None),
+                getattr(Ctc, 'dest_cgc', None)
+            )
 
             # ---------------------------------------------------------
             # 4. Busca e Serializa NOTAS FISCAIS (tb_nf_esp)
