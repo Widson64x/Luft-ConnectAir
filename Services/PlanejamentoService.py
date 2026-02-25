@@ -371,7 +371,7 @@ class PlanejamentoService:
             DataBuscaVoos = DataEmissaoReal + timedelta(hours=10)
 
             # 2. Captura o Tipo de Carga
-            TipoCargaValor = CplEncontrado.TipoCarga if CplEncontrado else None
+            TipoCarga = CplEncontrado.TipoCarga if CplEncontrado else None
 
             # 3. NOVO: Captura o CNPJ e o Serviço Contratado
             # Tenta pegar o CNPJ do responsável pelo frete ou do remetente
@@ -396,7 +396,7 @@ class PlanejamentoService:
                 'valor': (CtcEncontrado.valmerc or 0),
                 'remetente': str(CtcEncontrado.remet_nome).strip(),
                 'destinatario': str(CtcEncontrado.dest_nome).strip(),
-                'tipo_carga': TipoCargaValor,
+                'tipo_carga': TipoCarga,
 
                 'cnpj_cliente': cnpj_alvo,
                 'servico_contratado': servico_contratado
@@ -411,7 +411,7 @@ class PlanejamentoService:
     def BuscarCtcsConsolidaveis(cidade_origem, uf_origem, cidade_destino, uf_destino, data_base, filial_excluir=None, ctc_excluir=None, tipo_carga=None):
         """
         Busca CTCs do mesmo dia/rota/tipo.
-        CORREÇÃO: Agora retorna 'origem_uf', 'destino_uf' e 'cnpj_cliente' para propagação no Lote.
+        Agora retorna 'origem_uf', 'destino_uf' e 'cnpj_cliente' para propagação no Lote.
         """
         Sessao = ObterSessaoSqlServer()
         try:
