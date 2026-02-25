@@ -1,8 +1,12 @@
+import networkx as nx
+from datetime import datetime, timedelta, time
 from Services.LogService import LogService
+from Services.TabelaFreteService import TabelaFreteService
+from Services.CiaAereaService import CiaAereaService
 
 class RouteIntelligenceService:
     """
-    Serviço dedicado à inteligência de roteamento e categorização avançada.
+    Serviço centralizado dedicado à inteligência de roteamento, montagem de grafos e categorização avançada.
     """
 
     # Pesos Base
@@ -21,55 +25,152 @@ class RouteIntelligenceService:
         servico_str = str(servico_contratado).upper().strip() if servico_contratado else 'PADRÃO'
         carga_str = str(tipo_carga).upper().strip() if tipo_carga else 'GERAL'
         
-        # 1. PERECÍVEL + EXPRESSO (Urgência Máxima) 
         if carga_str == 'PERECIVEL' and 'EXPRESSO' in servico_str:
-            """
-            Serviços top de linha para cargas perecíveis e que exigem rapidez extrema.
-            OBS: Mantemos os serviços expressos como opção, pois podem ser mais rápidos e o cliente pode se interessar caso sejam 
-            apresentados como recomendação. Nesses casos sempre damos um super bônus para os serviços que se encaixam nessa categoria, 
-            mas sem eliminar completamente as outras opções, já que o cliente pode ter escolhido expresso por outros motivos 
-            (ex: prioridade na entrega, mesmo que a carga não seja perecível).
-             A ideia aqui é que, mesmo para clientes que escolheram expresso, os serviços mais rápidos e aderentes à carga perecível 
-             sejam destacados como recomendação, mas sem eliminar completamente os serviços expressos, já que o cliente demonstrou interesse em 
-             algo mais rápido.
-            """
-            return [
-                'GOL LOG SAÚDE', 
-                'GOL LOG RAPIDO',
-                'LATAM EXPRESSO (VELOZ)', 
-                'LATAM RESERVADO', 
-            ]
-        
-        # 2. EXPRESSO (Prioridade Alta) Porém sem a urgência extrema da perecibilidade
+            return ['GOL LOG SAÚDE', 'GOL LOG RAPIDO', 'LATAM EXPRESSO (VELOZ)', 'LATAM RESERVADO']
         elif 'EXPRESSO' in servico_str:
-            """
-            Serviços premium para clientes que optaram por serviço expresso, mesmo sem ser perecível.
-            OBS: Mantemos os serviços economicos como opção, pois o cliente pode ter escolhido expresso por outros motivos 
-            (ex: prioridade na entrega, mesmo que a carga não seja perecível).
-            Aqui seria o meio termo, onde damos preferência para os serviços expressos, mas sem eliminar completamente os econômicos, 
-            já que o cliente demonstrou interesse em algo mais rápido.
-            """
-            return [
-                'GOL LOG SAÚDE', 
-                'GOL LOG RAPIDO',
-                'GOL LOG ECONOMICO (SBY)',
-                'LATAM CONVENCIONAL (ESTANDAR MEDS)',
-                'LATAM EXPRESSO (VELOZ)',
-                'LATAM RESERVADO'
-            ]
-        
-        # 3. PADRÃO / ECONÔMICO / CONVENCIONAL
+            return ['GOL LOG SAÚDE', 'GOL LOG RAPIDO', 'GOL LOG ECONOMICO (SBY)', 'LATAM CONVENCIONAL (ESTANDAR MEDS)', 'LATAM EXPRESSO (VELOZ)', 'LATAM RESERVADO']
         else:
-            """
-            Serviços padrão para clientes que não optaram por serviços expressos ou perecíveis.
-            OBS: Mesmo para clientes que não escolheram expresso, mantemos os serviços expressos como opção, pois podem ser mais rápidos 
-            e o cliente pode se interessar caso sejam apresentados como recomendação.
-            """
-            return [
-                'GOL LOG ECONOMICO (SBY)', 
-                'LATAM CONVENCIONAL (ESTANDAR MEDS)'
-            ]
+            return ['GOL LOG ECONOMICO (SBY)', 'LATAM CONVENCIONAL (ESTANDAR MEDS)']
 
+    # =========================================================================
+    # MOTOR DE GRAFOS E ROTEAMENTO (Movidos do MalhaService)
+    # =========================================================================
+    
+    @staticmethod
+    def AnalisarEEncontrarRotas(voos_db, data_inicio, lista_origens, lista_destinos, peso_total, tipo_carga, servico_contratado):
+        """
+        Método central que recebe os dados brutos e executa toda a inteligência (Grafo -> Caminhos -> Métricas -> Categorias).
+        """
+        LogService.Info("RouteIntelligence", "Iniciando processamento e montagem do grafo inteligente...")
+        
+        # 1. Obtém as regras de negócio (Scores e Serviços Alvo)
+        ScoresParceria = CiaAereaService.ObterDicionarioScores()
+        lista_servicos_alvo = RouteIntelligenceService._DeParaServicoIdeal(servico_contratado, tipo_carga)
+        
+        # 2. Montagem do Grafo filtrando parcerias bloqueadas
+        G = nx.DiGraph()
+        for Voo in voos_db:
+            NomeCia = Voo.CiaAerea.strip().upper()
+            if ScoresParceria.get(NomeCia, 50) <= 0:
+                continue
+            
+            OrigemNo = Voo.AeroportoOrigem.strip().upper()
+            DestinoNo = Voo.AeroportoDestino.strip().upper()
+            if G.has_edge(OrigemNo, DestinoNo):
+                G[OrigemNo][DestinoNo]['voos'].append(Voo)
+            else:
+                G.add_edge(OrigemNo, DestinoNo, voos=[Voo])
+                
+        # 3. Processamento de Caminhos
+        ListaCandidatos = []
+        for origem_iata in lista_origens:
+            for destino_iata in lista_destinos:
+                if not G.has_node(origem_iata) or not G.has_node(destino_iata): 
+                    continue 
+
+                try:
+                    CaminhosNos = list(nx.all_simple_paths(G, source=origem_iata, target=destino_iata, cutoff=3))
+                except: 
+                    continue 
+
+                for Caminho in CaminhosNos:
+                    SequenciaVoos = RouteIntelligenceService._ValidarCaminhoCronologico(G, Caminho, data_inicio)
+                    if not SequenciaVoos: continue
+                    
+                    # 4. Cálculo de Métricas da Rota
+                    Duracao = RouteIntelligenceService._CalcularDuracaoRota(SequenciaVoos)
+                    TrocasCia = RouteIntelligenceService._ContarTrocasCia(SequenciaVoos)
+                    QtdEscalas = len(SequenciaVoos) - 1
+                    DadosFinanceiros = RouteIntelligenceService.CalcularCustoRota(SequenciaVoos, peso_total, lista_servicos_alvo)
+
+                    ScoreParceriaAcumulado = sum([ScoresParceria.get(v.CiaAerea.strip().upper(), 50) for v in SequenciaVoos])
+                    MediaParceria = ScoreParceriaAcumulado / len(SequenciaVoos) if len(SequenciaVoos) > 0 else 50
+                    
+                    ListaCandidatos.append({
+                        'rota': SequenciaVoos,
+                        'detalhes_tarifas': DadosFinanceiros['detalhes'],
+                        'metricas': {
+                            'duracao': Duracao, 
+                            'custo': DadosFinanceiros['custo_total'], 
+                            'escalas': QtdEscalas, 
+                            'trocas_cia': TrocasCia, 
+                            'indice_parceria': MediaParceria,
+                            'sem_tarifa': DadosFinanceiros['sem_tarifa'],
+                            'score': 0
+                        }
+                    })
+        
+        # 5. Otimiza e Categoriza as Opções encontradas
+        return RouteIntelligenceService.OtimizarOpcoes(ListaCandidatos, tipo_carga, servico_contratado)
+
+    @staticmethod
+    def CalcularCustoRota(lista_voos, peso_total, lista_servicos_alvo=None):
+        custo_total = 0.0
+        detalhes_financeiros = []
+        sem_tarifa_flag = False
+
+        for voo in lista_voos:
+            custo_trecho, info_frete = TabelaFreteService.CalcularCustoEstimado(
+                voo.AeroportoOrigem, voo.AeroportoDestino, voo.CiaAerea, peso_total, lista_servicos_preferenciais=lista_servicos_alvo 
+            )
+
+            if info_frete.get('tarifa_missing', False):
+                sem_tarifa_flag = True
+            
+            info_frete['custo_calculado'] = custo_trecho
+            custo_total += custo_trecho
+            detalhes_financeiros.append(info_frete)
+
+        return {'custo_total': custo_total, 'detalhes': detalhes_financeiros, 'sem_tarifa': sem_tarifa_flag}
+
+    @staticmethod
+    def _ValidarCaminhoCronologico(Grafo, ListaNos, DataInicio):
+        VoosEscolhidos = []
+        MomentoDisponivel = DataInicio if isinstance(DataInicio, datetime) else datetime.combine(DataInicio, time.min)
+        for i in range(len(ListaNos) - 1):
+            Origem, Destino = ListaNos[i], ListaNos[i+1]
+            if Destino not in Grafo[Origem]: return None
+            OpcoesVoos = sorted(Grafo[Origem][Destino]['voos'][:], key=lambda v: (v.DataPartida, v.HorarioSaida))
+            
+            CiaPreferida = VoosEscolhidos[-1].CiaAerea if VoosEscolhidos else None
+            if CiaPreferida: OpcoesVoos = [v for v in OpcoesVoos if v.CiaAerea == CiaPreferida] + [v for v in OpcoesVoos if v.CiaAerea != CiaPreferida]
+            
+            VooViavel = None
+            for Voo in OpcoesVoos:
+                SaidaVoo = datetime.combine(Voo.DataPartida, Voo.HorarioSaida)
+                if i == 0:
+                    if SaidaVoo >= MomentoDisponivel: VooViavel = Voo; break
+                else:
+                    ChegadaAnt = datetime.combine(VoosEscolhidos[-1].DataPartida, VoosEscolhidos[-1].HorarioChegada)
+                    if VoosEscolhidos[-1].HorarioChegada < VoosEscolhidos[-1].HorarioSaida: ChegadaAnt += timedelta(days=1)
+                    if SaidaVoo >= ChegadaAnt + timedelta(hours=1) and SaidaVoo <= ChegadaAnt + timedelta(hours=48): VooViavel = Voo; break
+            
+            if VooViavel:
+                VoosEscolhidos.append(VooViavel)
+                ChegadaVoo = datetime.combine(VooViavel.DataPartida, VooViavel.HorarioChegada)
+                if VooViavel.HorarioChegada < VooViavel.HorarioSaida: ChegadaVoo += timedelta(days=1)
+                MomentoDisponivel = ChegadaVoo
+            else: return None
+        return VoosEscolhidos
+
+    @staticmethod
+    def _CalcularDuracaoRota(ListaVoos):
+        if not ListaVoos: return 0
+        Primeiro, Ultimo = ListaVoos[0], ListaVoos[-1]
+        Inicio = datetime.combine(Primeiro.DataPartida, Primeiro.HorarioSaida)
+        Fim = datetime.combine(Ultimo.DataPartida, Ultimo.HorarioChegada)
+        if Ultimo.HorarioChegada < Ultimo.HorarioSaida: Fim += timedelta(days=1)
+        while Fim < Inicio: Fim += timedelta(days=1)
+        return (Fim - Inicio).total_seconds() / 60
+
+    @staticmethod
+    def _ContarTrocasCia(ListaVoos):
+        if not ListaVoos: return 0
+        return sum(1 for i in range(len(ListaVoos)-1) if ListaVoos[i].CiaAerea != ListaVoos[i+1].CiaAerea)
+
+    # =========================================================================
+    # LÓGICA DE SCORE E CATEGORIZAÇÃO
+    # =========================================================================
     @staticmethod
     def OtimizarOpcoes(lista_candidatos, tipo_carga=None, servico_contratado=None):
         """
