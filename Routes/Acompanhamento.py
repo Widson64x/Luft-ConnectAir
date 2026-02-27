@@ -1,5 +1,6 @@
 from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify
+from flask_login import login_required, current_user
 from Services.AcompanhamentoService import AcompanhamentoService
 from Services.LogService import LogService
 from Services.PermissaoService import RequerPermissao
@@ -8,6 +9,7 @@ AcompanhamentoBP = Blueprint('Acompanhamento', __name__, url_prefix='/Acompanham
 
 @AcompanhamentoBP.route('/Painel', methods=['GET'])
 @RequerPermissao('acompanhamento.visualizar')
+@login_required
 def Painel():
     LogService.Info("AcompanhamentoRoute", "Acessando rota /Painel.")
     try:
@@ -28,6 +30,7 @@ def Painel():
         return render_template('Acompanhamento/Index.html', resumo={}, data_inicio=hoje, data_fim=hoje)
 
 @AcompanhamentoBP.route('/Api/ListarAwbs', methods=['GET'])
+@login_required
 def ApiListarAwbs():
     filtros = {
         'DataInicio': request.args.get('dataInicio'),
@@ -40,12 +43,14 @@ def ApiListarAwbs():
     return jsonify(dados)
 
 @AcompanhamentoBP.route('/Api/Historico/<path:numero_awb>', methods=['GET'])
+@login_required
 def ApiHistorico(numero_awb):
     LogService.Debug("AcompanhamentoRoute", f"API /Historico chamada para {numero_awb}")
     historico = AcompanhamentoService.ObterHistoricoAwb(numero_awb)
     return jsonify(historico)
 
 @AcompanhamentoBP.route('/Api/DetalhesVooModal', methods=['GET'])
+@login_required
 def ApiDetalhesVooModal():
     numero = request.args.get('numeroVoo')
     data = request.args.get('dataRef') 

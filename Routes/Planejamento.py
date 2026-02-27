@@ -1,11 +1,10 @@
-from flask import Blueprint, render_template, jsonify, request, send_file
+from flask import Blueprint, render_template, jsonify, request, send_file, flash, redirect, url_for
 from flask_login import login_required, current_user
 from datetime import timedelta, datetime, date
 
 # Import dos Serviços
 from Services.PermissaoService import RequerPermissao
 from Services.PlanejamentoService import PlanejamentoService
-# CORREÇÃO: Importação atualizada para a nova lógica estratégica
 from Services.Shared.GeoService import BuscarCoordenadasCidade, BuscarAeroportoEstrategico, BuscarTopAeroportos
 from Services.MalhaService import MalhaService
 from Services.LogService import LogService
@@ -40,7 +39,6 @@ def Dashboard():
 @login_required
 @RequerPermissao('planejamento.visualizar')
 def ApiCtcsHoje():
-    # Log de Debug para não poluir o histórico principal com chamadas de API frequentes
     LogService.Debug("Routes.Planejamento", "API Listar CTCs requisitada.")
     Dados = PlanejamentoService.BuscarCtcsPlanejamento()
     return jsonify(Dados)
@@ -53,7 +51,9 @@ def MontarPlanejamento(filial, serie, ctc):
     
     # 1. Busca Dados do CTC
     DadosCtc = PlanejamentoService.ObterCtcDetalhado(filial, serie, ctc)
-    if not DadosCtc: return "Não encontrado", 404
+    if not DadosCtc: 
+        flash(f"Erro: O CTC {filial}-{serie}-{ctc} não foi encontrado ou já foi processado.", "danger")
+        return redirect(url_for('Planejamento.Dashboard'))
 
     # 2. Geografia
     CoordOrigem = BuscarCoordenadasCidade(DadosCtc['origem_cidade'], DadosCtc['origem_uf'])
@@ -64,17 +64,17 @@ def MontarPlanejamento(filial, serie, ctc):
         DadosCtc['origem_cidade'], DadosCtc['origem_uf'],
         DadosCtc['destino_cidade'], DadosCtc['destino_uf'],
         DadosCtc['data_emissao_real'], filial, ctc, DadosCtc['tipo_carga'],
-        servico_alvo=DadosCtc.get('servico_contratado') # <--- BLINDAGEM ATIVADA AQUI
+        servico_alvo=DadosCtc.get('servico_contratado') 
     )
     DadosUnificados = PlanejamentoService.UnificarConsolidacao(DadosCtc, CtcsCandidatos)
 
-    # --- NOVO: VERIFICA SE JÁ EXISTE PLANEJAMENTO SALVO ---
+    if DadosUnificados.get('is_consolidado'):
+        flash(f"Lote virtual criado: {DadosUnificados.get('qtd_docs')} CTCs foram consolidados para esta rota.", "success")
+
+    # Verifica se já existe planejamento salvo
     PlanejamentoSalvo = PlanejamentoService.ObterPlanejamentoPorCtc(filial, serie, ctc)
     
-    # Se já existe, nós ainda calculamos rotas (OpcoesRotas) caso ele queira "Recalcular",
-    # mas passamos o Salvo separadamente para o Front exibir primeiro.
-    
-    # 4. Aeroportos (Busca Padrão para cálculo de novas opções)
+    # 4. Aeroportos 
     ListaOrigem = BuscarTopAeroportos(CoordOrigem['lat'], CoordOrigem['lon'], limite=2)
     ListaDestino = BuscarTopAeroportos(CoordDestino['lat'], CoordDestino['lon'], limite=2)
     IatasOrigem = [a['iata'] for a in ListaOrigem]
@@ -83,7 +83,7 @@ def MontarPlanejamento(filial, serie, ctc):
     AeroOrigemPrincipal = ListaOrigem[0] if ListaOrigem else None
     AeroDestinoPrincipal = ListaDestino[0] if ListaDestino else None
 
-    # 5. Busca de Rotas (Sempre calcula para ter as opções de "Recalcular")
+    # 5. Busca de Rotas 
     OpcoesRotas = {}
     if IatasOrigem and IatasDestino:
         DataInicioBusca = DadosUnificados['data_busca'] 
@@ -91,7 +91,6 @@ def MontarPlanejamento(filial, serie, ctc):
         if PesoTotal <= 0: PesoTotal = float(DadosUnificados.get('peso_fisico', 10.0))
         DataLimite = DataInicioBusca + timedelta(days=5) 
         
-        # Repassando os novos parâmetros para a busca na malha e inteligência
         OpcoesRotas = MalhaService.BuscarOpcoesDeRotas(
             DataInicioBusca, 
             DataLimite, 
@@ -101,6 +100,11 @@ def MontarPlanejamento(filial, serie, ctc):
             tipo_carga=DadosUnificados.get('tipo_carga'),
             servico_contratado=DadosUnificados.get('servico_contratado')
         )
+        
+        if not OpcoesRotas:
+            flash("Atenção: Nenhuma rota aérea ativa foi encontrada para os parâmetros informados.", "warning")
+    else:
+        flash("Atenção: Não foram encontrados aeroportos viáveis próximos à origem ou destino.", "warning")
 
     return render_template('Planejamento/Editor.html', 
                            Ctc=DadosUnificados, 
@@ -108,18 +112,24 @@ def MontarPlanejamento(filial, serie, ctc):
                            AeroOrigem=AeroOrigemPrincipal,
                            AeroDestino=AeroDestinoPrincipal,
                            OpcoesRotas=OpcoesRotas,
-                           PlanejamentoSalvo=PlanejamentoSalvo) # <--- INJEÇÃO DO SALVO
+                           PlanejamentoSalvo=PlanejamentoSalvo) 
 
-# --- NOVA ROTA: CANCELAR ---
+# --- ROTA CANCELAR ---
 @PlanejamentoBp.route('/API/Cancelar', methods=['POST'])
 @login_required
 @RequerPermissao('planejamento.editar')
 def CancelarPlanejamentoRota():
     dados = request.json
     id_plan = dados.get('id_planejamento')
-    if not id_plan: return jsonify({'sucesso': False, 'msg': 'ID Inválido'})
+    
+    if not id_plan: 
+        return jsonify({'sucesso': False, 'msg': 'ID de planejamento inválido para cancelamento.'})
     
     sucesso, msg = PlanejamentoService.CancelarPlanejamento(id_plan, current_user.id)
+    
+    if sucesso:
+        msg = "Planejamento cancelado com sucesso. Os CTCs retornaram para a fila de pendências."
+        
     return jsonify({'sucesso': sucesso, 'msg': msg})
 
 @PlanejamentoBp.route('/API/Salvar', methods=['POST'])
@@ -128,7 +138,8 @@ def CancelarPlanejamentoRota():
 def SalvarPlanejamento():
     try:
         dados_front = request.json
-        if not dados_front: return jsonify({'sucesso': False}), 400
+        if not dados_front: 
+            return jsonify({'sucesso': False, 'msg': 'Nenhum dado recebido do formulário.'}), 400
 
         filial = dados_front.get('filial')
         serie = dados_front.get('serie')
@@ -136,7 +147,6 @@ def SalvarPlanejamento():
         
         LogService.Info("Routes.Planejamento", f"Recebendo requisição de salvamento para {filial}-{serie}-{ctc}")
 
-        # Recebe a lista completa de voos (rota)
         rota_completa = dados_front.get('rota_completa', []) 
 
         DadosCtc = PlanejamentoService.ObterCtcDetalhado(filial, serie, ctc)
@@ -145,7 +155,7 @@ def SalvarPlanejamento():
             DadosCtc['destino_cidade'], DadosCtc['destino_uf'],
             DadosCtc['data_emissao_real'], filial, ctc,
             DadosCtc['tipo_carga'],
-            servico_alvo=DadosCtc.get('servico_contratado') # <--- BLINDAGEM ATIVADA AQUI TAMBÉM
+            servico_alvo=DadosCtc.get('servico_contratado') 
         )
         DadosUnificados = PlanejamentoService.UnificarConsolidacao(DadosCtc, CtcsCandidatos)
         
@@ -153,7 +163,6 @@ def SalvarPlanejamento():
         CoordOrigem = BuscarCoordenadasCidade(DadosCtc['origem_cidade'], DadosCtc['origem_uf'])
         CoordDestino = BuscarCoordenadasCidade(DadosCtc['destino_cidade'], DadosCtc['destino_uf'])
         
-        # CORREÇÃO: Utiliza BuscarAeroportoEstrategico com a UF
         AeroOrigem = None
         AeroDestino = None
 
@@ -180,14 +189,24 @@ def SalvarPlanejamento():
         
         if Id: 
             LogService.Info("Routes.Planejamento", f"Planejamento salvo com sucesso. ID Retornado: {Id}")
-            return jsonify({'sucesso': True, 'id_planejamento': Id})
+            return jsonify({
+                'sucesso': True, 
+                'id_planejamento': Id, 
+                'msg': 'Planejamento registrado com sucesso! O lote foi encaminhado para a próxima etapa.'
+            })
         
         LogService.Error("Routes.Planejamento", "Service retornou None ao salvar.")
-        return jsonify({'sucesso': False, 'msg': 'Erro ao gravar'}), 500
+        return jsonify({'sucesso': False, 'msg': 'Erro interno ao tentar gravar os trechos do voo. Contate o suporte.'}), 500
 
     except Exception as e:
-        LogService.Error("Routes.Planejamento", "Exceção não tratada ao salvar planejamento", e)
-        return jsonify({'sucesso': False, 'msg': str(e)}), 500
+        LogService.Error("Routes.Planejamento", "Exceção ao salvar planejamento", e)
+        msg_erro = str(e)
+        
+        # Tratamento específico para retornar amigável ao SweetAlert/Toastr se for a Trava
+        if "TRAVA DE CORTE" in msg_erro:
+            return jsonify({'sucesso': False, 'msg': msg_erro}), 400
+            
+        return jsonify({'sucesso': False, 'msg': f"Erro ao registrar planejamento: {msg_erro}"}), 500
 
 @PlanejamentoBp.route('/API/Exportar')
 @login_required
@@ -198,7 +217,8 @@ def ExportarPlanejamentosExcel():
     ArquivoGerado = PlanejamentoService.GerarExcelPlanejamentos()
     
     if not ArquivoGerado:
-        return "Erro ao gerar o arquivo de planejamento.", 500
+        flash("Erro de Conexão: Não foi possível gerar o arquivo de planejamento no momento. Tente novamente.", "danger")
+        return redirect(url_for('Planejamento.Dashboard'))
 
     NomeArquivo = f'Planejamento_Aereo_{datetime.now().strftime("%Y%m%d_%H%M")}.xlsx'
     
@@ -237,11 +257,7 @@ def MapaGlobal():
                 # Atualiza Totais
                 Agrupamento[UfOrig]['qtd_docs'] += 1
                 Agrupamento[UfOrig]['qtd_vols'] += int(c['volumes'])
-                
-                # --- CORREÇÃO AQUI ---
-                # Usa o valor bruto direto (float), sem converter string
                 Agrupamento[UfOrig]['valor_total'] += c['raw_val_mercadoria']
-                # ---------------------
                 
                 if 'URGENTE' in str(c['prioridade']).upper():
                     Agrupamento[UfOrig]['tem_urgencia'] = True
@@ -259,4 +275,5 @@ def MapaGlobal():
         return render_template('Planejamento/Map.html', Dados=DadosMapa)
     except Exception as e:
         LogService.Error("Routes.Planejamento", "Erro fatal ao renderizar Mapa Global", e)
-        return "Erro interno", 500
+        flash("Erro de Conexão: Não foi possível carregar os dados do mapa. Tente novamente em instantes.", "danger")
+        return redirect(url_for('Planejamento.Dashboard'))

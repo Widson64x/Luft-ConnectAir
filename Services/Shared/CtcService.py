@@ -1,9 +1,9 @@
 from datetime import datetime, date, time
 from decimal import Decimal
 from Conexoes import ObterSessaoSqlServer
-from Models.SQL_SERVER.Ctc import CtcEsp, CtcEspCpl
-from Models.SQL_SERVER.NfEsp import NfEsp       # <--- Importe Novo
-from Models.SQL_SERVER.Ocorrencia import Ocorrencia # <--- Importe Novo
+from Models.SQL_SERVER.Ctc import CtcEsp, CtcEspFarma, CtcEspCpl
+from Models.SQL_SERVER.NfEsp import NfEsp
+from Models.SQL_SERVER.Ocorrencia import Ocorrencia
 from Services.LogService import LogService
 
 class CtcService:
@@ -75,6 +75,31 @@ class CtcService:
             if Cpl:
                 for coluna in Cpl.__table__.columns:
                     dados_completos[coluna.name] = safe_val(getattr(Cpl, coluna.name))
+                
+                # ---------------------------------------------------------
+                # NOVA LÓGICA: INTERCEPTAÇÃO SUBCONTRATAÇÃO FARMA
+                # ---------------------------------------------------------
+                ctc_corresp = getattr(Cpl, 'ctc_corresp', None)
+                if ctc_corresp and str(ctc_corresp).strip():
+                    # Busca na tabela da Farma usando o ctc_corresp
+                    ctc_farma = Sessao.query(CtcEspFarma).filter(
+                        CtcEspFarma.filialctc == str(ctc_corresp).strip()
+                    ).first()
+                    
+                    if ctc_farma:
+                        # Temos uma subcontratação! Substituímos os dados no dict principal
+                        # Usando 'respons_nome' e 'respons_cgc' da Farma como você pediu
+                        cliente_real_nome = safe_val(getattr(ctc_farma, 'respons_nome'))
+                        cliente_real_cgc = safe_val(getattr(ctc_farma, 'respons_cgc'))
+                        
+                        # Sobrescreve as variáveis do remetente/responsável no dicionário final
+                        dados_completos['remet_nome'] = cliente_real_nome
+                        dados_completos['remet_cgc'] = cliente_real_cgc
+                        dados_completos['respons_nome'] = cliente_real_nome
+                        dados_completos['respons_cgc'] = cliente_real_cgc
+                        
+                        # Opcional: Criar uma flag para o Front-end saber que foi subcontratado
+                        dados_completos['is_subcontratacao_farma'] = True
             else:
                 dados_completos['StatusCTC'] = 'N/A'
                 dados_completos['TipoCarga'] = 'N/A'
