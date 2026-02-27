@@ -352,7 +352,10 @@ class PlanejamentoService:
                 except: pass
 
             DataEmissaoReal = datetime.combine(DataBase.date(), HoraFinal)
-            DataBuscaVoos = datetime.now() + timedelta(hours=10) 
+            
+            # SLA DE OPERAÇÃO: Adiciona 12 horas a partir de 'agora' para dar tempo de separar e transportar a carga até o aeroporto.
+            DataBuscaVoos = datetime.now() + timedelta(hours=12) 
+            
             TipoCarga = CplEncontrado.TipoCarga if CplEncontrado else None
 
             is_dev = CtcEncontrado.motivodoc == 'DEV'

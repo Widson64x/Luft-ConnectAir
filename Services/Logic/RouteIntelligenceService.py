@@ -62,16 +62,27 @@ class RouteIntelligenceService:
                 G.add_edge(OrigemNo, DestinoNo, voos=[Voo])
                 
         # 3. Processamento de Caminhos
+        LogService.Info("RouteIntelligence", f"Grafo Montado: {G.number_of_nodes()} aeroportos conectados e {G.number_of_edges()} trechos (arestas).")
+
+        # 3. Processamento de Caminhos
         ListaCandidatos = []
         for origem_iata in lista_origens:
             for destino_iata in lista_destinos:
-                if not G.has_node(origem_iata) or not G.has_node(destino_iata): 
+                
+                # --- NOVOS LOGS DE VALIDAÇÃO DOS IATAS ---
+                if not G.has_node(origem_iata):
+                    LogService.Warning("RouteIntelligence", f"FALHA GRAFO: Origem {origem_iata} não possui voos partindo/chegando nela na malha atual.")
+                    continue
+                if not G.has_node(destino_iata):
+                    LogService.Warning("RouteIntelligence", f"FALHA GRAFO: Destino {destino_iata} não possui voos partindo/chegando nela na malha atual.")
                     continue 
 
                 try:
                     CaminhosNos = list(nx.all_simple_paths(G, source=origem_iata, target=destino_iata, cutoff=3))
-                except: 
-                    continue 
+                    LogService.Info("RouteIntelligence", f"Sucesso Grafo: Encontrados {len(CaminhosNos)} caminhos teóricos entre {origem_iata} e {destino_iata}.")
+                except Exception as e: 
+                    LogService.Error("RouteIntelligence", f"Erro no motor de caminhos", e)
+                    continue
 
                 for Caminho in CaminhosNos:
                     SequenciaVoos = RouteIntelligenceService._ValidarCaminhoCronologico(G, Caminho, data_inicio)
@@ -187,7 +198,10 @@ class RouteIntelligenceService:
             'interline': []
         }
 
+        LogService.Info("RouteIntelligence", f"--- CATEGORIZANDO {len(lista_candidatos)} OPÇÕES VÁLIDAS ENCONTRADAS ---")
+
         if not lista_candidatos:
+            LogService.Warning("RouteIntelligence", "FALHA FINAL: Os caminhos do grafo existiam, mas NENHUM passou nos filtros de tempo cronológico ou companhia bloqueada.")
             return Categorias
 
         candidatos_processados = []

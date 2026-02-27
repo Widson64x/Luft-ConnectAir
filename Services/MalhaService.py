@@ -215,10 +215,16 @@ class MalhaService:
             VoosDB = Sessao.query(VooMalha).join(RemessaMalha).filter(
                     RemessaMalha.Ativo == True,
                     VooMalha.DataPartida >= FiltroDataInicio, 
-                    VooMalha.DataPartida <= FiltroDataFim + timedelta(days=5) 
+                    VooMalha.DataPartida <= FiltroDataFim + timedelta(days=30) # Lembre-se que mudamos para 30 aqui
                 ).all()
+            
+            # --- NOVOS LOGS AQUI ---
+            LogService.Info("MalhaService", f"Buscando voos entre {FiltroDataInicio} e {FiltroDataFim + timedelta(days=30)}")
+            LogService.Info("MalhaService", f"IATAs Buscados -> Origens: {lista_origens} | Destinos: {lista_destinos}")
+            LogService.Info("MalhaService", f"Quantidade de voos totais resgatados da base: {len(VoosDB)}")
 
             if not VoosDB: 
+                LogService.Warning("MalhaService", "FALHA: Nenhum voo foi encontrado no banco de dados para as datas solicitadas!")
                 return ResultadosFormatados
             
             # 2. DELEGA PARA O CÉREBRO: O Intelligence processa tudo

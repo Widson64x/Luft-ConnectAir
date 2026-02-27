@@ -74,9 +74,9 @@ def MontarPlanejamento(filial, serie, ctc):
     # Verifica se já existe planejamento salvo
     PlanejamentoSalvo = PlanejamentoService.ObterPlanejamentoPorCtc(filial, serie, ctc)
     
-    # 4. Aeroportos 
-    ListaOrigem = BuscarTopAeroportos(CoordOrigem['lat'], CoordOrigem['lon'], limite=2)
-    ListaDestino = BuscarTopAeroportos(CoordDestino['lat'], CoordDestino['lon'], limite=2)
+    # 4. Aeroportos (Aumentamos o limite para 5 para forçar a achar Hubs maiores como POA, FLN, CWB)
+    ListaOrigem = BuscarTopAeroportos(CoordOrigem['lat'], CoordOrigem['lon'], limite=5)
+    ListaDestino = BuscarTopAeroportos(CoordDestino['lat'], CoordDestino['lon'], limite=5)
     IatasOrigem = [a['iata'] for a in ListaOrigem]
     IatasDestino = [a['iata'] for a in ListaDestino]
     
@@ -89,7 +89,8 @@ def MontarPlanejamento(filial, serie, ctc):
         DataInicioBusca = DadosUnificados['data_busca'] 
         PesoTotal = float(DadosUnificados.get('peso_taxado', 0.0))
         if PesoTotal <= 0: PesoTotal = float(DadosUnificados.get('peso_fisico', 10.0))
-        DataLimite = DataInicioBusca + timedelta(days=5) 
+        
+        DataLimite = DataInicioBusca + timedelta(days=7)
         
         OpcoesRotas = MalhaService.BuscarOpcoesDeRotas(
             DataInicioBusca, 
