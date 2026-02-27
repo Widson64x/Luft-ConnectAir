@@ -171,7 +171,21 @@ class CtcEsp(Base):
     uf_coleta = Column(String(2))
     cep_coleta = Column(String(8))
     Codigo_ClienteEdiLog = Column(Integer)
+
+class CtcEspFarma(Base):
+    # Apontamento Cross-Database (Banco 'farma', schema 'dbo', tabela 'tb_ctc_esp')
+    __tablename__ = 'tb_ctc_esp' # Nome interno pro SQLAlchemy não confundir
+    __table_args__ = {'schema': 'farma.dbo'}
     
+    # --- Chaves Primárias ---
+    filial = Column(String(2), primary_key=True)
+    filialctc = Column(String(10), primary_key=True)
+    seriectc = Column(String(3), primary_key=True)
+
+    # --- Colunas que precisamos para a subcontratação ---
+    respons_nome = Column(String(40))
+    respons_cgc = Column(String(14))
+
 class CtcEspCpl(Base):
     __tablename__ = 'tb_ctc_esp_cpl'
     __table_args__ = {'schema': 'intec.dbo'}
