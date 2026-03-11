@@ -15,6 +15,7 @@ from Models.SQL_SERVER.Cidade import Cidade, RemessaCidade
 from Models.SQL_SERVER.MalhaAerea import VooMalha , RemessaMalha
 from Models.SQL_SERVER.Cadastros import Cliente
 from Models.SQL_SERVER.ServicoCliente import ServicoCliente
+from Models.SQL_SERVER.Filial import Filial
 import re
 from Services.LogService import LogService 
 
@@ -1046,7 +1047,12 @@ class PlanejamentoService:
             Resultados = SessaoPG.query(
                 PlanejamentoItem,
                 CtcEsp.rotafilialdest,
-                CtcEsp.motivodoc
+                CtcEsp.motivodoc,
+                CtcEsp.remet_nome,
+                CtcEsp.dest_nome,
+                CtcEspCpl.ctc_corresp,
+                CtcEspCpl.TipoCarga,
+                Filial.nomefilial
             ).join(
                 PlanejamentoCabecalho, PlanejamentoItem.IdPlanejamento == PlanejamentoCabecalho.IdPlanejamento
             ).outerjoin(
@@ -1054,6 +1060,10 @@ class PlanejamentoService:
                 (PlanejamentoItem.Filial.collate('DATABASE_DEFAULT') == CtcEsp.filial.collate('DATABASE_DEFAULT')) &
                 (PlanejamentoItem.Serie.collate('DATABASE_DEFAULT') == CtcEsp.seriectc.collate('DATABASE_DEFAULT')) &
                 (PlanejamentoItem.Ctc.collate('DATABASE_DEFAULT') == CtcEsp.filialctc.collate('DATABASE_DEFAULT'))
+            ).outerjoin(
+                CtcEspCpl, CtcEsp.filialctc == CtcEspCpl.filialctc
+            ).outerjoin(
+                Filial, PlanejamentoItem.Filial.collate('DATABASE_DEFAULT') == Filial.filial.collate('DATABASE_DEFAULT')
             ).options(
                 joinedload(PlanejamentoItem.Cabecalho).joinedload(PlanejamentoCabecalho.Trechos),
                 joinedload(PlanejamentoItem.CidadeOrigemObj),
@@ -1064,19 +1074,74 @@ class PlanejamentoService:
 
             DadosPlanilha = []
             Hoje = date.today()
+            
+            # Cache para evitar consultar o mesmo CTC da Farma repetidas vezes no banco
+            CacheFarma = {}
 
             for Row in Resultados:
                 Item = Row.PlanejamentoItem
                 RotaLastMile = Row.rotafilialdest if Row.rotafilialdest else ''
                 MotivoDoc = Row.motivodoc if Row.motivodoc else ''
+                NomeFilialStr = str(Row.nomefilial).strip() if Row.nomefilial else Item.Filial
+                TipoCargaStr = str(Row.TipoCarga).strip() if Row.TipoCarga else ''
+                
+                RemetNome = Row.remet_nome if Row.remet_nome else Item.Remetente
+                DestNome = Row.dest_nome if Row.dest_nome else Item.Destinatario
+                CtcCorresp = Row.ctc_corresp
 
+                # --- LÓGICA DE SUBCONTRATAÇÃO FARMA ---
+                if CtcCorresp and str(CtcCorresp).strip():
+                    ctc_farma = str(CtcCorresp).strip()
+                    if ctc_farma not in CacheFarma:
+                        try:
+                            query_farma = text("SELECT respons_nome FROM farma.dbo.tb_ctc_esp (NOLOCK) WHERE filialctc = :ctc")
+                            farma_data = SessaoPG.execute(query_farma, {'ctc': ctc_farma}).fetchone()
+                            if farma_data and farma_data.respons_nome:
+                                CacheFarma[ctc_farma] = farma_data.respons_nome
+                            else:
+                                CacheFarma[ctc_farma] = None
+                        except Exception as e_farma:
+                            LogService.Warning("PlanejamentoService", f"Erro buscar subcontratação Farma no Excel: {e_farma}")
+                            CacheFarma[ctc_farma] = None
+                    
+                    nome_farma = CacheFarma.get(ctc_farma)
+                    if nome_farma:
+                        RemetNome = nome_farma
+
+                # --- LÓGICA DE REVERSA (DEV) ---
+                ClienteFinal = DestNome if MotivoDoc == 'DEV' else RemetNome
+                DestinatarioFinal = RemetNome if MotivoDoc == 'DEV' else DestNome
+
+                if not ClienteFinal: ClienteFinal = Item.Remetente
+                if not DestinatarioFinal: DestinatarioFinal = Item.Destinatario
+
+                # --- MONTAGEM DOS TRECHOS DE VOO ---
                 Cabecalho = Item.Cabecalho
                 TrechoPrincipal = None
+                VooFormatado = ""
                 
                 if Cabecalho.Trechos:
                     TrechosOrdenados = sorted(Cabecalho.Trechos, key=lambda t: t.Ordem)
                     if TrechosOrdenados:
                         TrechoPrincipal = TrechosOrdenados[0]
+                        
+                        TrechosStrings = []
+                        for idx, trecho in enumerate(TrechosOrdenados):
+                            origem = trecho.AeroportoOrigem or ''
+                            destino = trecho.AeroportoDestino or ''
+                            cia = trecho.CiaAerea or ''
+                            voo = trecho.NumeroVoo or ''
+                            saida = trecho.DataPartida.strftime('%H:%M') if getattr(trecho, 'DataPartida', None) else '--:--'
+                            chegada = trecho.DataChegada.strftime('%H:%M') if getattr(trecho, 'DataChegada', None) else '--:--'
+                            
+                            if idx == 0:
+                                str_t = f"EM {origem} VOO {cia} {voo} {saida} / {chegada} EM {destino}"
+                            else:
+                                str_t = f"VOO {cia} {voo} {saida} / {chegada} EM {destino}"
+                                
+                            TrechosStrings.append(str_t)
+                            
+                        VooFormatado = " - ".join(TrechosStrings)
 
                 UfOrigem = Item.CidadeOrigemObj.Uf if Item.CidadeOrigemObj and hasattr(Item.CidadeOrigemObj, 'Uf') else ''
                 UfDestino = Item.CidadeDestinoObj.Uf if Item.CidadeDestinoObj and hasattr(Item.CidadeDestinoObj, 'Uf') else ''
@@ -1087,40 +1152,49 @@ class PlanejamentoService:
                 elif Item.DataEmissao and Item.DataEmissao.date() < Hoje:
                     TipoClassificacao = "BACKLOG"
 
+                # --- LÓGICA DO CORTE SEM HORÁRIO ---
                 CorteFmt = ''
-                if Item.Corte and Item.HorarioCorte:
-                    CorteFmt = f"{Item.Corte}° Corte - ({Item.HorarioCorte.strftime('%H:%M')})"
-                elif Item.HorarioCorte:
-                    CorteFmt = Item.HorarioCorte.strftime('%H:%M')
-                elif TrechoPrincipal and TrechoPrincipal.HorarioCorte:
-                    CorteFmt = TrechoPrincipal.HorarioCorte.strftime('%H:%M')
+                if Item.Corte is not None:
+                    CorteFmt = f"{Item.Corte}° Corte"
 
                 DataPartidaFmt = TrechoPrincipal.DataPartida.strftime('%d/%m/%Y %H:%M') if TrechoPrincipal and TrechoPrincipal.DataPartida else ''
 
-                Linha = {
-                    'UF ORIGEM': UfOrigem,
-                    'UNIDADE RESPONSÁVEL LAST MILE': RotaLastMile, 
-                    'TIPO': TipoClassificacao, 
-                    'CIA': TrechoPrincipal.CiaAerea if TrechoPrincipal else '',
-                    'SERVIÇO': TrechoPrincipal.TipoServico if TrechoPrincipal else '',
-                    'CORTE': CorteFmt,
-                    'NOTA FISCAL': Item.NotaFiscal if Item.NotaFiscal else Item.Ctc,
-                    'CLIENTE': Item.Remetente,
-                    'RAZÃO SOCIAL DESTINATÁRIO': Item.Destinatario,
-                    'CIDADE DESTINO': Item.DestinoCidade,
-                    'UF DESTINO': UfDestino,
-                    'VOLUMES': Item.Volumes,
-                    'PESO': float(Item.PesoTaxado) if Item.PesoTaxado else 0.0,
-                    'VALOR NF': float(Item.ValMercadoria) if Item.ValMercadoria else 0.0,
-                    'PLANEJAMENTO': Cabecalho.IdPlanejamento,
-                    'STATUS': Cabecalho.Status,
-                    'FILIAL': Item.Filial,
-                    'SÉRIE': Item.Serie,
-                    'CTC': Item.Ctc,
-                    'VOO': TrechoPrincipal.NumeroVoo if TrechoPrincipal else '',
-                    'PREVISÃO DT. PARTIDA': DataPartidaFmt
-                }
-                DadosPlanilha.append(Linha)
+                # --- LÓGICA DE MULTIPLAS NOTAS FISCAIS EM LINHAS SEPARADAS ---
+                NotasRawStr = str(Item.NotaFiscal).strip() if Item.NotaFiscal else str(Item.Ctc)
+                # Divide por qualquer separador comum: vírgula, barra, ponto-e-vírgula ou espaço
+                NotasLista = [n.strip() for n in re.split(r'[,;/|\s]+', NotasRawStr) if n.strip()]
+                
+                # Se após limpar não sobrar nada, ele garante que pelo menos use o CTC
+                if not NotasLista:
+                    NotasLista = [str(Item.Ctc)]
+
+                # Cria uma linha duplicada idêntica pra cada nota fiscal separada no array
+                for nf_individual in NotasLista:
+                    Linha = {
+                        'UF ORIGEM': UfOrigem,
+                        'UNIDADE RESPONSÁVEL LAST MILE': RotaLastMile, 
+                        'TIPO': TipoClassificacao, 
+                        'TIPO DE CARGA': TipoCargaStr,
+                        'CIA': TrechoPrincipal.CiaAerea if TrechoPrincipal else '',
+                        'SERVIÇO': TrechoPrincipal.TipoServico if TrechoPrincipal else '',
+                        'CORTE': CorteFmt,
+                        'NOTA FISCAL': nf_individual, # Campo individualizado da NF
+                        'CLIENTE': str(ClienteFinal).strip().upper() if ClienteFinal else '',
+                        'RAZÃO SOCIAL DESTINATÁRIO': str(DestinatarioFinal).strip().upper() if DestinatarioFinal else '',
+                        'CIDADE DESTINO': Item.DestinoCidade,
+                        'UF DESTINO': UfDestino,
+                        'VOLUMES': Item.Volumes,
+                        'PESO': float(Item.PesoTaxado) if Item.PesoTaxado else 0.0,
+                        'VALOR NF': float(Item.ValMercadoria) if Item.ValMercadoria else 0.0,
+                        'PLANEJAMENTO': Cabecalho.IdPlanejamento,
+                        'STATUS': Cabecalho.Status,
+                        'FILIAL': NomeFilialStr, 
+                        'SÉRIE': Item.Serie,
+                        'CTC': Item.Ctc,
+                        'VOO': VooFormatado, 
+                        'PREVISÃO DT. PARTIDA': DataPartidaFmt
+                    }
+                    DadosPlanilha.append(Linha)
 
             DfPlanilha = pd.DataFrame(DadosPlanilha)
             ArquivoMemoria = io.BytesIO()
