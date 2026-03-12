@@ -25,7 +25,7 @@ def Gerenciar():
                 return redirect(url_for('Frete.Gerenciar'))
 
     Historico = TabelaFreteService.ListarRemessas()
-    return render_template('TabelasFrete/Manager.html', ListaRemessas=Historico)
+    return render_template('Pages/TabelasFrete/Manager.html', ListaRemessas=Historico)
 
 @FreteBp.route('/Fretes/Excluir/<int:id_remessa>')
 @login_required

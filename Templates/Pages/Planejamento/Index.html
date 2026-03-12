@@ -1,0 +1,264 @@
+{% extends "Layout/BaseLayout.html" %}
+{% import 'luftcore/components.html' as ui %}
+
+{% block titulo %}Monitoramento Aéreo | Luft-ConnectAir{% endblock %}
+
+{% block conteudo %}
+{% include "Components/_ModalCtc.html" %}
+
+<style>
+    /* --- ESTILOS EXCLUSIVOS DO PLANEJAMENTO --- */
+    .luft-planejamento-wrapper {
+        display: flex;
+        flex-direction: column;
+        animation: slideUpFade 0.6s ease-out forwards;
+    }
+
+    @keyframes slideUpFade { 
+        from { opacity: 0; transform: translateY(20px); } 
+        to { opacity: 1; transform: translateY(0); } 
+    }
+
+    /* Tabs de Navegação */
+    .luft-tabs-wrapper { 
+        display: flex; 
+        gap: 8px; 
+        border-bottom: 2px solid var(--luft-border); 
+        padding-bottom: 12px; 
+        margin-bottom: 24px; 
+        overflow-x: auto;
+    }
+    
+    .luft-tab-btn { 
+        background: transparent; 
+        border: none; 
+        font-weight: 600; 
+        color: var(--luft-text-muted); 
+        padding: 8px 16px; 
+        border-radius: 8px; 
+        cursor: pointer; 
+        transition: 0.2s; 
+        display: flex; 
+        align-items: center; 
+        gap: 8px; 
+        white-space: nowrap;
+    }
+    
+    .luft-tab-btn:hover { 
+        background: var(--luft-bg-app); 
+        color: var(--luft-text-main); 
+    }
+    
+    .luft-tab-btn.active { 
+        background: rgba(59, 130, 246, 0.1); 
+        color: var(--luft-primary-600); 
+    }
+
+    /* Tabela */
+    .luft-planejamento-tabela {
+        width: 100%;
+        border-collapse: collapse;
+        white-space: nowrap;
+    }
+    
+    .luft-planejamento-tabela th {
+        text-align: left; 
+        padding: 12px 16px; 
+        font-size: 0.75rem; 
+        font-weight: 700;
+        text-transform: uppercase; 
+        color: var(--luft-text-muted); 
+        background: var(--luft-bg-app);
+        position: sticky; 
+        top: 0; 
+        z-index: 10; 
+        border-bottom: 1px solid var(--luft-border);
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    
+    .luft-planejamento-tabela th:hover {
+        background: var(--luft-border);
+    }
+    
+    .luft-planejamento-tabela td { 
+        padding: 12px 16px; 
+        border-bottom: 1px solid var(--luft-border); 
+        font-size: 0.85rem; 
+        color: var(--luft-text-main); 
+        vertical-align: middle; 
+    }
+
+    .luft-planejamento-tabela tr:hover td {
+        background-color: var(--luft-bg-app);
+    }
+    
+    .flow-icon { color: var(--luft-text-muted); margin: 0 4px; font-size: 0.8rem; }
+</style>
+
+<div class="luft-planejamento-wrapper">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-4">
+        <div>
+            <h1 class="font-black text-main d-flex align-items-center gap-2" style="font-size: 1.8rem; letter-spacing: -0.5px;">
+                <i class="ph-duotone ph-airplane-tilt text-primary"></i> Painel de Planejamento
+            </h1>
+            <p class="text-muted mt-1 font-medium" id="data-extenso">Carregando data...</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('Planejamento.ExportarPlanejamentosExcel') }}" class="btn d-flex align-items-center gap-2" style="background-color: #217346; color: white; border: none;" title="Exportar para Excel">
+                <i class="ph-bold ph-microsoft-excel-logo" style="font-size: 1.2rem;"></i> Exportar
+            </a>
+            
+            <a href="{{ url_for('Planejamento.MapaGlobal') }}" class="btn btn-primary d-flex align-items-center gap-2" title="Ver Mapa Global">
+                <i class="ph-bold ph-globe-hemisphere-west" style="font-size: 1.2rem;"></i> Mapa Global
+            </a>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 24px;">
+        <div class="luft-card hover-lift p-4 d-flex align-items-center gap-4">
+            <div class="d-flex align-items-center justify-content-center rounded-xl bg-info-light text-info" style="width: 52px; height: 52px; font-size: 1.6rem; flex-shrink: 0;">
+                <i class="ph-duotone ph-package"></i>
+            </div>
+            <div>
+                <p class="text-muted text-xs font-bold mb-1" style="text-transform: uppercase; letter-spacing: 0.5px;">Total CT-e</p>
+                <h3 class="text-2xl font-black text-main m-0" id="kpi-total">0</h3>
+            </div>
+        </div>
+
+        <div class="luft-card hover-lift p-4 d-flex align-items-center gap-4">
+            <div class="d-flex align-items-center justify-content-center rounded-xl bg-warning-light text-warning" style="width: 52px; height: 52px; font-size: 1.6rem; flex-shrink: 0;">
+                <i class="ph-duotone ph-scales"></i>
+            </div>
+            <div>
+                <p class="text-muted text-xs font-bold mb-1" style="text-transform: uppercase; letter-spacing: 0.5px;">Peso Total</p>
+                <h3 class="text-2xl font-black text-main m-0"><span id="kpi-peso">0</span> <span class="text-sm font-semibold text-muted">kg</span></h3>
+            </div>
+        </div>
+
+        <div class="luft-card hover-lift p-4 d-flex align-items-center gap-4">
+            <div class="d-flex align-items-center justify-content-center rounded-xl bg-success-light text-success" style="width: 52px; height: 52px; font-size: 1.6rem; flex-shrink: 0;">
+                <i class="ph-duotone ph-currency-circle-dollar"></i>
+            </div>
+            <div>
+                <p class="text-muted text-xs font-bold mb-1" style="text-transform: uppercase; letter-spacing: 0.5px;">Valor Total</p>
+                <h3 class="text-xl font-black text-success m-0">R$ <span id="kpi-valor">0,00</span></h3>
+            </div>
+        </div>
+
+        <div class="luft-card hover-lift p-4 d-flex align-items-center gap-4">
+            <div class="d-flex align-items-center justify-content-center rounded-xl bg-primary-light text-primary" style="width: 52px; height: 52px; font-size: 1.6rem; flex-shrink: 0;">
+                <i class="ph-duotone ph-receipt"></i>
+            </div>
+            <div>
+                <p class="text-muted text-xs font-bold mb-1" style="text-transform: uppercase; letter-spacing: 0.5px;">Qtd. Notas</p>
+                <h3 class="text-2xl font-black text-main m-0" id="kpi-notas">0</h3>
+            </div>
+        </div>
+    </div>
+
+    <div class="luft-tabs-wrapper">
+        <button class="luft-tab-btn active" onclick="MudarAba('TODOS')" id="tab-todos">
+            <i class="ph-bold ph-squares-four"></i> Visão Global
+        </button>
+        <button class="luft-tab-btn" onclick="MudarAba('DIARIO')" id="tab-diario">
+            <i class="ph-bold ph-sun"></i> Do Dia
+        </button>
+        <button class="luft-tab-btn" onclick="MudarAba('BACKLOG')" id="tab-backlog">
+            <i class="ph-bold ph-clock-counter-clockwise"></i> Backlog
+        </button>
+        <button class="luft-tab-btn" onclick="MudarAba('REVERSA')" id="tab-reversa">
+            <i class="ph-bold ph-arrow-u-up-left"></i> Reversa
+        </button>
+    </div>
+
+    <div class="luft-card" style="padding: 0; overflow: hidden; display: flex; flex-direction: column;">
+        
+        <div class="d-flex gap-4 flex-wrap align-items-end" style="padding: 24px; border-bottom: 1px solid var(--luft-border); background: transparent;">
+            
+            <div style="flex: 2; min-width: 250px;">
+                <label class="form-label text-xs font-bold text-muted mb-1" style="text-transform: uppercase;">Pesquisar</label>
+                <div class="relative">
+                    <i class="ph-bold ph-magnifying-glass absolute" style="left: 14px; top: 50%; transform: translateY(-50%); color: var(--luft-text-muted);"></i>
+                    <input type="text" id="input-busca" class="form-control pl-10" placeholder="Buscar por CTC, cidade, cliente..." onkeyup="FiltrarTabela()" style="padding-left: 40px;">
+                </div>
+            </div>
+
+            <div style="flex: 1; min-width: 180px;">
+                <label class="form-label text-xs font-bold text-muted mb-1" style="text-transform: uppercase;">Prioridade</label>
+                <div class="relative">
+                    <i class="ph-bold ph-flag-banner absolute" style="left: 14px; top: 50%; transform: translateY(-50%); color: var(--luft-text-muted);"></i>
+                    <select id="filtro-prioridade" class="form-control pl-10" onchange="FiltrarTabela()" style="padding-left: 40px; cursor: pointer;">
+                        <option value="TODOS">Todas Prioridades</option>
+                        <option value="URGENTE">⚠️ Apenas Urgentes</option>
+                        <option value="AGENDADA">📅 Apenas Agendadas</option> 
+                        <option value="NORMAL">✅ Apenas Normais</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="flex: 1; min-width: 180px;">
+                <label class="form-label text-xs font-bold text-muted mb-1" style="text-transform: uppercase;">Filial</label>
+                <div class="relative">
+                    <i class="ph-bold ph-storefront absolute" style="left: 14px; top: 50%; transform: translateY(-50%); color: var(--luft-text-muted);"></i>
+                    <select id="filtro-filial" class="form-control pl-10" onchange="FiltrarTabela()" style="padding-left: 40px; cursor: pointer;">
+                        <option value="TODOS">Todas Filiais</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="flex: 1; min-width: 180px;">
+                <label class="form-label text-xs font-bold text-muted mb-1" style="text-transform: uppercase;">Motivo</label>
+                <div class="relative">
+                    <i class="ph-bold ph-info absolute" style="left: 14px; top: 50%; transform: translateY(-50%); color: var(--luft-text-muted);"></i>
+                    <select id="filtro-motivo" class="form-control pl-10" onchange="FiltrarTabela()" style="padding-left: 40px; cursor: pointer;">
+                        <option value="TODOS">Todos Motivos</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div id="transition-container" style="overflow-x: auto; max-height: 55vh; overflow-y: auto;">
+            <table class="luft-planejamento-tabela">
+                <thead>
+                    <tr>
+                        <th style="text-align: center;">Ações</th> 
+                        <th onclick="Ordenar('status_planejamento')">Status</th>
+                        <th onclick="Ordenar('prioridade')" style="text-align: center;" title="Prioridade">Prio.</th>
+                        <th onclick="Ordenar('origem_dados')">Tipo</th>
+                        <th onclick="Ordenar('ctc')">CTC / Série</th>
+                        <th onclick="Ordenar('unid_lastmile')" style="text-align: center;">UNID. LASTMILE</th>
+                        <th onclick="Ordenar('data_raw')">Emissão <i id="seta-data_raw" class="ph-bold ph-arrow-down text-primary"></i></th>
+                        <th>Origem <i class="ph-bold ph-arrow-right flow-icon"></i> Destino</th>
+                        <th onclick="Ordenar('remetente')">Cliente / Tipo Carga</th>
+                        <th onclick="Ordenar('qtd_notas')" style="text-align: center;" title="NFs">NFs</th> 
+                        <th onclick="Ordenar('volumes')" style="text-align: right;">Vols.</th>
+                        <th onclick="Ordenar('peso_taxado')" style="text-align: right;">Peso Fís. / Tax.</th>
+                        <th onclick="Ordenar('raw_val_mercadoria')" style="text-align: right;">Valor</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    <tr>
+                        <td colspan="13" style="text-align: center; padding: 60px; color: var(--luft-text-muted);">
+                            <i class="ph-bold ph-spinner ph-spin text-primary" style="font-size: 2rem; margin-bottom: 10px;"></i>
+                            <br>Carregando dados do planejamento...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="d-flex justify-content-end align-items-center" style="padding: 16px 24px; background: transparent; border-top: 1px solid var(--luft-border);">
+            <div id="contador-registros" class="text-xs font-bold text-muted" style="text-transform: uppercase;">Mostrando 0 registros</div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const URL_API_LISTAR = "{{ url_for('Planejamento.ApiCtcsHoje') }}";
+    const URL_BASE_MONTAR = "{{ url_for('Planejamento.MontarPlanejamento', filial='__F__', serie='__S__', ctc='__C__') }}";
+</script>
+<script src="{{ url_for('static', filename='JS/Planejamento/Index.js') }}" defer></script>
+{% endblock %}

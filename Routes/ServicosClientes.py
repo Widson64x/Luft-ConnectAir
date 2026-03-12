@@ -10,7 +10,7 @@ ServicosClientesBp = Blueprint('ServicosClientes', __name__, url_prefix='/Planej
 def Gerenciar():
     """Renderiza a tela de cadastro enviando a lista de clientes para a Árvore de Seleção"""
     ListaClientes = ServicoClienteService.ObterClientesParaSelecao()
-    return render_template('ServicoCliente/Manager.html', Clientes=ListaClientes)
+    return render_template('Pages/ServicoCliente/Manager.html', Clientes=ListaClientes)
 
 @ServicosClientesBp.route('/DadosCliente/<int:CodigoCliente>', methods=['GET'])
 @login_required

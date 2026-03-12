@@ -10,7 +10,7 @@ CortesBp = Blueprint('Cortes', __name__)
 @RequerPermissao('cadastros.cortes.visualizar') 
 def Gerenciar():
     arvore_filiais = CorteService.ListarFiliaisAgrupadas()
-    return render_template('Cortes/Manager.html', ArvoreFiliais=arvore_filiais)
+    return render_template('Pages/Cortes/Manager.html', ArvoreFiliais=arvore_filiais)
 
 @CortesBp.route('/API/Listar/Planejamento')
 @login_required

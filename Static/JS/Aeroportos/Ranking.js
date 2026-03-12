@@ -1,20 +1,18 @@
 /**
- * Ranking.js - Versão 3.0 (Performance Otimizada)
- * - Infinite Scroll
- * - Debounce na Pesquisa
- * - Manipulação eficiente do DOM
+ * Ranking.js - Atualizado para LuftCore UI
+ * - Infinite Scroll, Debounce, DOM Otimizado.
  */
 
 let EstadoAtual = {
     modo: 'GLOBAL', 
     ufSelecionada: null,
-    listaCompletaFiltrada: [], // A lista total que atende aos filtros atuais
-    itensRenderizados: 0,      // Controle de paginação
-    ITENS_POR_PAGINA: 50       // Quantidade de cards por lote
+    listaCompletaFiltrada: [], 
+    itensRenderizados: 0,      
+    ITENS_POR_PAGINA: 50       
 };
 
-let CacheGlobal = null; // Cache para não recalcular o "Global" toda vez
-let TimeoutPesquisa = null; // Para o debounce
+let CacheGlobal = null; 
+let TimeoutPesquisa = null; 
 
 document.addEventListener('DOMContentLoaded', () => {
     ConfigurarScrollInfinito();
@@ -29,21 +27,18 @@ function AtivarModoGlobal() {
     ResetarSidebar();
     document.getElementById('btn-global').classList.add('active');
 
-    // Usa cache se já tiver calculado antes
     if (!CacheGlobal) {
         let todos = [];
         Object.keys(window.DadosRanking).forEach(uf => {
             const aeroportosUf = window.DadosRanking[uf].map(a => ({...a, ufOrigem: uf}));
             todos = [...todos, ...aeroportosUf];
         });
-        // Ordena maior -> menor
         todos.sort((a, b) => b.importancia - a.importancia);
         CacheGlobal = todos;
     }
 
     AtualizarHeader('Visão Global', 'Ordenado por Índice de Importância');
     
-    // Reseta lista e renderiza o primeiro lote
     EstadoAtual.listaCompletaFiltrada = CacheGlobal;
     ResetarRenderizacao();
 }
@@ -65,22 +60,16 @@ function SelecionarUf(uf) {
 }
 
 function ResetarSidebar() {
-    document.querySelectorAll('.uf-card').forEach(el => el.classList.remove('active'));
-    // Opcional: Manter o termo de pesquisa ou limpar? Aqui limpei para evitar confusão
+    document.querySelectorAll('.luft-uf-item').forEach(el => el.classList.remove('active'));
     const input = document.getElementById('global-search');
     if(input && EstadoAtual.modo !== 'GLOBAL') input.value = '';
 }
 
-// --- PESQUISA COM DEBOUNCE (LEVEZA) ---
+// --- PESQUISA ---
 
 function FiltrarGlobal(termo) {
-    // Cancela a execução anterior se o usuário ainda estiver digitando
     clearTimeout(TimeoutPesquisa);
-
-    // Aguarda 300ms antes de processar
-    TimeoutPesquisa = setTimeout(() => {
-        ExecutarFiltro(termo);
-    }, 300);
+    TimeoutPesquisa = setTimeout(() => { ExecutarFiltro(termo); }, 300);
 }
 
 function ExecutarFiltro(termo) {
@@ -92,16 +81,10 @@ function ExecutarFiltro(termo) {
         return;
     }
 
-    // Remove active da sidebar visualmente
-    document.querySelectorAll('.uf-card').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.luft-uf-item').forEach(el => el.classList.remove('active'));
+    if (!CacheGlobal) AtivarModoGlobal(); 
 
-    // Busca sempre na base completa (CacheGlobal)
-    // Se quiser buscar só na UF atual, mude CacheGlobal para window.DadosRanking[EstadoAtual.ufSelecionada]
-    if (!CacheGlobal) AtivarModoGlobal(); // Garante que o cache exista
-
-    const baseBusca = CacheGlobal; 
-    
-    const resultados = baseBusca.filter(a => {
+    const resultados = CacheGlobal.filter(a => {
         return (a.iata && a.iata.toLowerCase().includes(termo)) ||
                (a.nome && a.nome.toLowerCase().includes(termo)) ||
                (a.regiao && a.regiao.toLowerCase().includes(termo));
@@ -113,12 +96,11 @@ function ExecutarFiltro(termo) {
     ResetarRenderizacao();
 }
 
-// --- RENDERIZAÇÃO INTELIGENTE (SCROLL INFINITO) ---
+// --- RENDERIZAÇÃO INTELIGENTE ---
 
 function ConfigurarScrollInfinito() {
     const container = document.getElementById('container-aeroportos');
     container.addEventListener('scroll', () => {
-        // Se rolou até perto do final (margem de 100px)
         if (container.scrollTop + container.clientHeight >= container.scrollHeight - 100) {
             RenderizarProximoLote();
         }
@@ -127,15 +109,15 @@ function ConfigurarScrollInfinito() {
 
 function ResetarRenderizacao() {
     const container = document.getElementById('container-aeroportos');
-    container.scrollTop = 0; // Volta ao topo
+    container.scrollTop = 0; 
     container.innerHTML = '';
     EstadoAtual.itensRenderizados = 0;
     
     if (EstadoAtual.listaCompletaFiltrada.length === 0) {
         container.innerHTML = `
-            <div style="grid-column: 1/-1; text-align: center; padding: 60px; color: var(--cor-texto-secundario); opacity: 0.7;">
-                <i class="ph-duotone ph-airplane-slash" style="font-size: 3rem; margin-bottom:15px;"></i>
-                <p style="font-size: 1.1rem;">Nenhum aeroporto encontrado.</p>
+            <div style="grid-column: 1/-1; text-align: center; padding: 60px; color: var(--luft-text-muted);">
+                <i class="ph-duotone ph-airplane-slash text-muted" style="font-size: 3.5rem; margin-bottom:15px;"></i>
+                <p class="font-bold text-main text-lg">Nenhum aeroporto encontrado.</p>
             </div>`;
         return;
     }
@@ -145,55 +127,53 @@ function ResetarRenderizacao() {
 
 function RenderizarProximoLote() {
     const total = EstadoAtual.listaCompletaFiltrada.length;
-    if (EstadoAtual.itensRenderizados >= total) return; // Já renderizou tudo
+    if (EstadoAtual.itensRenderizados >= total) return; 
 
     const inicio = EstadoAtual.itensRenderizados;
     const fim = Math.min(inicio + EstadoAtual.ITENS_POR_PAGINA, total);
     
     const lote = EstadoAtual.listaCompletaFiltrada.slice(inicio, fim);
-    
-    // Constrói HTML em uma única string gigante (Muito mais rápido que innerHTML += repetido)
     const htmlLote = lote.map(aero => ConstruirCardHTML(aero)).join('');
     
     const container = document.getElementById('container-aeroportos');
-    // Insere o HTML sem destruir o que já existe (insertAdjacentHTML é performático)
     container.insertAdjacentHTML('beforeend', htmlLote);
 
     EstadoAtual.itensRenderizados = fim;
 }
 
 function ConstruirCardHTML(aero) {
-    const tierClass = GetTierClass(aero.importancia);
     const colorStyle = GetColorStyle(aero.importancia);
-    const mostrarUf = EstadoAtual.modo === 'GLOBAL' || aero.ufOrigem;
+    const borderColor = GetBorderColor(aero.importancia);
+    const bgLightColor = GetBgLightColor(aero.importancia);
     
-    const htmlUf = mostrarUf ? 
-        `<span class="uf-mini-badge">${aero.ufOrigem || ''}</span>` : '';
+    const mostrarUf = EstadoAtual.modo === 'GLOBAL' || aero.ufOrigem;
+    const htmlUf = mostrarUf ? `<span class="luft-badge luft-badge-secondary font-black">${aero.ufOrigem || ''}</span>` : '';
 
     return `
-        <div class="airport-card ${tierClass}" id="card-${aero.id_aeroporto}">
-            <div class="card-top">
-                <div style="display:flex; justify-content:space-between; width:100%; align-items:flex-start;">
-                    <div class="iata-tag">${aero.iata || '---'}</div>
-                    ${htmlUf}
-                </div>
-                <div class="airport-details" style="margin-top: 10px;">
-                    <h3 title="${aero.nome}">${aero.nome}</h3>
-                    <p><i class="ph-fill ph-map-pin"></i> ${aero.regiao || 'Região Desconhecida'}</p>
-                </div>
+        <div class="luft-card p-4 hover-lift" id="card-${aero.id_aeroporto}" style="border-top: 4px solid ${colorStyle};">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div class="font-black text-main text-2xl" style="font-family: monospace; letter-spacing: 1px;">${aero.iata || '---'}</div>
+                ${htmlUf}
             </div>
             
-            <div class="slider-section">
-                <div class="slider-labels">
-                    <span>Importância</span>
-                    <span class="percent-badge" id="badge-${aero.id_aeroporto}" style="color: ${colorStyle}">
+            <div class="mb-4">
+                <h3 class="font-bold text-main m-0 mb-1 text-md" title="${aero.nome}" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${aero.nome}</h3>
+                <p class="text-xs text-muted font-medium d-flex align-items-center gap-1">
+                    <i class="ph-fill ph-map-pin"></i> ${aero.regiao || 'Região Desconhecida'}
+                </p>
+            </div>
+            
+            <div class="bg-app p-3 rounded border" style="border-color: var(--luft-border);">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-xs font-bold text-muted text-uppercase">Importância</span>
+                    <span class="font-black" id="badge-${aero.id_aeroporto}" style="color: ${colorStyle}; font-size: 1.1rem;">
                         ${aero.importancia}%
                     </span>
                 </div>
-                <div class="range-wrapper">
-                    <div class="range-fill" id="fill-${aero.id_aeroporto}" style="width: ${aero.importancia}%; background: ${colorStyle}"></div>
+                <div class="luft-range-wrapper" style="background: ${bgLightColor}; border: 1px solid ${borderColor};">
+                    <div class="luft-range-fill" id="fill-${aero.id_aeroporto}" style="width: ${aero.importancia}%; background: ${colorStyle};"></div>
                     <input type="range" min="0" max="100" value="${aero.importancia}" 
-                           class="range-input" 
+                           class="luft-range-input" 
                            oninput="AtualizarInput(${aero.id_aeroporto}, this.value, '${aero.ufOrigem}')"
                            data-id="${aero.id_aeroporto}">
                 </div>
@@ -212,17 +192,18 @@ function AtualizarHeader(titulo, subtitulo) {
 function AtualizarInput(id, valor, ufRef) {
     valor = parseInt(valor);
     
-    // Atualiza Visual (Apenas do card específico, muito leve)
     const badge = document.getElementById(`badge-${id}`);
     const fill = document.getElementById(`fill-${id}`);
     const card = document.getElementById(`card-${id}`);
+    
     const color = GetColorStyle(valor);
+    const borderColor = GetBorderColor(valor);
+    const bgLightColor = GetBgLightColor(valor);
     
     if(badge) { badge.innerText = `${valor}%`; badge.style.color = color; }
     if(fill) { fill.style.width = `${valor}%`; fill.style.background = color; }
-    if(card) { card.className = `airport-card ${GetTierClass(valor)}`; }
+    if(card) { card.style.borderTopColor = color; }
 
-    // Atualiza Fonte de Dados
     const ufAlvo = (ufRef && ufRef !== 'undefined') ? ufRef : EstadoAtual.ufSelecionada;
     if(ufAlvo && window.DadosRanking[ufAlvo]) {
         const index = window.DadosRanking[ufAlvo].findIndex(x => x.id_aeroporto === id);
@@ -237,8 +218,8 @@ function SalvarRankingAtual() {
     
     text.innerText = 'Processando...';
     btn.disabled = true;
+    btn.innerHTML = `<i class="ph-bold ph-spinner ph-spin text-lg"></i> <span class="btn-text">Salvando...</span>`;
 
-    // Salva todas as UFs em paralelo
     const promises = Object.keys(window.DadosRanking).map(uf => {
         return fetch('/Luft-ConnectAir/Aeroportos/API/SalvarRanking', {
             method: 'POST',
@@ -251,36 +232,40 @@ function SalvarRankingAtual() {
     .then(results => {
         const falhas = results.filter(r => !r.sucesso);
         if(falhas.length === 0) {
-            text.innerText = 'Tudo Salvo!';
-            btn.style.background = 'var(--cor-sucesso)';
+            btn.innerHTML = `<i class="ph-bold ph-check-circle text-lg"></i> <span class="btn-text">Tudo Salvo!</span>`;
             setTimeout(() => {
-                text.innerText = originalText;
-                btn.style.background = '';
+                btn.innerHTML = `<i class="ph-bold ph-floppy-disk text-lg"></i> <span class="btn-text">${originalText}</span>`;
                 btn.disabled = false;
             }, 2000);
         } else {
             alert(`Erro ao salvar ${falhas.length} estados.`);
-            text.innerText = originalText;
+            btn.innerHTML = `<i class="ph-bold ph-floppy-disk text-lg"></i> <span class="btn-text">${originalText}</span>`;
             btn.disabled = false;
         }
     })
     .catch(err => {
         console.error(err);
         alert('Erro de comunicação.');
-        text.innerText = originalText;
+        btn.innerHTML = `<i class="ph-bold ph-floppy-disk text-lg"></i> <span class="btn-text">${originalText}</span>`;
         btn.disabled = false;
     });
 }
 
-// Helpers
-function GetTierClass(val) {
-    if (val < 30) return 'tier-low';
-    if (val < 70) return 'tier-mid';
-    return 'tier-high';
+// Helpers de Cores LuftCore
+function GetColorStyle(val) {
+    if (val < 30) return 'var(--luft-danger)';
+    if (val < 70) return 'var(--luft-warning)';
+    return 'var(--luft-success)';
 }
 
-function GetColorStyle(val) {
-    if (val < 30) return 'var(--cor-erro)';
-    if (val < 70) return 'var(--cor-aviso)';
-    return 'var(--cor-sucesso)';
+function GetBorderColor(val) {
+    if (val < 30) return 'rgba(239, 68, 68, 0.2)';
+    if (val < 70) return 'rgba(245, 158, 11, 0.2)';
+    return 'rgba(34, 197, 94, 0.2)';
+}
+
+function GetBgLightColor(val) {
+    if (val < 30) return 'rgba(239, 68, 68, 0.05)';
+    if (val < 70) return 'rgba(245, 158, 11, 0.05)';
+    return 'rgba(34, 197, 94, 0.05)';
 }

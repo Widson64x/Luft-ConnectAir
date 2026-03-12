@@ -13,7 +13,7 @@ def Index():
     """Renderiza a tela de listagem"""
     try:
         ListaDevolucoes = ReversaService.ListarDevolucoesPendentes()
-        return render_template('Reversa/Index.html', Lista=ListaDevolucoes)
+        return render_template('Pages/Reversa/Index.html', Lista=ListaDevolucoes)
     except Exception as e:
         LogService.Error("Rotas.Reversa", "Erro ao renderizar index", e)
         return "Erro ao carregar dados", 500

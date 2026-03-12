@@ -1,0 +1,274 @@
+{% extends "Layout/BaseLayout.html" %}
+{% import 'luftcore/components.html' as ui %}
+
+{% block titulo %}Cockpit de Planejamento | Luft-ConnectAir{% endblock %}
+
+{% block conteudo %}
+{% include "Components/_ModalCtc.html" %}
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-rotatedmarker/0.2.0/leaflet.rotatedMarker.min.js"></script> 
+
+<style>
+    /* --- ESTRUTURA DO EDITOR (LuftCore Padrão) --- */
+    .luft-editor-wrapper {
+        display: flex;
+        gap: 20px;
+        height: calc(100vh - 120px);
+        animation: slideUpFade 0.5s ease-out forwards;
+    }
+
+    @keyframes slideUpFade { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+
+    .luft-editor-map-container {
+        flex: 1;
+        border-radius: 16px;
+        border: 1px solid var(--luft-border);
+        overflow: hidden;
+        z-index: 1;
+        background: var(--luft-bg-app);
+        box-shadow: var(--luft-shadow-sm);
+    }
+
+    .luft-editor-sidebar {
+        width: 420px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        overflow-y: auto;
+    }
+
+    /* Tabs de Estratégias */
+    .luft-strategy-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+    
+    .luft-strategy-btn {
+        background: var(--luft-bg-panel);
+        border: 1px solid var(--luft-border);
+        border-radius: 8px;
+        padding: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: var(--luft-text-muted);
+    }
+    
+    .luft-strategy-btn:hover { background: var(--luft-bg-app); color: var(--luft-text-main); }
+    .luft-strategy-btn.active { 
+        background: rgba(59, 130, 246, 0.08); 
+        border-color: var(--luft-primary-500); 
+        color: var(--luft-primary-600); 
+    }
+
+    /* Timeline Container Genérico */
+    .luft-editor-timeline {
+        background: var(--luft-bg-panel);
+        border: 1px solid var(--luft-border);
+        border-radius: 12px;
+        flex: 1;
+        overflow-y: auto;
+        padding: 0;
+    }
+
+    /* Modal Lote Customizado */
+    .luft-modal-lote-backdrop {
+        position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+        z-index: 2000; display: none; align-items: center; justify-content: center;
+    }
+    .luft-modal-lote-backdrop:not(.hidden) { display: flex; }
+    
+    .hidden { display: none !important; }
+</style>
+
+<div class="luft-editor-wrapper">
+    <div class="luft-editor-map-container" id="map"></div>
+
+    <div class="luft-editor-sidebar">
+        
+        <div class="luft-card p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="luft-badge luft-badge-secondary" 
+                     onclick="{% if Ctc.is_consolidado %}AbrirModalLote(){% endif %}"
+                     style="{{ 'cursor: pointer;' if Ctc.is_consolidado else '' }}"
+                     title="{{ 'Clique para ver os documentos' if Ctc.is_consolidado else '' }}">
+                    {% if Ctc.is_consolidado %}
+                        <i class="ph-bold ph-stack"></i> Lote: {{ Ctc.qtd_docs }} docs <i class="ph-bold ph-caret-down ml-1"></i>
+                    {% else %}
+                        <i class="ph-bold ph-file-text"></i> CTC Individual
+                    {% endif %}
+                </div>
+
+                <div class="luft-badge {{ 'luft-badge-danger' if 'URGENTE' in (Ctc.prioridade|upper) else 'luft-badge-primary' }}">
+                    {{ Ctc.prioridade or 'Normal' }}
+                </div>
+            </div>
+
+            <h2 class="font-black text-main m-0 d-flex align-items-center gap-2" style="font-size: 1.2rem;">
+                {{ Ctc.origem_cidade }} <i class="ph-bold ph-airplane-tilt text-primary"></i> {{ Ctc.destino_cidade }}
+            </h2>
+            <div class="text-xs text-muted mt-2 d-flex flex-column gap-1">
+                <span class="font-bold text-main" style="font-size: 0.9rem;">{{ Ctc.filial }}-{{ Ctc.serie }}-{{ Ctc.ctc }}</span>
+                <span>Fís: {{ Ctc.peso_fisico|float|round(2) }} | Tax: <strong class="text-main">{{ Ctc.peso_taxado|float|round(2) }} kg</strong></span>
+                <span class="text-success font-bold" style="font-size: 0.95rem;">R$ {{ "{:,.2f}".format(Ctc.valor) }}</span>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                <span class="luft-badge luft-badge-info" title="Tipo de Carga"><i class="ph-bold ph-package"></i> {{ Ctc.tipo_carga or 'GERAL' }}</span>
+                <span class="luft-badge luft-badge-success" title="Serviço Contratado"><i class="ph-bold ph-handshake"></i> {{ Ctc.servico_contratado or 'PADRÃO' }}</span>
+                <span class="luft-badge luft-badge-secondary" title="{{ Ctc.remetente }} - {{ Ctc.cnpj_cliente or Ctc.remet_cgc }}" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    <i class="ph-bold ph-user"></i> {{ Ctc.remetente[:15] }}... 
+                </span>
+            </div>
+        </div>
+
+        <div id="aviso-modo-visualizacao" class="luft-alert luft-alert-success hidden">
+            <i class="ph-fill ph-lock-key luft-alert-icon"></i>
+            <div class="luft-alert-content">
+                <h4 class="luft-alert-title">Planejamento Confirmado</h4>
+                <p class="luft-alert-text">Criado em <span id="lbl-data-criacao"></span></p>
+            </div>
+        </div>
+
+        <div class="luft-strategy-grid" id="container-estrategias">     
+            <button class="luft-strategy-btn active" onclick="SelecionarEstrategia('recomendada')" id="tab-recomendada" title="Melhor Custo-Benefício">
+                <i class="ph-duotone ph-star text-warning"></i> Recomendada
+            </button>
+            <button class="luft-strategy-btn" onclick="SelecionarEstrategia('direta')" id="tab-direta" title="Voo Direto (Sem Escalas)">
+                <i class="ph-duotone ph-paper-plane-right text-primary"></i> Direta
+            </button>
+            <button class="luft-strategy-btn" onclick="SelecionarEstrategia('rapida')" id="tab-rapida" title="Menor Tempo Total">
+                <i class="ph-duotone ph-lightning text-danger"></i> Rápida
+            </button>
+            <button class="luft-strategy-btn" onclick="SelecionarEstrategia('economica')" id="tab-economica" title="Menor Custo de Frete">
+                <i class="ph-duotone ph-coins text-success"></i> Econômica
+            </button>
+            <button class="luft-strategy-btn" onclick="SelecionarEstrategia('conexao_mesma_cia')" id="tab-conexao_mesma_cia" title="Conexão Mesma Cia">
+                <i class="ph-duotone ph-airplane-tilt text-info"></i> Conexão
+            </button>
+            <button class="luft-strategy-btn" onclick="SelecionarEstrategia('interline')" id="tab-interline" title="Múltiplas Cias Aéreas">
+                <i class="ph-duotone ph-shuffle text-secondary"></i> Interline
+            </button>
+        </div>
+
+        <div class="luft-card p-3 d-flex justify-content-between text-center" id="strategy-metrics">
+            <div>
+                <span class="text-xs text-muted font-bold d-block text-uppercase">Custo Est.</span>
+                <span class="font-black text-success" style="font-size: 1.1rem;" id="metrica-custo">--</span>
+            </div>
+            <div style="width: 1px; background: var(--luft-border);"></div>
+            <div>
+                <span class="text-xs text-muted font-bold d-block text-uppercase">Tempo Total</span>
+                <span class="font-black text-main" style="font-size: 1.1rem;" id="metrica-tempo">--</span>
+            </div>
+            <div style="width: 1px; background: var(--luft-border);"></div>
+            <div>
+                <span class="text-xs text-muted font-bold d-block text-uppercase">Conexões</span>
+                <span class="font-black text-main" style="font-size: 1.1rem;" id="metrica-conexoes">--</span>
+            </div>
+        </div>
+
+        <div class="luft-editor-timeline" id="timeline-content">
+            <div style="text-align:center; padding: 60px 20px; color: var(--luft-text-muted);">
+                <i class="ph-bold ph-spinner ph-spin text-primary" style="font-size: 2rem;"></i> 
+                <p class="mt-2 font-medium">Calculando melhores rotas...</p>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('Planejamento.Dashboard') }}" class="btn btn-secondary flex-1" style="text-align: center;">Voltar</a>
+            
+            <button class="btn btn-danger hidden flex-1" id="btn-cancelar-plan" onclick="CancelarPlanejamentoExistente()">
+                <i class="ph-bold ph-trash"></i> Cancelar
+            </button>
+
+            <button class="btn btn-secondary hidden flex-1" id="btn-recalcular" onclick="AtivarModoEdicao()">
+                <i class="ph-bold ph-arrows-clockwise"></i> Recalcular
+            </button>
+
+            <button class="btn btn-success flex-2" onclick="ConfirmarPlanejamento()" id="btn-confirmar" style="flex: 2;">
+                <i class="ph-bold ph-check-circle"></i> Confirmar Rota
+            </button>
+        </div>
+    </div>
+</div>
+
+{% if Ctc.is_consolidado %}
+<div id="modal-lote-backdrop" class="luft-modal-lote-backdrop hidden" onclick="FecharModalLote(event)">
+    <div class="luft-card p-0" style="width: 95%; max-width: 1400px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden;" onclick="event.stopPropagation()">
+        
+        <div class="p-4 d-flex justify-content-between align-items-center bg-app" style="border-bottom: 1px solid var(--luft-border);">
+            <h3 class="font-bold text-main m-0 d-flex align-items-center gap-2">
+                <i class="ph-duotone ph-stack text-primary"></i> Composição do Lote ({{ Ctc.qtd_docs }} docs)
+            </h3>
+            <button class="btn-icon-only" onclick="FecharModalLote(null)"><i class="ph-bold ph-x"></i></button>
+        </div>
+        
+        <div style="overflow-y: auto; flex: 1; padding: 0;">
+            <table class="luft-table" style="width: 100%; border-collapse: collapse;">
+                <thead style="position: sticky; top: 0; background: var(--luft-bg-app); border-bottom: 1px solid var(--luft-border);">
+                    <tr>
+                        <th class="p-3 text-left text-xs text-muted font-bold text-uppercase">Documento</th>
+                        <th class="p-3 text-left text-xs text-muted font-bold text-uppercase">CNPJ Cliente</th>
+                        <th class="p-3 text-left text-xs text-muted font-bold text-uppercase">Remetente</th>
+                        <th class="p-3 text-left text-xs text-muted font-bold text-uppercase">Destinatário</th>
+                        <th class="p-3 text-left text-xs text-muted font-bold text-uppercase">Tipo Carga</th>
+                        <th class="p-3 text-left text-xs text-muted font-bold text-uppercase">Serviço</th>
+                        <th class="p-3 text-center text-xs text-muted font-bold text-uppercase">Vol</th>
+                        <th class="p-3 text-right text-xs text-muted font-bold text-uppercase">Peso</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for doc in Ctc.lista_docs %}
+                    <tr style="border-bottom: 1px solid var(--luft-border);">
+                        <td class="p-3 font-bold text-primary">{{ doc.filial }}-{{ doc.serie }}-{{ doc.ctc }}</td>
+                        <td class="p-3" style="font-family: monospace; color: var(--luft-text-muted);">{{ doc.cnpj_cliente or doc.remet_cgc }}</td>
+                        <td class="p-3" title="{{ doc.remetente }}">
+                            <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; color: var(--luft-text-main);">
+                                <i class="ph-bold ph-user text-muted"></i> {{ doc.remetente }}
+                            </div>
+                        </td>
+                        <td class="p-3" title="{{ doc.destinatario }}">
+                             <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; color: var(--luft-text-main);">
+                                <i class="ph-bold ph-map-pin text-muted"></i> {{ doc.destinatario }}
+                             </div>
+                        </td>
+                        <td class="p-3"><span class="luft-badge luft-badge-info">{{ doc.tipo_carga or 'GERAL' }}</span></td>
+                        <td class="p-3"><span class="luft-badge luft-badge-success">{{ doc.servico_contratado or 'PADRÃO' }}</span></td>
+                        <td class="p-3 text-center text-main">{{ doc.volumes }}</td>
+                        <td class="p-3 text-right text-main">{{ doc.peso_fisico|float|round(2) }} kg</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot style="background: var(--luft-bg-app); border-top: 2px solid var(--luft-border);">
+                    <tr>
+                        <td colspan="6" class="p-3 text-right font-black text-main">TOTAL DO LOTE:</td>
+                        <td class="p-3 text-center font-black text-main">{{ Ctc.volumes }}</td>
+                        <td class="p-3 text-right font-black text-main">{{ Ctc.peso_fisico|float|round(2) }} kg</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script>
+    window.opcoesRotas = {{ OpcoesRotas | tojson | safe }};
+    window.ctc = {{ Ctc | tojson | safe }};
+    window.planejamentoSalvo = {{ PlanejamentoSalvo | tojson | safe }};
+    window.origemCoords = { lat: {{ Origem.lat | default(0) }}, lon: {{ Origem.lon | default(0) }} };
+    window.destinoCoords = { lat: {{ Destino.lat | default(0) }}, lon: {{ Destino.lon | default(0) }} };
+    
+    const URL_GRAVAR_PLANEJAMENTO = "{{ url_for('Planejamento.SalvarPlanejamento') }}";
+    const URL_CANCELAR_PLANEJAMENTO = "{{ url_for('Planejamento.CancelarPlanejamentoRota') }}";
+</script>
+<script src="{{ url_for('static', filename='JS/Planejamento/Editor.js') }}"></script>
+{% endblock %}

@@ -109,7 +109,7 @@ def Gerenciar():
 
     Historico = MalhaService.ListarRemessas()
     
-    return render_template('Malha/Manager.html', 
+    return render_template('Pages/Malha/Manager.html', 
                            ListaRemessas=Historico, 
                            ExibirModal=ModalConfirmacao, 
                            DadosModal=DadosConfirmacao)

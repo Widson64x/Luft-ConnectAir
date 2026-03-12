@@ -1,5 +1,6 @@
 /**
- * Index.js - Controlador do Painel de Planejamento (Versão Modern UI)
+ * Index.js - Controlador do Painel de Planejamento 
+ * Atualizado para o padrão LuftCore
  */
 
 let DADOS_ORIGINAIS = [];
@@ -36,7 +37,7 @@ function AtualizarDataExtenso() {
 async function BuscarDados() {
     try {
         const tabela = document.getElementById('table-body');
-        if(tabela) tabela.innerHTML = '<tr><td colspan="11" style="text-align:center; padding:20px;">Carregando dados...</td></tr>';
+        if(tabela) tabela.innerHTML = '<tr><td colspan="13" style="text-align:center; padding:60px; color:var(--luft-text-muted);"><i class="ph-bold ph-spinner ph-spin text-primary" style="font-size: 2rem; margin-bottom: 10px;"></i><br>Buscando dados no servidor...</td></tr>';
 
         const resp = await fetch(URL_API_LISTAR);
         if (!resp.ok) throw new Error("Erro na requisição");
@@ -71,7 +72,7 @@ async function BuscarDados() {
     } catch (e) {
         console.error("Erro API:", e);
         const tabela = document.getElementById('table-body');
-        if(tabela) tabela.innerHTML = `<tr><td colspan="11" style="color:red; text-align:center;">Erro ao carregar: ${e.message}</td></tr>`;
+        if(tabela) tabela.innerHTML = `<tr><td colspan="13" class="text-danger font-bold" style="text-align:center; padding:40px;"><i class="ph-bold ph-warning-circle" style="font-size:2rem;"></i><br>Erro ao carregar: ${e.message}</td></tr>`;
     }
 }
 
@@ -90,9 +91,10 @@ function Renderizar() {
     if (DADOS_VISIVEIS.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="11" style="text-align: center; padding: 40px; color: var(--text-secondary);">
-                    <i class="ph-duotone ph-magnifying-glass" style="font-size: 32px; margin-bottom: 10px;"></i><br>
-                    Nenhum registro encontrado para os filtros atuais.
+                <td colspan="13" style="text-align: center; padding: 60px; color: var(--luft-text-muted);">
+                    <i class="ph-duotone ph-magnifying-glass" style="font-size: 3rem; margin-bottom: 15px; color: var(--luft-border);"></i><br>
+                    <span class="font-bold text-main">Nenhum registro encontrado</span><br>
+                    <span class="text-xs">Altere os filtros ou pesquise novamente.</span>
                 </td>
             </tr>`;
         contador.innerText = 'Mostrando 0 registros';
@@ -108,29 +110,22 @@ function Renderizar() {
         // --- LÓGICA DE PRIORIDADE (3 TIPOS) ---
         const prio = (row.prioridade || 'NORMAL').toUpperCase();
         let iconPrio = '<i class="ph-bold ph-minus" title="NORMAL"></i>'; // Default Normal
-        let stylePrio = 'color: #cbd5e1; opacity: 0.5;';
+        let classPrio = 'text-muted';
 
         if (prio === 'S' || prio === 'URGENTE') {
-            // Vermelho + Ícone de Sirene/Alerta
-            stylePrio = 'color: #ef4444; font-size: 18px;'; 
-            iconPrio = '<i class="ph-fill ph-warning-circle" title="URGENTE"></i>';
+            classPrio = 'text-danger font-black'; 
+            iconPrio = '<i class="ph-fill ph-warning-circle text-lg"></i>';
         } 
         else if (prio === 'AGENDADA') {
-            // Laranja/Azul + Ícone de Relógio/Calendário
-            stylePrio = 'color: #f59e0b; font-size: 18px;'; 
-            iconPrio = '<i class="ph-fill ph-clock-countdown" title="AGENDADA"></i>';
+            classPrio = 'text-warning font-black'; 
+            iconPrio = '<i class="ph-fill ph-clock-countdown text-lg"></i>';
         } 
-        else {
-            // Cinza + Menos (Normal)
-            stylePrio = 'color: #cbd5e1; opacity: 0.5;'; 
-            iconPrio = '<i class="ph-bold ph-minus" title="NORMAL"></i>';
-        }
         
         // Badge de Tipo (Origem Dados)
         let badgeOrigem = '';
-        if(row.origem_dados === 'DIARIO') badgeOrigem = '<span class="badge badge-origem-DIARIO">Do Dia</span>';
-        else if(row.origem_dados === 'BACKLOG') badgeOrigem = '<span class="badge badge-origem-BACKLOG">Backlog</span>';
-        else if(row.origem_dados === 'REVERSA') badgeOrigem = '<span class="badge badge-origem-REVERSA">Reversa</span>';
+        if(row.origem_dados === 'DIARIO') badgeOrigem = '<span class="luft-badge luft-badge-info">Do Dia</span>';
+        else if(row.origem_dados === 'BACKLOG') badgeOrigem = '<span class="luft-badge luft-badge-warning">Backlog</span>';
+        else if(row.origem_dados === 'REVERSA') badgeOrigem = '<span class="luft-badge luft-badge-secondary">Reversa</span>';
 
         // Link de Montagem
         const linkMontar = URL_BASE_MONTAR
@@ -139,52 +134,56 @@ function Renderizar() {
             .replace('__C__', row.ctc);
 
         tr.innerHTML = `
-            <td style="text-align: center;">
-                <button class="btn-tabela-acao" onclick="AbrirModalGlobal('${row.filial}', '${row.serie}', '${row.ctc}')">
-                    <i class="ph-bold ph-file-text"></i>
-                </button>
-                <a href="${linkMontar}" class="btn-tabela-acao" style="color: var(--primary-color);">
-                    <i class="ph-bold ph-airplane-tilt"></i>
-                </a>
+            <td style="text-align: center; min-width: 110px;">
+                <div class="d-flex align-items-center justify-content-center gap-2">
+                    <button class="btn btn-secondary d-flex align-items-center justify-content-center" style="padding: 6px; width: 36px; height: 36px;" onclick="AbrirModalGlobal('${row.filial}', '${row.serie}', '${row.ctc}')" title="Ver Detalhes">
+                        <i class="ph-bold ph-file-text" style="font-size: 1.1rem;"></i>
+                    </button>
+                    <a href="${linkMontar}" class="btn btn-primary d-flex align-items-center justify-content-center" style="padding: 6px; width: 36px; height: 36px;" title="Planejar Rota">
+                        <i class="ph-bold ph-airplane-tilt" style="font-size: 1.1rem;"></i>
+                    </a>
+                </div>
             </td>
             <td>
                 ${row.tem_planejamento 
-                    ? `<span class="status-badge st-ok"><div class="status-dot" style="background:#16a34a"></div> ${row.status_planejamento}</span>`
-                    : `<span class="status-badge st-pendente"><div class="status-dot"></div> Pendente</span>`
+                    ? `<span class="luft-badge luft-badge-success"><i class="ph-fill ph-check-circle"></i> ${row.status_planejamento}</span>`
+                    : `<span class="luft-badge luft-badge-warning"><i class="ph-fill ph-clock"></i> Pendente</span>`
                 }
             </td>
-            <td style="text-align: center; ${stylePrio}">${iconPrio}</td>
+            <td style="text-align: center;" class="${classPrio}">${iconPrio}</td>
             <td>${badgeOrigem}</td>
             <td>
-                <span class="txt-destaque">${row.ctc}</span>
-                <span class="txt-secondary">Sér. ${row.serie} | ${row.filial}</span>
+                <span class="font-bold text-main d-block" style="font-family: monospace; font-size: 1rem;">${row.ctc}</span>
+                <span class="text-xs text-muted">Sér. ${row.serie} | ${row.filial}</span>
             </td>
-            <td style="text-align: center;">${row.unid_lastmile || '-'}</td>
+            <td style="text-align: center;" class="font-medium text-main">${row.unid_lastmile || '-'}</td>
             <td>
-                <span style="font-weight:600">${row.data_emissao}</span>
-                <span class="txt-secondary">${row.hora_emissao}</span>
+                <span class="font-bold text-main d-block">${row.data_emissao}</span>
+                <span class="text-xs text-muted"><i class="ph-bold ph-clock"></i> ${row.hora_emissao}</span>
             </td>
             <td>
-                <div style="display:flex; align-items:center; gap:5px;">
-                    <span style="font-weight:600">${row.origem.split('/')[0]}</span>
-                    <i class="ph-bold ph-arrow-right flow-icon"></i>
-                    <span style="font-weight:600">${row.destino.split('/')[0]}</span>
+                <div class="d-flex align-items-center gap-2 font-bold text-main mb-1">
+                    ${row.origem.split('/')[0]}
+                    <i class="ph-bold ph-arrow-right text-muted" style="font-size: 0.8rem;"></i>
+                    ${row.destino.split('/')[0]}
                 </div>
-                <span class="txt-secondary">${row.origem.split('/')[1]} &rarr; ${row.destino.split('/')[1]}</span>
+                <span class="text-xs text-muted" style="max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block;">
+                    ${row.origem.split('/')[1] || ''} &rarr; ${row.destino.split('/')[1] || ''}
+                </span>
             </td>
             <td>
-                <div style="max-width: 350px; overflow: hidden; text-overflow: ellipsis;" title="${row.remetente}">
+                <div class="font-medium text-main mb-1" style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${row.remetente}">
                     ${row.remetente}
                 </div>
-                <span class="badge" style="background:#f1f5f9; color:#475569; margin-top:2px;">${row.tipo_carga || 'NORMAL'}</span>
+                <span class="luft-badge luft-badge-secondary" style="font-size: 0.65rem;">${row.tipo_carga || 'NORMAL'}</span>
             </td>
-            <td style="text-align: center;">${row.qtd_notas}</td>
-            <td style="text-align: right;">${row.volumes}</td>
-            <td style="text-align: right; line-height: 1.2;">
-                <div style="font-size: 0.8em; color: #64748b;">${fmtNumero.format(row.peso_fisico)}</div>
-                <div style="font-weight: bold; color: #0f172a;">${fmtNumero.format(row.peso_taxado)} Tax</div>
+            <td style="text-align: center;" class="font-black text-main">${row.qtd_notas}</td>
+            <td style="text-align: right;" class="font-bold text-main">${row.volumes}</td>
+            <td style="text-align: right; line-height: 1.3;">
+                <div class="text-xs text-muted">${fmtNumero.format(row.peso_fisico)} Fís</div>
+                <div class="font-black text-main">${fmtNumero.format(row.peso_taxado)} Tax</div>
             </td>
-            <td style="text-align: right; color: var(--text-secondary);">${fmtMoeda.format(row.raw_val_mercadoria)}</td>
+            <td style="text-align: right; font-weight: 800; color: var(--luft-success);">${fmtMoeda.format(row.raw_val_mercadoria)}</td>
         `;
         fragment.appendChild(tr);
     });
@@ -206,33 +205,30 @@ function MudarAba(tipo) {
     isAnimating = true;
     const container = document.getElementById('transition-container');
     
-    // Atualiza Botões
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    // Atualiza Botões com a nova classe do LuftCore (luft-tab-btn)
+    document.querySelectorAll('.luft-tab-btn').forEach(btn => btn.classList.remove('active'));
     document.getElementById(`tab-${tipo.toLowerCase()}`).classList.add('active');
 
-    // Animação de Saída
+    // Opacidade para transição suave
     if(container) {
-        container.classList.remove('slide-in-right');
-        container.classList.add('slide-out-left');
+        container.style.transition = 'opacity 0.2s';
+        container.style.opacity = '0';
     }
 
     setTimeout(() => {
         ABA_ATUAL = tipo;
         FiltrarTabela(); // Renderiza com os novos dados
         
-        // Animação de Entrada
+        // Retorna a opacidade
         if(container) {
-            container.classList.remove('slide-out-left');
-            void container.offsetWidth; // Trigger Reflow
-            container.classList.add('slide-in-right');
+            container.style.opacity = '1';
         }
 
         setTimeout(() => {
-            if(container) container.classList.remove('slide-in-right');
             isAnimating = false;
-        }, 400);
+        }, 200);
 
-    }, 400);
+    }, 200);
 }
 
 function FiltrarTabela() {
@@ -245,7 +241,7 @@ function FiltrarTabela() {
         // Filtro de Texto
         const matchTexto = !termo || item.busca_texto.includes(termo);
         
-        // --- ATUALIZADO: Filtros Select (3 Prioridades) ---
+        // Filtros Select (3 Prioridades)
         let matchPrio = true;
         const pItem = (item.prioridade || 'NORMAL').toUpperCase();
 
@@ -274,7 +270,6 @@ function FiltrarTabela() {
 }
 
 function AtualizarKPIs() {
-    // IDs atualizados conforme o novo HTML
     const elTotal = document.getElementById('kpi-total');
     const elPeso = document.getElementById('kpi-peso');
     const elValor = document.getElementById('kpi-valor');
@@ -310,10 +305,13 @@ function Ordenar(coluna) {
         ORDEM_ATUAL.dir = 'asc';
     }
     
-    document.querySelectorAll('th i').forEach(i => i.className = 'ph-bold ph-caret-up-down sort-icon');
+    // Atualiza ícones de ordenação para padrão cinza
+    document.querySelectorAll('.luft-planejamento-tabela th i').forEach(i => i.className = 'ph-bold ph-caret-up-down text-muted');
+    
+    // Pinta o ícone da coluna ativa de azul primário
     const thAtual = document.querySelector(`th[onclick="Ordenar('${coluna}')"] i`);
     if(thAtual) {
-        thAtual.className = ORDEM_ATUAL.dir === 'asc' ? 'ph-bold ph-caret-up' : 'ph-bold ph-caret-down';
+        thAtual.className = ORDEM_ATUAL.dir === 'asc' ? 'ph-bold ph-caret-up text-primary' : 'ph-bold ph-caret-down text-primary';
     }
 
     AplicarOrdenacao();

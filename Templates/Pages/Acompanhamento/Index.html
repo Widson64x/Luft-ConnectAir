@@ -1,0 +1,327 @@
+{% extends "Layout/BaseLayout.html" %}
+{% import 'luftcore/components.html' as ui %}
+
+{% block titulo %}Painel de Acompanhamento | Luft-ConnectAir{% endblock %}
+
+{% block conteudo %}
+{% include 'Components/_ModalAwb.html' %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+    /* --- ESTILOS EXCLUSIVOS DO ACOMPANHAMENTO --- */
+    .luft-acompanhamento-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        height: calc(100vh - 120px); /* Ajuste para não gerar barra de rolagem infinita na página */
+        overflow: hidden;
+        animation: slideUpFade 0.6s ease-out forwards;
+    }
+
+    @keyframes slideUpFade { 
+        from { opacity: 0; transform: translateY(20px); } 
+        to { opacity: 1; transform: translateY(0); } 
+    }
+
+    /* Seção do Mapa */
+    .luft-acompanhamento-mapa {
+        flex: 1;
+        min-height: 350px;
+        border-radius: 16px;
+        border: 1px solid var(--luft-border);
+        overflow: hidden;
+        position: relative;
+        background: #fff;
+        box-shadow: var(--luft-shadow-sm);
+    }
+
+    /* Seção da Tabela */
+    .luft-acompanhamento-tabela {
+        flex: 1;
+        min-height: 250px;
+        border-radius: 16px;
+        border: 1px solid var(--luft-border);
+        background: var(--luft-bg-panel);
+        box-shadow: var(--luft-shadow-sm);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .luft-acompanhamento-tabela-wrap { flex: 1; overflow-y: auto; }
+    .luft-acompanhamento-tabela table { width: 100%; border-collapse: collapse; }
+    .luft-acompanhamento-tabela th {
+        text-align: left; padding: 12px 24px; font-size: 0.75rem; font-weight: 700;
+        text-transform: uppercase; color: var(--luft-text-muted); background: var(--luft-bg-app);
+        position: sticky; top: 0; z-index: 10; border-bottom: 1px solid var(--luft-border);
+    }
+    .luft-acompanhamento-tabela td { 
+        padding: 12px 24px; border-bottom: 1px solid var(--luft-border); 
+        font-size: 0.85rem; color: var(--luft-text-main); vertical-align: middle; 
+    }
+    
+    /* Classes dinâmicas mantidas para o JS */
+    .row-main { cursor: pointer; transition: 0.2s; background: var(--luft-bg-panel); }
+    .row-main:hover { background-color: var(--luft-bg-app); }
+    .row-main.active { background-color: rgba(59, 130, 246, 0.05); border-left: 4px solid var(--luft-primary-500); }
+    .detail-cell { background: var(--luft-bg-app); padding: 0 !important; border-bottom: 1px solid var(--luft-border); }
+
+    .voo-interativo {
+        cursor: pointer; border-bottom: 1px dashed var(--luft-primary-500); 
+        transition: 0.2s; color: var(--luft-text-main); font-weight: 600;
+    }
+    .voo-interativo:hover { background-color: rgba(59, 130, 246, 0.1); color: var(--luft-primary-600); }
+
+    /* Legendas do Mapa */
+    .luft-map-controls { position: absolute; top: 20px; left: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; }
+    .luft-btn-map-info {
+        width: 36px; height: 36px; background: var(--luft-bg-panel); border-radius: 8px; box-shadow: var(--luft-shadow-md);
+        display: flex; align-items: center; justify-content: center; cursor: pointer;
+        font-size: 1.2rem; color: var(--luft-primary-600); transition: 0.2s; border: 1px solid var(--luft-border);
+    }
+    .luft-btn-map-info:hover { background: var(--luft-primary-600); color: #fff; transform: scale(1.05); }
+
+    .luft-map-legend {
+        position: absolute; top: 0; left: 45px; width: 240px; background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(8px); border-radius: 12px; padding: 16px;
+        box-shadow: var(--luft-shadow-lg); border: 1px solid var(--luft-border);
+        opacity: 0; visibility: hidden; transform: translateX(-10px); transition: all 0.3s ease; pointer-events: none;
+    }
+    [data-theme="dark"] .luft-map-legend { background: rgba(30, 41, 59, 0.95); }
+    
+    .luft-map-controls:hover .luft-map-legend { opacity: 1; visibility: visible; transform: translateX(0); pointer-events: auto; }
+
+    .luft-lg-section { margin-bottom: 12px; border-bottom: 1px solid var(--luft-border); padding-bottom: 8px; }
+    .luft-lg-section:last-child { margin-bottom: 0; border: none; padding-bottom: 0; }
+    .luft-lg-title { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: var(--luft-text-muted); margin-bottom: 8px; letter-spacing: 0.5px; }
+    .luft-lg-item { display: flex; align-items: center; gap: 10px; font-size: 0.8rem; color: var(--luft-text-main); margin-bottom: 6px; font-weight: 500; }
+    .luft-lg-icon { width: 16px; display: flex; justify-content: center; }
+    .luft-dot { width: 10px; height: 10px; border-radius: 50%; display: block; }
+    .luft-line { width: 16px; height: 3px; border-radius: 2px; display: block; }
+
+    /* Modal de Voo */
+    .luft-modal-voo-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5); z-index: 2000;
+        display: none; align-items: center; justify-content: center;
+        backdrop-filter: blur(4px);
+    }
+    .luft-modal-voo-card {
+        background: var(--luft-bg-panel); width: 400px;
+        border-radius: 16px; box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+        overflow: hidden; animation: slideUpFade 0.3s ease; border: 1px solid var(--luft-border);
+    }
+
+    .m-header { padding: 20px 24px; color: white; display: flex; justify-content: space-between; align-items: center; }
+    .mh-latam { background: linear-gradient(135deg, #E30613, #b3000b); }
+    .mh-gol { background: linear-gradient(135deg, #FF7020, #e05e15); }
+    .mh-azul { background: linear-gradient(135deg, #009FE3, #0077aa); }
+    .mh-default { background: var(--luft-text-muted); }
+
+    .m-body { padding: 24px; }
+    .m-route { 
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 20px; background: var(--luft-bg-app); padding: 15px; border-radius: 12px;
+    }
+    .m-iata { font-size: 1.8rem; font-weight: 800; color: var(--luft-text-main); }
+    
+    .m-info-row { display: flex; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px dashed var(--luft-border); padding-bottom: 8px; }
+    .m-lbl { font-size: 0.75rem; color: var(--luft-text-muted); font-weight: 600; text-transform: uppercase; }
+    .m-val { font-weight: 700; color: var(--luft-text-main); font-size: 0.95rem; }
+
+    .m-close-btn { 
+        background: transparent; border: none; color: white; font-size: 1.5rem; cursor: pointer; 
+        opacity: 0.8; transition: 0.2s; display: flex; align-items: center; justify-content: center;
+    }
+    .m-close-btn:hover { opacity: 1; transform: scale(1.1); }
+</style>
+
+<div class="luft-acompanhamento-wrapper">
+    
+    <div class="luft-card p-4 d-flex align-items-end gap-4 flex-wrap" style="flex: 0 0 auto;">
+        
+        <div style="flex: 1; min-width: 200px;">
+            <label class="form-label text-xs font-bold text-muted mb-1" style="text-transform: uppercase;">Buscar AWB</label>
+            <div class="relative">
+                <i class="ph-bold ph-magnifying-glass absolute" style="left: 12px; top: 50%; transform: translateY(-50%); color: var(--luft-text-muted);"></i>
+                <input type="text" id="buscaAwb" class="form-control pl-10" placeholder="Ex: 957-..." style="padding-left: 36px;">
+            </div>
+        </div>
+
+        <div style="flex: 1; min-width: 200px;">
+            <label class="form-label text-xs font-bold text-muted mb-1" style="text-transform: uppercase;">Filial CTC</label>
+            <div class="relative">
+                <i class="ph-bold ph-file-text absolute" style="left: 12px; top: 50%; transform: translateY(-50%); color: var(--luft-text-muted);"></i>
+                <input type="text" id="buscaFilialCtc" class="form-control pl-10" placeholder="N° Filial CTC..." style="padding-left: 36px;">
+            </div>
+        </div>
+
+        <div style="flex: 0 0 150px;">
+            <label class="form-label text-xs font-bold text-muted mb-1" style="text-transform: uppercase;">De</label>
+            <input type="date" id="dataInicio" class="form-control" value="{{ data_inicio }}">
+        </div>
+
+        <div style="flex: 0 0 150px;">
+            <label class="form-label text-xs font-bold text-muted mb-1" style="text-transform: uppercase;">Até</label>
+            <input type="date" id="dataFim" class="form-control" value="{{ data_fim }}">
+        </div>
+
+        <div style="flex: 0 0 auto;">
+            <button class="btn btn-primary d-flex align-items-center gap-2" onclick="CarregarDados()" style="height: 40px;">
+                Filtrar <i class="ph-bold ph-caret-right"></i>
+            </button>
+        </div>
+
+        <div class="d-flex flex-column align-items-end pl-4" style="margin-left: auto; border-left: 1px solid var(--luft-border);">
+            <span class="text-xs font-bold text-muted" style="text-transform: uppercase;">Listadas</span>
+            <span id="lbl-total" class="font-black text-primary" style="font-size: 1.8rem; line-height: 1;">0</span>
+        </div>
+    </div>
+
+    <div class="luft-acompanhamento-mapa">
+        <div id="mapa-voos" style="width: 100%; height: 100%; z-index: 1;"></div>
+        
+        <div class="luft-map-controls">
+            <div class="luft-btn-map-info">
+                <i class="ph-bold ph-info"></i>
+            </div>
+
+            <div class="luft-map-legend">
+                <div class="luft-lg-section">
+                    <div class="luft-lg-title">Status da Localização</div>
+                    <div class="luft-lg-item">
+                        <div class="luft-lg-icon"><span class="luft-dot" style="background: #10b981; border: 2px solid #fff; box-shadow: 0 0 0 1px #10b981;"></span></div>
+                        <span>Origem (Embarque)</span>
+                    </div>
+                    <div class="luft-lg-item">
+                        <div class="luft-lg-icon"><span class="luft-dot" style="background: #ef4444; border: 2px solid #fff; box-shadow: 0 0 0 1px #ef4444;"></span></div>
+                        <span>Local Atual (Carga)</span>
+                    </div>
+                    <div class="luft-lg-item">
+                        <div class="luft-lg-icon"><span class="luft-dot" style="background: var(--luft-text-muted); border: 2px dashed #fff;"></span></div>
+                        <span>Destino Final</span>
+                    </div>
+                </div>
+
+                <div class="luft-lg-section">
+                    <div class="luft-lg-title">Linhas de Rota</div>
+                    <div class="luft-lg-item">
+                        <div class="luft-lg-icon"><span class="luft-line" style="background: #e30613;"></span></div>
+                        <span>Voo LATAM</span>
+                    </div>
+                    <div class="luft-lg-item">
+                        <div class="luft-lg-icon"><span class="luft-line" style="background: #ff7020;"></span></div>
+                        <span>Voo GOL</span>
+                    </div>
+                    <div class="luft-lg-item">
+                        <div class="luft-lg-icon"><span class="luft-line" style="background: #0d6efd;"></span></div>
+                        <span>Voo AZUL</span>
+                    </div>
+                    <div class="luft-lg-item">
+                        <div class="luft-lg-icon"><span class="luft-line" style="background: var(--luft-text-muted); border-bottom: 2px dashed var(--luft-text-muted); height: 0;"></span></div>
+                        <span>Rota Pendente</span>
+                    </div>
+                </div>
+                
+                <div class="luft-lg-section">
+                    <div class="luft-lg-title">Ícones Especiais</div>
+                    <div class="luft-lg-item">
+                        <div class="luft-lg-icon"><i class="ph-fill ph-airplane-tilt" style="color: #10b981;"></i></div>
+                        <span>Chegou ao Destino</span>
+                    </div>
+                    <div class="luft-lg-item">
+                        <div class="luft-lg-icon"><i class="ph-fill ph-airplane-tilt" style="color: #f59e0b;"></i></div>
+                        <span>Em Trânsito Aéreo</span>
+                    </div>
+                    <div class="luft-lg-item">
+                        <div class="luft-lg-icon"><i class="ph-fill ph-airplane-tilt" style="color: #ef4444;"></i></div>
+                        <span>Aguardando Decolagem</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="luft-acompanhamento-tabela">
+        <div class="d-flex justify-content-between align-items-center p-3 border-b" style="border-color: var(--luft-border);">
+            <div class="font-bold text-main d-flex align-items-center gap-2" style="font-size: 1rem;">
+                <i class="ph-duotone ph-airplane-in-flight text-primary text-xl"></i> Detalhamento das Cargas
+            </div>
+        </div>
+        <div class="luft-acompanhamento-tabela-wrap">
+            <table id="tabela-awbs">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;"></th>
+                        <th>AWB</th>
+                        <th>Cia</th>
+                        <th>Rota</th>
+                        <th>Voo Atual</th>
+                        <th>Peso (Kg)</th>
+                        <th>Status</th>
+                        <th>Data Status</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="luft-modal-voo-overlay" id="modal-voo">
+    <div class="luft-modal-voo-card">
+        <div class="m-header mh-default" id="mv-header">
+            <div class="d-flex gap-3 align-items-center">
+                <i class="ph-fill ph-airplane-tilt" style="font-size: 1.5rem;"></i>
+                <div class="d-flex flex-column">
+                    <span id="mv-cia" style="font-size: 0.8rem; opacity: 0.9;">CIA</span>
+                    <span id="mv-numero" style="font-size: 1.4rem; font-weight: 800; line-height: 1;">VOO 0000</span>
+                </div>
+            </div>
+            <button class="m-close-btn" onclick="FecharModalVoo()"><i class="ph-bold ph-x"></i></button>
+        </div>
+        <div class="m-body">
+            <div class="m-route">
+                <div style="text-align: center;">
+                    <div class="m-iata" id="mv-origem">GRU</div>
+                    <div class="text-xs text-muted" style="max-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="mv-origem-nome">-</div>
+                </div>
+                <i class="ph-bold ph-airplane-takeoff" style="font-size: 1.5rem; color: var(--luft-primary-500);"></i>
+                <div style="text-align: center;">
+                    <div class="m-iata" id="mv-destino">MIA</div>
+                    <div class="text-xs text-muted" style="max-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="mv-destino-nome">-</div>
+                </div>
+            </div>
+
+            <div class="m-info-row">
+                <span class="m-lbl">Data da Partida</span>
+                <span class="m-val" id="mv-data">00/00/0000</span>
+            </div>
+            <div class="m-info-row">
+                <span class="m-lbl">Horário Saída</span>
+                <span class="m-val" id="mv-saida">00:00</span>
+            </div>
+            <div class="m-info-row" style="border-bottom: none;">
+                <span class="m-lbl">Horário Chegada</span>
+                <span class="m-val" id="mv-chegada">00:00</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Objeto de Configuração para injetar as URLs do Jinja2 no JS externo
+    const APP_CONFIG = {
+        urls: {
+            listarAwbs: "{{ url_for('Acompanhamento.ApiListarAwbs') }}",
+            // Passa a URL base sem o número, o JS concatena o ID depois
+            historico: "{{ url_for('Acompanhamento.ApiHistorico', numero_awb='') }}", 
+            detalhesVoo: "{{ url_for('Acompanhamento.ApiDetalhesVooModal') }}"
+        }
+    };
+</script>
+
+<script src="{{ url_for('static', filename='JS/Acompanhamento/Index.js') }}"></script>
+
+{% endblock %}

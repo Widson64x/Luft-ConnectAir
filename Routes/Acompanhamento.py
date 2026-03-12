@@ -19,7 +19,7 @@ def Painel():
         hoje = datetime.now().strftime('%Y-%m-%d')
         
         return render_template(
-            'Acompanhamento/Index.html', 
+            'Pages/Acompanhamento/Index.html', 
             resumo=resumo, 
             data_inicio=hoje, 
             data_fim=hoje
@@ -27,7 +27,7 @@ def Painel():
     except Exception as e:
         LogService.Error("AcompanhamentoRoute", "Erro ao renderizar Painel.", e)
         hoje = datetime.now().strftime('%Y-%m-%d')
-        return render_template('Acompanhamento/Index.html', resumo={}, data_inicio=hoje, data_fim=hoje)
+        return render_template('Pages/Acompanhamento/Index.html', resumo={}, data_inicio=hoje, data_fim=hoje)
 
 @AcompanhamentoBP.route('/Api/ListarAwbs', methods=['GET'])
 @login_required

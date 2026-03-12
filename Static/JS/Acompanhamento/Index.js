@@ -1,6 +1,7 @@
 /**
  * Arquivo: dashboard.js
  * Responsável pela lógica do Painel de Acompanhamento (Luft-ConnectAir)
+ * Atualizado para o padrão LuftCore
  */
 
 var map = null;
@@ -17,12 +18,12 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function GetCorPorCia(texto) {
-    if(!texto) return '#64748b';
+    if(!texto) return 'var(--luft-text-muted)';
     const t = texto.toUpperCase().trim(); 
     if (t.includes('LATAM') || t.includes('TAM') || /^(LA|JJ)(\s|-|\d|$)/.test(t)) return '#e30613';
     if (t.includes('GOL') || /^(G3)(\s|-|\d|$)/.test(t)) return '#ff7020';
     if (t.includes('AZUL') || /^(AD)(\s|-|\d|$)/.test(t)) return '#0d6efd';
-    return '#64748b';
+    return '#64748b'; // Cor padrão (slate-500)
 }
 
 function InitMap() {
@@ -87,7 +88,7 @@ function CarregarDados() {
 
     const tbody = document.querySelector('#tabela-awbs tbody');
 
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:60px; color:var(--cor-texto-secundario);"><i class="ph-spinner ph-spin" style="font-size:28px;"></i><br><span style="margin-top:10px; display:block">Buscando cargas...</span></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:60px; color:var(--luft-text-muted);"><i class="ph-spinner ph-spin text-primary" style="font-size:28px;"></i><br><span style="margin-top:10px; display:block">Buscando cargas...</span></td></tr>`;
     
     ResetarMapaVisual(); 
 
@@ -102,7 +103,7 @@ function CarregarDados() {
             document.getElementById('lbl-total').innerText = data.length;
 
             if(data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:40px;">Nenhum registro encontrado.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:40px; color:var(--luft-text-muted);">Nenhum registro encontrado.</td></tr>`;
                 return;
             }
 
@@ -111,7 +112,7 @@ function CarregarDados() {
                 const rowId = `row-${awb.CodigoId}`;
                 const corCia = GetCorPorCia(awb.CiaAerea);
 
-                let badgeClass = 'badge-secondary';
+                let badgeClass = 'luft-badge luft-badge-secondary';
                 const status = awb.Status ? awb.Status.toUpperCase() : '';
 
                 const successStatus = ['ENTREGUE', 'CARGA ENTREGUE'];
@@ -119,12 +120,12 @@ function CarregarDados() {
                 const warningStatus = ['RECEPCAO DOCUMENTAL', 'LIBERADO PELA FISCALIZAÇÃO', 'EM PROCESSO DE LIBERAÇÃO FISCAL'];
                 const infoStatus = ['CARGA ALOCADA', 'EMBARQUE CONFIRMADO', 'AGUARDANDO DESEMBARQUE', 'AGUARDANDO', 'CARGA DESEMBARCADA', 'EMBARQUE SURFACE', 'DESEMBARQUE VÔO', 'EMBARQUE VÔO'];
 
-                if (successStatus.some(s => status.includes(s))) badgeClass = 'badge-success';
-                else if (dangerStatus.some(s => status.includes(s))) badgeClass = 'badge-danger';
-                else if (warningStatus.some(s => status.includes(s))) badgeClass = 'badge-warning';
-                else if (infoStatus.some(s => status.includes(s))) badgeClass = 'badge-info';
+                if (successStatus.some(s => status.includes(s))) badgeClass = 'luft-badge luft-badge-success';
+                else if (dangerStatus.some(s => status.includes(s))) badgeClass = 'luft-badge luft-badge-danger';
+                else if (warningStatus.some(s => status.includes(s))) badgeClass = 'luft-badge luft-badge-warning';
+                else if (infoStatus.some(s => status.includes(s))) badgeClass = 'luft-badge luft-badge-info';
 
-                let htmlVoo = '<span style="color:#ccc;">-</span>';
+                let htmlVoo = '<span style="color:var(--luft-text-muted);">-</span>';
                 if(awb.Voo && awb.Voo.length > 2) {
                     htmlVoo = `<span class="voo-interativo" title="Duplo clique para detalhes do voo" 
                                ondblclick="AbrirModalVoo('${awb.Voo}', '${awb.DataStatus}', event)">
@@ -142,19 +143,19 @@ function CarregarDados() {
                 
                 trMain.innerHTML = `
                     <td style="text-align:center;">
-                        <i class="ph-bold ph-caret-right" id="icon-${rowId}" style="color:#64748b;"></i>
+                        <i class="ph-bold ph-caret-right transition-transform" id="icon-${rowId}" style="color:var(--luft-text-muted);"></i>
                     </td>
-                    <td style="font-weight:700; color:var(--cor-primaria); font-family:monospace; cursor:pointer;"
+                    <td style="font-weight:700; color:var(--luft-primary-600); font-family:monospace; cursor:pointer;"
                         title="Duplo clique para ver detalhes completos da Carga"
                         ondblclick="AbrirModalAwbDetalhes('${awb.CodigoId}', event)">
                         ${awb.Numero}
                     </td>
                     <td><span style="font-weight:600; color:${corCia};">${awb.CiaAerea || 'INDEF'}</span></td>
-                    <td><span style="font-weight:700;">${awb.Origem}</span> <i class="ph-bold ph-arrow-right" style="font-size:0.8rem; color:#ccc;"></i> <span style="font-weight:700;">${awb.Destino}</span></td>
+                    <td><span style="font-weight:700;">${awb.Origem}</span> <i class="ph-bold ph-arrow-right" style="font-size:0.8rem; color:var(--luft-text-muted);"></i> <span style="font-weight:700;">${awb.Destino}</span></td>
                     <td>${htmlVoo}</td>
                     <td>${awb.Peso.toFixed(1)} kg</td>
-                    <td><span class="badge ${badgeClass}">${awb.Status}</span></td>
-                    <td style="color:var(--cor-texto-secundario); font-size:0.8rem;">${awb.DataStatus}</td>
+                    <td><span class="${badgeClass}">${awb.Status}</span></td>
+                    <td style="color:var(--luft-text-muted); font-size:0.8rem;">${awb.DataStatus}</td>
                 `;
 
                 let trDetail = document.createElement('tr');
@@ -217,28 +218,28 @@ function ToggleTree(numeroAwb, rowId) {
 
 function RenderizarTimeline(data, container) {
     const historico = data.Historico || [];
-    if(historico.length === 0) { container.innerHTML = `Sem histórico.`; return; }
+    if(historico.length === 0) { container.innerHTML = `<span class="text-muted">Sem histórico.</span>`; return; }
 
-    let html = `<div class="timeline-container">`;
+    let html = `<div class="timeline-container" style="padding: 20px 40px;">`;
     historico.forEach((h, index) => {
         let statusClass = index === 0 && !h.Status.includes('ENTREGUE') ? 'active' : 'completed';
         
         let vooDisplay = '';
         if(h.Voo && h.Voo.length > 2) {
-            vooDisplay = `<span class="voo-interativo" style="background:#e0f2fe; color:#0369a1; padding:2px 8px; border-radius:4px;"
+            vooDisplay = `<span class="voo-interativo" style="background:rgba(14, 165, 233, 0.1); color:var(--luft-info); padding:2px 8px; border-radius:4px;"
                           ondblclick="AbrirModalVoo('${h.Voo}', '${h.Data}', event)">
-                          <i class="ph-airplane-tilt"></i> ${h.Voo}</span>`;
+                          <i class="ph-bold ph-airplane-tilt"></i> ${h.Voo}</span>`;
         }
 
         html += `
             <div class="tl-item" style="display:flex; gap:20px; padding-bottom:20px; position:relative;">
-                <div style="position:absolute; left:7px; top:20px; bottom:0; width:2px; background:#e2e8f0;"></div>
-                <div style="width:16px; height:16px; border-radius:50%; background:${statusClass === 'active' ? '#fff' : '#10b981'}; border:2px solid ${statusClass === 'active' ? '#f59e0b' : '#10b981'}; z-index:2;"></div>
+                <div style="position:absolute; left:7px; top:20px; bottom:0; width:2px; background:var(--luft-border);"></div>
+                <div style="width:16px; height:16px; border-radius:50%; background:${statusClass === 'active' ? 'var(--luft-bg-panel)' : '#10b981'}; border:2px solid ${statusClass === 'active' ? '#f59e0b' : '#10b981'}; z-index:2;"></div>
                 <div style="flex:1;">
-                    <div style="font-weight:700; color:#1e293b;">${h.Status}</div>
-                    <div style="font-size:0.8rem; color:#64748b;">${h.Data}</div>
+                    <div style="font-weight:700; color:var(--luft-text-main);">${h.Status}</div>
+                    <div style="font-size:0.8rem; color:var(--luft-text-muted);">${h.Data}</div>
                     <div style="margin-top:6px; font-size:0.8rem; display:flex; gap:12px;">
-                        <span style="background:#f1f5f9; padding:2px 8px; border-radius:4px;"><i class="ph-map-pin"></i> ${h.Local}</span>
+                        <span style="background:var(--luft-bg-app); color:var(--luft-text-main); padding:2px 8px; border-radius:4px;"><i class="ph-bold ph-map-pin"></i> ${h.Local}</span>
                         ${vooDisplay}
                     </div>
                 </div>

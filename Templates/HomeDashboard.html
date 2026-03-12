@@ -1,0 +1,330 @@
+{% extends "Layout/BaseLayout.html" %}
+{% import 'luftcore/components.html' as ui %}
+
+{% block titulo %}Dashboard - Luft-ConnectAir{% endblock %}
+
+{% block conteudo %}
+
+<style>
+    /* --- CONFIGURAÇÕES EXCLUSIVAS DA DASHBOARD (Padrão LuftCore) --- */
+    .luft-dashboard-wrapper {
+        display: flex; 
+        flex-direction: column; 
+        gap: 32px;
+        padding-bottom: 40px;
+        animation: slideUpFade 0.6s ease-out forwards;
+    }
+
+    @keyframes slideUpFade { 
+        from { opacity: 0; transform: translateY(20px); } 
+        to { opacity: 1; transform: translateY(0); } 
+    }
+
+    /* --- 1. HERO SECTION (COMMAND CENTER) --- */
+    .luft-dashboard-hero {
+        position: relative;
+        background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #172554 100%);
+        border-radius: 24px;
+        padding: 40px;
+        color: white;
+        overflow: hidden;
+        box-shadow: 0 20px 50px rgba(30, 58, 138, 0.3);
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center;
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    /* Background Map Effect */
+    .luft-dashboard-hero-bg {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23ffffff' fill-opacity='0.05' fill-rule='evenodd'/%3E%3C/svg%3E");
+        opacity: 0.6; z-index: 0;
+    }
+
+    .luft-dashboard-hero-content { position: relative; z-index: 2; }
+    
+    .luft-dashboard-badge-hero {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+        padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 700;
+        text-transform: uppercase; margin-bottom: 15px; letter-spacing: 1px;
+        backdrop-filter: blur(4px);
+    }
+    
+    .luft-dashboard-clock {
+        position: relative; z-index: 2;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        padding: 20px 30px; border-radius: 16px;
+        text-align: right;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    }
+    
+    .luft-dashboard-clock-time { font-family: 'Monaco', monospace; font-size: 2.5rem; font-weight: 700; color: #fff; letter-spacing: 2px; }
+    .luft-dashboard-clock-label { font-size: 0.8rem; color: #3b82f6; text-transform: uppercase; font-weight: 700; margin-top: 5px; display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+    
+    .luft-dashboard-dot-pulse { 
+        width: 8px; height: 8px; background: #22c55e; border-radius: 50%; 
+        box-shadow: 0 0 10px #22c55e; animation: pulse 2s infinite; 
+    }
+
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
+    /* --- 2. MODULES GRID --- */
+    .luft-dashboard-grid {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px;
+    }
+
+    .luft-dashboard-module {
+        background: var(--luft-bg-panel);
+        border: 1px solid var(--luft-border);
+        border-radius: 20px;
+        padding: 30px;
+        position: relative; overflow: hidden;
+        text-decoration: none;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        display: flex; flex-direction: column; justify-content: space-between;
+        height: 240px;
+    }
+
+    .luft-dashboard-module:hover {
+        transform: translateY(-8px);
+        box-shadow: var(--luft-shadow-lg);
+        border-color: rgba(59, 130, 246, 0.3); /* Utilizando azul primário padrão */
+    }
+
+    /* Fundo Gradiente Sutil no Hover */
+    .luft-dashboard-module::before {
+        content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        background: radial-gradient(circle at top right, rgba(59, 130, 246, 0.08), transparent 70%);
+        opacity: 0; transition: 0.4s;
+    }
+    .luft-dashboard-module:hover::before { opacity: 1; }
+
+    /* Ícone Flutuante */
+    .luft-dashboard-module-icon {
+        width: 64px; height: 64px;
+        background: var(--luft-bg-app);
+        border: 1px solid var(--luft-border);
+        border-radius: 16px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 2.2rem; color: var(--luft-text-muted);
+        transition: all 0.4s ease;
+        margin-bottom: 20px; z-index: 2;
+    }
+    
+    /* Hover no Card afeta o Ícone */
+    .luft-dashboard-module:hover .luft-dashboard-module-icon {
+        background: var(--luft-primary-600);
+        color: white;
+        border-color: var(--luft-primary-600);
+        transform: scale(1.1) rotate(-5deg);
+        box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+    }
+
+    .luft-dashboard-module-content { position: relative; z-index: 2; }
+    
+    .luft-dashboard-module-action {
+        position: absolute; bottom: 25px; right: 25px;
+        width: 40px; height: 40px;
+        border-radius: 50%;
+        background: rgba(0,0,0,0.03);
+        display: flex; align-items: center; justify-content: center;
+        color: var(--luft-primary-600);
+        opacity: 0; transform: translateX(-10px);
+        transition: all 0.3s ease 0.1s;
+    }
+    .luft-dashboard-module:hover .luft-dashboard-module-action { 
+        opacity: 1; transform: translateX(0); background: rgba(59, 130, 246, 0.1); 
+    }
+
+</style>
+
+<div class="luft-dashboard-wrapper">
+    
+    <div class="luft-dashboard-hero">
+        <div class="luft-dashboard-hero-bg"></div>
+        
+        <div class="luft-dashboard-hero-content">
+            <div class="luft-dashboard-badge-hero">
+                <i class="ph-fill ph-shield-check text-success"></i> Sistema Operacional
+            </div>
+            <h1 class="font-black mb-2" style="font-size: 2.2rem; letter-spacing: -1px;">
+                Bem-vindo ao Luft-ConnectAir
+            </h1>
+            <p style="color: rgba(255,255,255,0.7); max-width: 500px; line-height: 1.5;">
+                Painel de controle unificado para gestão de malha aérea, rastreamento de cargas e análise de viabilidade logística em tempo real.
+            </p>
+        </div>
+
+        <div class="luft-dashboard-clock">
+            <div class="luft-dashboard-clock-time" id="local-clock">00:00:00</div>
+            <div class="luft-dashboard-clock-label">
+                <div class="luft-dashboard-dot-pulse"></div> BRASÍLIA (BRT)
+            </div>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 24px;">
+        
+        <div class="luft-card hover-lift d-flex align-items-center gap-4" style="padding: 24px; border-radius: 16px;">
+            <div class="d-flex align-items-center justify-content-center rounded-xl bg-primary-light text-primary" style="width: 56px; height: 56px; font-size: 1.8rem; flex-shrink: 0;">
+                <i class="ph-duotone ph-airplane-tilt"></i>
+            </div>
+            <div>
+                <p class="text-muted text-xs font-bold mb-1" style="text-transform: uppercase; letter-spacing: 0.5px;">Voos Ativos (Hoje)</p>
+                <h3 class="text-2xl font-black text-main m-0" id="voos-ativos">Detectando...</h3>
+            </div>
+        </div>
+
+        <div class="luft-card hover-lift d-flex align-items-center gap-4" style="padding: 24px; border-radius: 16px;">
+            <div class="d-flex align-items-center justify-content-center rounded-xl bg-success-light text-success" style="width: 56px; height: 56px; font-size: 1.8rem; flex-shrink: 0;">
+                <i class="ph-duotone ph-database"></i>
+            </div>
+            <div>
+                <p class="text-muted text-xs font-bold mb-1" style="text-transform: uppercase; letter-spacing: 0.5px;">Status API</p>
+                <h3 class="text-2xl font-black text-success m-0" id="status-api">Online</h3>
+            </div>
+        </div>
+
+        <div class="luft-card hover-lift d-flex align-items-center gap-4" style="padding: 24px; border-radius: 16px;">
+            <div class="d-flex align-items-center justify-content-center rounded-xl bg-info-light text-info" style="width: 56px; height: 56px; font-size: 1.8rem; flex-shrink: 0;">
+                <i class="ph-duotone ph-users"></i>
+            </div>
+            <div>
+                <p class="text-muted text-xs font-bold mb-1" style="text-transform: uppercase; letter-spacing: 0.5px;">Usuário</p>
+                <h3 class="text-xl font-black text-main m-0">{{ current_user.Login.split()[0] if current_user.is_authenticated else 'Visitante' }}</h3>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="d-flex align-items-center gap-2 mt-2">
+        <i class="ph-bold ph-squares-four text-primary" style="font-size: 1.2rem;"></i>
+        <h3 class="font-bold text-main" style="font-size: 1.1rem;">Módulos do Sistema</h3>
+    </div>
+
+    <div class="luft-dashboard-grid">
+        {% if current_user.TemPermissao('planejamento.visualizar') %}
+        <a href="{{ url_for('Planejamento.Dashboard') }}" class="luft-dashboard-module">
+            <div class="luft-dashboard-module-icon"><i class="ph-duotone ph-globe-hemisphere-west"></i></div>
+            <div class="luft-dashboard-module-content">
+                <div class="font-black text-main mb-2" style="font-size: 1.4rem;">Planejamento</div>
+                <div class="text-muted" style="font-size: 0.9rem; line-height: 1.5;">Cockpit de monitoramento de cargas, roteirização visual e tracking.</div>
+            </div>
+            <div class="luft-dashboard-module-action"><i class="ph-bold ph-arrow-right"></i></div>
+        </a>
+        {% endif %}
+
+        {% if current_user.TemPermissao('acompanhamento.visualizar') %}
+        <a href="{{ url_for('Acompanhamento.Painel') }}" class="luft-dashboard-module">
+            <div class="luft-dashboard-module-icon"><i class="ph-bold ph-airplane-in-flight"></i></div>
+            <div class="luft-dashboard-module-content">
+                <div class="font-black text-main mb-2" style="font-size: 1.4rem;">Acompanhamento</div>
+                <div class="text-muted" style="font-size: 0.9rem; line-height: 1.5;">Acompanhamento em tempo real de voos e cargas.</div>
+            </div>
+            <div class="luft-dashboard-module-action"><i class="ph-bold ph-arrow-right"></i></div>
+        </a>
+        {% endif %}
+
+        {% if current_user.TemPermissao('cadastros.malha.visualizar') %}
+        <a href="{{ url_for('Escalas.Mapa') }}" class="luft-dashboard-module">
+            <div class="luft-dashboard-module-icon"><i class="ph-duotone ph-broadcast"></i></div>
+            <div class="luft-dashboard-module-content">
+                <div class="font-black text-main mb-2" style="font-size: 1.4rem;">Escalas e Rotas</div>
+                <div class="text-muted" style="font-size: 0.9rem; line-height: 1.5;">Mapa interativo global com visualização de tráfego aéreo e conexões.</div>
+            </div>
+            <div class="luft-dashboard-module-action"><i class="ph-bold ph-arrow-right"></i></div>
+        </a>
+        {% endif %}
+        
+        {# Lógica para definir o destino do módulo de Cadastro com base na prioridade #}
+        {% set link_destino = '' %}
+        {% if current_user.TemPermissao('cadastros.malha.editar') %}
+            {% set link_destino = url_for('Malha.Gerenciar') %}
+        {% elif current_user.TemPermissao('cadastros.aeroportos.editar') %}
+            {% set link_destino = url_for('Aeroporto.Gerenciar') %}
+        {% elif current_user.TemPermissao('cadastros.cidades.editar') %}
+            {% set link_destino = url_for('Cidade.Gerenciar') %}
+        {% elif current_user.TemPermissao('cadastros.tabelas.editar') %}
+            {% set link_destino = url_for('Frete.Gerenciar') %}
+        {% elif current_user.TemPermissao('cadastros.cortes.editar') %}
+            {% set link_destino = url_for('Cortes.Gerenciar') %}
+        {% endif %}
+
+        {% if link_destino %}
+            <a href="{{ link_destino }}" class="luft-dashboard-module">
+                <div class="luft-dashboard-module-icon"><i class="ph-duotone ph-file-xls"></i></div>
+                <div class="luft-dashboard-module-content">
+                    <div class="font-black text-main mb-2" style="font-size: 1.4rem;">Cadastro</div>
+                    <div class="text-muted" style="font-size: 0.9rem; line-height: 1.5;">Cadastro de malha aérea, aeroportos e cidades.</div>
+                </div>
+                <div class="luft-dashboard-module-action"><i class="ph-bold ph-arrow-right"></i></div>
+            </a>
+        {% endif %}
+
+        {% if current_user.TemPermissao('reversa.visualizar') %}
+        <a href="{{ url_for('Reversa.Index') }}" class="luft-dashboard-module">
+            <div class="luft-dashboard-module-icon"><i class="ph-bold ph-arrow-u-down-left"></i></div>
+            <div class="luft-dashboard-module-content">
+                <div class="font-black text-main mb-2" style="font-size: 1.4rem;">Devoluções e Reversas</div>
+                <div class="text-muted" style="font-size: 0.9rem; line-height: 1.5;">Área de gerenciamento de devoluções e processos de reversão. Para liberar os CTCs, de Devoluções.</div>
+            </div>
+            <div class="luft-dashboard-module-action"><i class="ph-bold ph-arrow-right"></i></div>
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    // --- RELÓGIO HORÁRIO DE BRASÍLIA ---
+    function updateClock() {
+        const now = new Date();
+        const options = { timeZone: 'America/Sao_Paulo', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' };
+        const timeString = now.toLocaleTimeString('pt-BR', options);
+        document.getElementById('local-clock').innerText = timeString;
+    }
+    setInterval(updateClock, 1000); 
+    updateClock();
+ 
+    // --- CARREGAR ESTATÍSTICAS REAIS ---
+    const API_STATS = "{{ url_for('Global.ApiVoosHoje') }}";
+
+    async function carregarStats() {
+        try {
+            const response = await fetch(API_STATS);
+            if (!response.ok) throw new Error('Erro na API');
+            
+            const total = await response.json();
+            
+            const elVoos = document.getElementById('voos-ativos');
+            const elApi = document.getElementById('status-api');
+            
+            if(elVoos) elVoos.innerText = total;
+            
+            if(elApi) {
+                elApi.innerText = "Online";
+                elApi.classList.remove("text-danger");
+                elApi.classList.add("text-success");
+            }
+
+        } catch (e) {
+            console.warn("Falha ao carregar stats:", e);
+            const elApi = document.getElementById('status-api');
+            if(elApi) {
+                elApi.innerText = "Off-line";
+                elApi.classList.remove("text-success");
+                elApi.classList.add("text-danger");
+            }
+        }
+    }
+
+    // Chama imediatamente e repete a cada 60s
+    carregarStats();
+    setInterval(carregarStats, 60000);
+
+</script>
+
+{% endblock %}

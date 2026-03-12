@@ -1,0 +1,124 @@
+{% extends "luftcore/base.html" %}
+{# Importando os componentes do LuftCore #}
+{% import 'luftcore/components.html' as ui %}
+
+{% block titulo %}
+    {% block title %}Luft-ConnectAir{% endblock %}
+{% endblock %}
+
+{% block extra_head %}
+    {% block extra_css %}{% endblock %}
+{% endblock %}
+
+{% block sidebar_menu %}
+    {# --- DASHBOARD --- #}
+    {{ ui.nav_item('Dashboard', 
+        icone='ph-bold ph-chart-pie-slice', 
+        href=url_for('Dashboard'), 
+        ativo=(request.endpoint == 'Dashboard')) 
+    }}
+
+    {# --- CADASTROS (Submenu em Árvore) --- #}
+    {% if current_user.TemPermissao('cadastros.malha.editar') or 
+          current_user.TemPermissao('cadastros.aeroportos.editar') or 
+          current_user.TemPermissao('cadastros.cidades.editar') or 
+          current_user.TemPermissao('cadastros.tabelas.editar') %}
+        
+        {% set ativo_cadastros = 'Malha' in request.endpoint or 'Aeroporto' in request.endpoint or 'Cidade' in request.endpoint or 'Frete' in request.endpoint or 'Cortes' in request.endpoint or 'ServicosClientes' in request.endpoint %}
+        
+        {% call ui.nav_item('Cadastros', icone='ph-bold ph-folder-notch', ativo=ativo_cadastros) %}
+            
+            {% if current_user.TemPermissao('cadastros.malha.editar') %}
+                {{ ui.nav_item('Malha Aérea', href=url_for('Malha.Gerenciar'), ativo=('Malha' in request.endpoint)) }}
+            {% endif %}
+
+            {% if current_user.TemPermissao('cadastros.aeroportos.editar') %}
+                {{ ui.nav_item('Aeroportos', href=url_for('Aeroporto.Gerenciar'), ativo=('Aeroporto' in request.endpoint)) }}
+            {% endif %}
+
+            {% if current_user.TemPermissao('cadastros.cidades.editar') %}
+                {{ ui.nav_item('Cidades', href=url_for('Cidade.Gerenciar'), ativo=('Cidade' in request.endpoint)) }}
+            {% endif %}
+
+            {% if current_user.TemPermissao('cadastros.tabelas.editar') %}
+                {{ ui.nav_item('Tabelas de Frete', href=url_for('Frete.Gerenciar'), ativo=('Frete' in request.endpoint)) }}
+            {% endif %}
+
+            {% if current_user.TemPermissao('cadastros.cortes.visualizar') %}
+                {{ ui.nav_item('Horários de Corte', href=url_for('Cortes.Gerenciar'), ativo=('Cortes' in request.endpoint)) }}
+            {% endif %}
+
+            {{ ui.nav_item('Serviços dos Clientes', href=url_for('ServicosClientes.Gerenciar'), ativo=('ServicosClientes' in request.endpoint)) }}
+            
+        {% endcall %}
+    {% endif %}
+
+    {# --- PLANEJAMENTO --- #}
+    {% if current_user.TemPermissao('planejamento.visualizar') %}
+        {{ ui.nav_item('Planejamento', 
+            icone='ph-bold ph-globe-hemisphere-west', 
+            href=url_for('Planejamento.Dashboard'), 
+            ativo=('Planejamento' in request.endpoint)) 
+        }}
+    {% endif %}
+
+    {# --- ESCALAS --- #}
+    {% if current_user.TemPermissao('cadastros.malha.visualizar') %}
+        {{ ui.nav_item('Escalas', 
+            icone='ph-bold ph-calendar-blank', 
+            href=url_for('Escalas.Mapa'), 
+            ativo=('Escalas' in request.endpoint)) 
+        }}
+    {% endif %}
+
+    {# --- ACOMPANHAMENTO --- #}
+    {% if current_user.TemPermissao('acompanhamento.visualizar') %}
+        {{ ui.nav_item('Acompanhamento', 
+            icone='ph-bold ph-airplane-in-flight', 
+            href=url_for('Acompanhamento.Painel'), 
+            ativo=('Acompanhamento' in request.endpoint)) 
+        }}
+    {% endif %}
+
+    {# --- DEVOLUÇÕES (REVERSA) --- #}
+    {% if current_user.TemPermissao('reversa.visualizar') %}
+        {{ ui.nav_item('Devoluções (Reversa)', 
+            icone='ph-bold ph-arrow-u-down-left', 
+            href=url_for('Reversa.Index'), 
+            ativo=('Reversa' in request.endpoint)) 
+        }}
+    {% endif %}
+
+    {# --- CONFIGURAÇÕES --- #}
+    {% if current_user.TemPermissao('sistema.configuracoes.visualizar') %}
+        {{ ui.nav_item('Configurações', 
+            icone='ph-bold ph-gear', 
+            href=url_for('Configuracoes.Index'), 
+            ativo=('Configuracoes' in request.endpoint)) 
+        }}
+    {% endif %}
+{% endblock %}
+
+{% block sidebar_actions %}
+    <button onclick="LuftCore.alternarTema()" class="luft-btn-action hover-lift" title="Tema">
+        <i class="ph-bold ph-moon"></i>
+    </button>
+    
+    <a href="{{ url_for('Auth.Logout') }}" class="luft-btn-action hover-lift text-danger" title="Sair">
+        <i class="ph-bold ph-power"></i>
+    </a>
+{% endblock %}
+
+{% block nome_usuario %}
+    {{ current_user.Login if current_user.is_authenticated else 'Visitante' }}
+{% endblock %}
+
+{% block content %}
+    {# Mantive o nome 'conteudo' para manter compatibilidade com os arquivos antigos do ConnectAir enquanto migramos as páginas #}
+    {% block conteudo %}{% endblock %}
+{% endblock %}
+
+{% block extra_scripts %}
+    <script src="{{ url_for('static', filename='JS/Base.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+{% endblock %}

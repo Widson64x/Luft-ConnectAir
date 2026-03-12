@@ -1,0 +1,147 @@
+{% extends "Layout/BaseLayout.html" %}
+{% import 'luftcore/components.html' as ui %}
+
+{% block titulo %}Ranking de Aeroportos | Luft-ConnectAir{% endblock %}
+
+{% block conteudo %}
+
+<style>
+    /* --- ESTRUTURA DO RANKING --- */
+    .luft-ranking-wrapper {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        gap: 24px;
+        height: calc(100vh - 120px);
+        animation: slideUpFade 0.5s ease-out forwards;
+    }
+
+    @keyframes slideUpFade { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Menu Lateral (Sidebar UF) */
+    .luft-ranking-sidebar {
+        display: flex; flex-direction: column; overflow: hidden;
+    }
+
+    .luft-uf-item {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 12px 20px; cursor: pointer; border-bottom: 1px solid var(--luft-border);
+        transition: 0.2s; color: var(--luft-text-main);
+    }
+    .luft-uf-item:hover { background: var(--luft-bg-app); }
+    .luft-uf-item.active { 
+        background: rgba(59, 130, 246, 0.1); 
+        border-left: 4px solid var(--luft-primary-500);
+        padding-left: 16px;
+    }
+    .luft-uf-item.active .uf-title { color: var(--luft-primary-600); font-weight: 800; }
+
+    /* Área Principal */
+    .luft-ranking-main {
+        display: flex; flex-direction: column; overflow: hidden;
+    }
+
+    /* Grid de Cards dos Aeroportos */
+    .luft-cards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 20px;
+        padding: 24px;
+        overflow-y: auto;
+    }
+
+    /* Range Customizado */
+    .luft-range-wrapper {
+        position: relative; width: 100%; height: 8px;
+        background: var(--luft-border); border-radius: 4px; margin-top: 10px;
+    }
+    .luft-range-fill {
+        position: absolute; top: 0; left: 0; height: 100%;
+        border-radius: 4px; transition: width 0.1s, background-color 0.3s;
+    }
+    .luft-range-input {
+        position: absolute; top: -5px; left: 0; width: 100%; height: 18px;
+        opacity: 0; cursor: pointer; z-index: 2;
+    }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-4">
+    <div>
+        <h1 class="font-black text-main d-flex align-items-center gap-2" style="font-size: 1.8rem; letter-spacing: -0.5px;">
+            <i class="ph-duotone ph-airplane-tilt text-primary"></i> Priorização de Aeroportos
+        </h1>
+        <p class="text-muted mt-1 font-medium">Defina a importância estratégica de cada terminal para o cálculo de rotas.</p>
+    </div>
+    
+    <div style="min-width: 300px;">
+        <div class="relative">
+            <i class="ph-bold ph-magnifying-glass absolute" style="left: 14px; top: 50%; transform: translateY(-50%); color: var(--luft-text-muted);"></i>
+            <input type="text" id="global-search" class="form-control pl-10" placeholder="Buscar por IATA, Nome ou Cidade..." onkeyup="FiltrarGlobal(this.value)" style="padding-left: 40px; border-radius: 50px;">
+        </div>
+    </div>
+</div>
+
+<div class="luft-ranking-wrapper">
+    
+    <div class="luft-card p-0 luft-ranking-sidebar">
+        <div class="p-3 bg-app border-b font-bold text-muted text-uppercase text-xs" style="border-color: var(--luft-border); letter-spacing: 0.5px;">
+            <i class="ph-bold ph-map-pin"></i> Navegação
+        </div>
+        
+        <div style="flex: 1; overflow-y: auto;">
+            <div class="luft-uf-item active" onclick="AtivarModoGlobal()" id="btn-global">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="d-flex align-items-center justify-content-center bg-primary-light text-primary rounded" style="width: 36px; height: 36px;">
+                        <i class="ph-bold ph-globe-hemisphere-west text-lg"></i>
+                    </div>
+                    <div>
+                        <div class="uf-title font-bold">Visão Global</div>
+                        <div class="text-xs text-muted">Top Ranking</div>
+                    </div>
+                </div>
+                <i class="ph-bold ph-caret-right text-muted"></i>
+            </div>
+
+            <div style="height: 1px; background: var(--luft-border); margin: 8px 0;"></div>
+
+            {% for uf, lista in Dados.items() %}
+            <div class="luft-uf-item item-uf" id="uf-{{ uf }}" onclick="SelecionarUf('{{ uf }}')">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="d-flex align-items-center justify-content-center bg-app border text-main font-black rounded" style="width: 36px; height: 36px; border-color: var(--luft-border);">
+                        {{ uf }}
+                    </div>
+                    <div>
+                        <div class="uf-title font-bold">Aeroportos</div>
+                        <div class="text-xs text-muted">{{ lista|length }} terminais</div>
+                    </div>
+                </div>
+                <i class="ph-bold ph-caret-right text-muted"></i>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="luft-card p-0 luft-ranking-main">
+        
+        <div class="p-4 bg-app border-b d-flex justify-content-between align-items-center flex-wrap gap-4" style="border-color: var(--luft-border);">
+            <div>
+                <h2 class="font-black text-main m-0 text-xl" id="titulo-view">--</h2>
+                <span class="text-sm font-medium text-muted" id="subtitulo-view">--</span>
+            </div>
+            
+            <button class="btn btn-success d-flex align-items-center gap-2 btn-save" onclick="SalvarRankingAtual()">
+                <i class="ph-bold ph-floppy-disk text-lg"></i>
+                <span class="btn-text">Salvar Alterações</span>
+            </button>
+        </div>
+
+        <div class="luft-cards-grid" id="container-aeroportos">
+            </div>
+    </div>
+
+</div>
+
+<script>
+    window.DadosRanking = {{ Dados | tojson | safe }};
+</script>
+<script src="{{ url_for('static', filename='JS/Aeroportos/Ranking.js') }}"></script>
+{% endblock %}

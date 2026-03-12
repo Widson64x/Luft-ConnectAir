@@ -1,0 +1,548 @@
+{% extends "Layout/BaseLayout.html" %}
+{% import 'luftcore/components.html' as ui %}
+
+{% block titulo %}Serviços ao Cliente | Luft-ConnectAir{% endblock %}
+
+{% block conteudo %}
+
+<style>
+    /* --- LAYOUT FIXO E ANIMAÇÕES (LuftCore) --- */
+    .luft-servico-wrapper {
+        animation: slideUpFade 0.5s ease-out forwards;
+    }
+    
+    @keyframes slideUpFade { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+
+    .luft-servico-grid {
+        display: grid;
+        grid-template-columns: 380px minmax(0, 1fr);
+        gap: 24px;
+        height: calc(100vh - 150px); 
+        min-height: 550px;
+        align-items: stretch;
+    }
+    
+    @media (max-width: 1100px) { 
+        .luft-servico-grid { 
+            grid-template-columns: 1fr; 
+            height: auto; 
+        } 
+    }
+    
+    /* --- TABELAS --- */
+    .luft-servicos-tabela { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .luft-servicos-tabela th {
+        background: var(--luft-bg-app); 
+        color: var(--luft-text-muted); 
+        font-weight: 700; 
+        text-transform: uppercase; 
+        font-size: 0.75rem;
+        padding: 16px 24px; 
+        text-align: left; 
+        position: sticky; top: 0; z-index: 10;
+        border-bottom: 1px solid var(--luft-border);
+    }
+    .luft-servicos-tabela td {
+        padding: 16px 24px; border-bottom: 1px solid var(--luft-border);
+        color: var(--luft-text-main); vertical-align: middle;
+    }
+    .luft-servicos-tabela tr:not(.linha-grupo-header):hover td { background-color: var(--luft-bg-app); }
+
+    /* Loader */
+    .loader-container { padding: 40px; text-align: center; color: var(--luft-text-muted); }
+    .spinner {
+        display: inline-block; width: 35px; height: 35px;
+        border: 3px solid rgba(59, 130, 246, 0.2);
+        border-radius: 50%; border-top-color: var(--luft-primary-600);
+        animation: spin 1s ease-in-out infinite; margin-bottom: 15px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* --- TREEVIEW (Estilizado para o Tema Claro/Escuro) --- */
+    .luft-tree-container {
+        border: 1px solid var(--luft-border);
+        border-radius: 8px;
+        padding: 12px;
+        max-height: calc(100vh - 600px); 
+        min-height: 180px;
+        overflow-y: auto;
+        background: var(--luft-bg-app);
+    }
+    .luft-tree-root, .luft-tree-children {
+        list-style-type: none;
+        padding-left: 0;
+        margin: 0;
+    }
+    .luft-tree-children {
+        margin-left: 20px;
+        border-left: 1px dashed var(--luft-border);
+        padding-left: 12px;
+        display: none; 
+    }
+    .luft-tree-root > li { margin-bottom: 8px; }
+    .luft-tree-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 0;
+    }
+    .luft-tree-item label {
+        margin: 0 !important;
+        font-weight: 600 !important;
+        cursor: pointer;
+        font-size: 0.85rem !important;
+        color: var(--luft-text-main);
+    }
+    .luft-tree-item input[type="checkbox"] {
+        cursor: pointer; width: 16px; height: 16px; accent-color: var(--luft-primary-600);
+    }
+    .toggle-icon {
+        cursor: pointer; color: var(--luft-text-muted); transition: transform 0.2s;
+    }
+    .toggle-icon.open { transform: rotate(90deg); }
+    
+    #InfoContagem {
+        background: rgba(59, 130, 246, 0.08); 
+        border: 1px dashed var(--luft-primary-500);
+        padding: 10px; border-radius: 8px; margin-top: 12px;
+        font-size: 0.8rem; color: var(--luft-primary-600); 
+        font-weight: 700; text-align: center;
+    }
+</style>
+
+<div class="luft-servico-wrapper">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-4 mb-4">
+        <div>
+            <h2 class="font-black text-main m-0 d-flex align-items-center gap-2" style="font-size: 1.8rem; letter-spacing: -0.5px;">
+                <i class="ph-duotone ph-handshake text-primary"></i> Serviços dos Clientes
+            </h2>
+            <p class="text-muted mt-1 font-medium">Gerencie SLAs, controle de temperatura e prioridades logísticas em lote.</p>
+        </div>
+    </div>
+
+    <div class="luft-servico-grid">
+        
+        <div class="luft-card" style="padding: 0; display: flex; flex-direction: column; overflow: hidden; height: 100%;">
+            <div class="d-flex justify-content-between align-items-center" style="padding: 20px 24px; border-bottom: 1px solid var(--luft-border); background: transparent;">
+                <h3 class="font-bold text-main m-0 text-lg d-flex align-items-center gap-2" id="FormTitle">
+                    <i class="ph-bold ph-plus-circle text-primary"></i> Nova Parametrização Lote
+                </h3>
+            </div>
+            
+            <div style="padding: 24px; overflow-y: auto; flex: 1;">
+                <form id="FormServico" action="{{ url_for('ServicosClientes.SalvarServico') }}" method="POST">
+                    
+                    <div style="margin-bottom: 20px;">
+                        <label class="form-label text-xs font-bold text-muted mb-2 text-uppercase d-block">
+                            <i class="ph-bold ph-buildings"></i> Seleção de Clientes
+                        </label>
+                        
+                        <div class="luft-tree-container">
+                            <ul class="luft-tree-root">
+                                {% for grupo, clientes_grupo in Clientes|groupby('Grupo') %}
+                                    {% set lista_clientes = clientes_grupo|list %}
+                                    
+                                    {% if lista_clientes|length == 1 %}
+                                        {# CASO 1: Apenas 1 CNPJ #}
+                                        {% set Cli = lista_clientes[0] %}
+                                        <li>
+                                            <div class="luft-tree-item" style="padding-left: 22px;">
+                                                <input type="checkbox" class="chk-cliente" name="clientes_selecionados[]" id="cliente_{{ Cli.CodigoCliente }}" value="{{ Cli.CodigoCliente }}">
+                                                <label for="cliente_{{ Cli.CodigoCliente }}">
+                                                    <strong class="text-primary"><i class="ph-bold ph-user"></i> {{ grupo or Cli.Fantasia or Cli.RazaoSocial }}</strong> <span class="text-muted font-medium ml-1">{{ Cli.Cnpj }}</span>
+                                                </label>
+                                            </div>
+                                        </li>
+                                    {% else %}
+                                        {# CASO 2: Múltiplos CNPJs #}
+                                        <li>
+                                            <div class="luft-tree-item">
+                                                <i class="ph-bold ph-caret-right toggle-icon" onclick="ToggleTree(this)"></i>
+                                                <input type="checkbox" class="chk-grupo" id="grupo_{{ loop.index }}" value="{{ grupo }}">
+                                                <label for="grupo_{{ loop.index }}"><strong class="text-primary"><i class="ph-bold ph-folders"></i> {{ grupo or 'Geral / Sem Grupo' }}</strong></label>
+                                            </div>
+                                            
+                                            <ul class="luft-tree-children">
+                                                {% for Cli in lista_clientes %}
+                                                <li>
+                                                    <div class="luft-tree-item">
+                                                        <input type="checkbox" class="chk-cliente" name="clientes_selecionados[]" id="cliente_{{ Cli.CodigoCliente }}" value="{{ Cli.CodigoCliente }}">
+                                                        <label for="cliente_{{ Cli.CodigoCliente }}" class="text-muted">{{ Cli.Cnpj }} - {{ Cli.Fantasia or Cli.RazaoSocial }}</label>
+                                                    </div>
+                                                </li>
+                                                {% endfor %}
+                                            </ul>
+                                        </li>
+                                    {% endif %}
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        <div id="InfoContagem">0 Clientes Selecionados</div>
+                    </div>
+
+                    <div style="height: 1px; background: var(--luft-border); margin: 24px 0;"></div>
+
+                    <div style="margin-bottom: 16px;">
+                        <label class="form-label text-xs font-bold text-muted mb-1 text-uppercase d-block">
+                            <i class="ph-bold ph-thermometer-snow text-info"></i> Durabilidade do Gelo
+                        </label>
+                        <input type="text" name="DurabilidadeGelo" id="DurabilidadeGelo" class="form-control" style="width: 100%;" 
+                            list="sugestoes-gelo" maxlength="86" required 
+                            placeholder="Ex: 48 horas ou Piaglis: 40h(8-44L)...">
+                            
+                        <datalist id="sugestoes-gelo">
+                            <option value="24 horas">
+                            <option value="48 horas">
+                            <option value="72 horas">
+                            <option value="96 horas">
+                        </datalist>
+                        
+                        <div class="text-xs text-muted mt-2 font-medium" style="line-height: 1.4;">
+                            <i class="ph-fill ph-info text-primary"></i> Para regras variáveis, digite um resumo curto.<br>
+                            <strong>Ex:</strong> DYSPORT 40h(8-21L) 72h(44-80L)
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 16px;">
+                        <label class="form-label text-xs font-bold text-muted mb-1 text-uppercase d-block">
+                            <i class="ph-bold ph-arrows-clockwise text-warning"></i> Troca de Gelo
+                        </label>
+                        <select name="AutorizacaoTrocaGelo" id="AutorizacaoTrocaGelo" class="form-control" style="width: 100%;" required>
+                            <option value="SIM">SIM (Autorizado)</option>
+                            <option value="NÃO">NÃO (Bloqueado)</option>
+                            <option value="SÓ COM AUTORIZAÇÃO">SÓ COM AUTORIZAÇÃO</option>
+                        </select>
+                    </div>
+
+                    <div style="margin-bottom: 16px;">
+                        <label class="form-label text-xs font-bold text-muted mb-1 text-uppercase d-block">
+                            <i class="ph-bold ph-package text-success"></i> Armazenagem
+                        </label>
+                        <select name="AutorizacaoArmazenagem" id="AutorizacaoArmazenagem" class="form-control" style="width: 100%;" required>
+                            <option value="SIM">SIM (Autorizado)</option>
+                            <option value="NÃO">NÃO (Bloqueado)</option>
+                            <option value="SÓ COM AUTORIZAÇÃO">SÓ COM AUTORIZAÇÃO</option>
+                        </select>
+                    </div>
+
+                    <div style="margin-bottom: 24px;">
+                        <label class="form-label text-xs font-bold text-muted mb-1 text-uppercase d-block">
+                            <i class="ph-bold ph-airplane-tilt text-primary"></i> Serviço Logístico
+                        </label>
+                        <select name="ServicoContratado" id="ServicoContratado" class="form-control" style="width: 100%;" required>
+                            <option value="">Selecione...</option>
+                            <option value="ECONÔMICO">ECONÔMICO</option>
+                            <option value="EXPRESSO">EXPRESSO</option>
+                            <option value="DEPENDE_DO_DESTINO">Depende do Destino</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" id="BtnSubmit" class="btn btn-primary d-flex align-items-center justify-content-center gap-2" style="width: 100%;">
+                        <i class="ph-bold ph-floppy-disk"></i> Salvar Lote
+                    </button>
+                    <button type="button" id="BtnCancel" class="btn btn-secondary d-flex align-items-center justify-content-center gap-2 mt-2" style="width: 100%; display: none;" onclick="CancelarEdicao()">
+                        <i class="ph-bold ph-x"></i> Cancelar Edição
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="luft-card" style="padding: 0; display: flex; flex-direction: column; overflow: hidden; height: 100%; min-width: 0;">
+            <div class="d-flex justify-content-between align-items-center" style="padding: 20px 24px; border-bottom: 1px solid var(--luft-border); background: transparent;">
+                <h3 class="font-bold text-main m-0 text-lg d-flex align-items-center gap-2">
+                    <i class="ph-bold ph-list-dashes text-primary"></i> Clientes Configurados
+                </h3>
+                <button onclick="CarregarListaServicos()" class="btn btn-secondary d-flex align-items-center gap-2" style="padding: 8px 16px; font-size: 0.85rem;">
+                    <i class="ph-bold ph-arrows-clockwise"></i> Atualizar
+                </button>
+            </div>
+            
+            <div style="flex: 1; overflow-y: auto; padding: 0;">
+                
+                <div id="loader-tabela" class="loader-container">
+                    <div class="spinner"></div>
+                    <p class="font-bold">Carregando serviços contratados...</p>
+                </div>
+
+                <table class="luft-servicos-tabela" id="tabela-servicos" style="display: none;">
+                    <thead>
+                        <tr>
+                            <th>Cliente</th>
+                            <th>Gelo / Troca</th>
+                            <th>Armazenagem</th>
+                            <th>Serviço</th>
+                            <th style="text-align: center;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-servicos">
+                    </tbody>
+                </table>
+                
+                <div id="empty-state" class="loader-container" style="display: none; padding-top: 80px;">
+                    <i class="ph-duotone ph-clipboard-text text-muted" style="font-size: 4rem; opacity: 0.5;"></i>
+                    <p class="font-bold mt-3">Nenhum serviço configurado até o momento.</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    const URL_SALVAR = "{{ url_for('ServicosClientes.SalvarServico') }}";
+    const URL_EDITAR_BASE = "{{ url_for('ServicosClientes.EditarServico', IdServico=0) }}";
+
+    document.addEventListener("DOMContentLoaded", function() {
+        CarregarListaServicos();
+        ConfigurarTreeview();
+    });
+
+    // --- LÓGICA DO TREEVIEW ---
+    function ToggleTree(icon) {
+        icon.classList.toggle('open');
+        const childrenContainer = icon.closest('li').querySelector('.luft-tree-children');
+        if(childrenContainer) {
+            childrenContainer.style.display = childrenContainer.style.display === 'block' ? 'none' : 'block';
+        }
+    }
+
+    function AtualizarContagem() {
+        const marcados = document.querySelectorAll('.chk-cliente:checked').length;
+        document.getElementById('InfoContagem').innerHTML = `${marcados} Cliente(s) Selecionado(s)`;
+    }
+
+    function ConfigurarTreeview() {
+        const treeRoot = document.querySelector('.luft-tree-root');
+        
+        treeRoot.addEventListener('change', function(e) {
+            const target = e.target;
+            
+            if (target.classList.contains('chk-grupo')) {
+                const parentLi = target.closest('li');
+                const childCheckboxes = parentLi.querySelectorAll('.chk-cliente');
+                childCheckboxes.forEach(chk => chk.checked = target.checked);
+            }
+            
+            if (target.classList.contains('chk-cliente')) {
+                UpdateParentStatus(target);
+            }
+            
+            AtualizarContagem();
+        });
+    }
+
+    function UpdateParentStatus(childCheckbox) {
+        let parentUl = childCheckbox.closest('.luft-tree-children');
+        if (!parentUl) return;
+        
+        let parentLi = parentUl.closest('li');
+        let parentCheckbox = parentLi.querySelector('.chk-grupo');
+        
+        let siblingCheckboxes = parentUl.querySelectorAll('.chk-cliente');
+        let allChecked = true;
+        let someChecked = false;
+
+        siblingCheckboxes.forEach(cb => {
+            if (cb.checked) someChecked = true;
+            else allChecked = false;
+        });
+
+        parentCheckbox.checked = allChecked;
+        parentCheckbox.indeterminate = someChecked && !allChecked;
+    }
+    // --- FIM LÓGICA TREEVIEW ---
+
+    function CarregarListaServicos() {
+        const loader = document.getElementById('loader-tabela');
+        const tabela = document.getElementById('tabela-servicos');
+        const tbody = document.getElementById('tbody-servicos');
+        const emptyState = document.getElementById('empty-state');
+
+        loader.style.display = 'block';
+        tabela.style.display = 'none';
+        emptyState.style.display = 'none';
+
+        fetch("{{ url_for('ServicosClientes.ListaServicosContratados') }}")
+            .then(response => response.json())
+            .then(data => {
+                tbody.innerHTML = '';
+                
+                if (data.length === 0) {
+                    loader.style.display = 'none';
+                    emptyState.style.display = 'block';
+                    return;
+                }
+
+                const grupos = data.reduce((acumulador, item) => {
+                    if (!acumulador[item.Grupo]) acumulador[item.Grupo] = [];
+                    acumulador[item.Grupo].push(item);
+                    return acumulador;
+                }, {});
+
+                const nomesGrupos = Object.keys(grupos).sort();
+
+                nomesGrupos.forEach((nomeGrupo, indexGrupo) => {
+                    const clientesDoGrupo = grupos[nomeGrupo];
+                    const nomeExibicaoGrupo = nomeGrupo === 'Z_Sem Grupo' ? 'Geral / Sem Grupo' : nomeGrupo;
+
+                    // CABEÇALHO DO GRUPO (A "Pastinha")
+                    const trGrupo = document.createElement('tr');
+                    trGrupo.className = 'linha-grupo-header';
+                    trGrupo.style.backgroundColor = 'var(--luft-bg-app)';
+                    trGrupo.style.cursor = 'pointer';
+                    trGrupo.innerHTML = `
+                        <td colspan="5" style="padding: 12px 24px; font-weight: 700; color: var(--luft-text-main);" onclick="ToggleTabelaGrupo('grupo_tabela_${indexGrupo}')">
+                            <i class="ph-bold ph-caret-down toggle-icon-tabela" id="icon_tabela_${indexGrupo}" style="transition: transform 0.2s; display: inline-block;"></i>
+                            <i class="ph-bold ph-folders" style="margin-left: 8px; margin-right: 8px; color: var(--luft-primary-600);"></i>
+                            ${nomeExibicaoGrupo} 
+                            <span style="font-size: 0.8rem; color: var(--luft-text-muted); font-weight: 600; margin-left: 6px;">(${clientesDoGrupo.length} serviço(s))</span>
+                        </td>
+                    `;
+                    tbody.appendChild(trGrupo);
+
+                    // CLIENTES DO GRUPO
+                    clientesDoGrupo.forEach(item => {
+                        const getBadgeAutorizacao = (valor) => {
+                            if(valor === 'SIM') return `<span class="luft-badge luft-badge-success">SIM</span>`;
+                            if(valor === 'NÃO') return `<span class="luft-badge luft-badge-danger">NÃO</span>`;
+                            return `<span class="luft-badge luft-badge-warning">SOB AUTORIZAÇÃO</span>`;
+                        };
+
+                        const getBadgeServico = (valor) => {
+                            if(valor === 'EXPRESSO') return `<span class="luft-badge luft-badge-warning"><i class="ph-fill ph-lightning"></i> EXPRESSO</span>`;
+                            if(valor === 'DEPENDE_DO_DESTINO') return `<span class="luft-badge luft-badge-info"><i class="ph-fill ph-star"></i> DEPENDE DO DESTINO</span>`;
+                            return `<span class="luft-badge luft-badge-success"><i class="ph-fill ph-truck"></i> ECONÔMICO</span>`;
+                        };
+
+                        const tr = document.createElement('tr');
+                        tr.className = `linha-grupo-tabela grupo_tabela_${indexGrupo}`; 
+                        
+                        const urlExcluir = `{{ url_for('ServicosClientes.ExcluirServico', IdServico=0) }}`.replace('0', item.Id);
+                        const nomeExibicao = item.Fantasia || item.RazaoSocial || 'Nome não cadastrado';
+
+                        tr.innerHTML = `
+                            <td style="padding-left: 40px;"> 
+                                <div style="font-size: 0.75rem; font-weight: 800; color: var(--luft-primary-600); margin-bottom: 2px;">
+                                    CÓD: ${item.CodigoCliente}
+                                </div>
+                                <div style="font-weight: 700; color: var(--luft-text-main);">
+                                    ${nomeExibicao}
+                                </div>
+                                <div style="font-size: 0.75rem; color: var(--luft-text-muted); margin-top: 2px; font-family: monospace;">
+                                    CNPJ: ${item.Cnpj || 'N/A'}
+                                </div>
+                            </td>
+                            <td>
+                                <div style="margin-bottom: 4px; font-size: 0.85rem;"><strong class="text-muted">Validade:</strong> <span class="font-bold text-main">${item.DurabilidadeGelo}</span></div>
+                                <div style="font-size: 0.85rem;"><strong class="text-muted">Troca:</strong> ${getBadgeAutorizacao(item.AutorizacaoTrocaGelo)}</div>
+                            </td>
+                            <td>${getBadgeAutorizacao(item.AutorizacaoArmazenagem)}</td>
+                            <td>${getBadgeServico(item.ServicoContratado)}</td>
+                            <td style="text-align: center;">
+                                <div class="d-flex justify-content-center gap-2">
+                                    <button class="btn btn-secondary text-primary d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; padding: 0;" title="Editar" 
+                                        onclick="PrepararEdicao(${item.Id}, '${item.CodigoCliente}', '${item.DurabilidadeGelo}', '${item.AutorizacaoTrocaGelo}', '${item.AutorizacaoArmazenagem}', '${item.ServicoContratado}')">
+                                        <i class="ph-bold ph-pencil-simple text-lg"></i>
+                                    </button>
+                                    
+                                    <form action="${urlExcluir}" method="POST" style="display:inline;" onsubmit="return confirm('Tem certeza que deseja excluir as parametrizações deste cliente?');">
+                                        <button type="submit" class="btn btn-secondary text-danger d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; padding: 0;" title="Excluir">
+                                            <i class="ph-bold ph-trash text-lg"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                });
+
+                loader.style.display = 'none';
+                tabela.style.display = 'table';
+            })
+            .catch(error => {
+                console.error("Erro ao carregar lista:", error);
+                loader.innerHTML = `<p class="text-danger font-bold"><i class="ph-bold ph-warning"></i> Erro ao carregar dados.</p>`;
+            });
+    }
+
+    function ToggleTabelaGrupo(classeGrupo) {
+        const linhas = document.querySelectorAll('.' + classeGrupo);
+        const icone = document.getElementById(classeGrupo.replace('grupo_tabela_', 'icon_tabela_'));
+        
+        let isHidden = false;
+        if(linhas.length > 0) {
+            isHidden = linhas[0].style.display === 'none';
+        }
+
+        linhas.forEach(linha => {
+            linha.style.display = isHidden ? 'table-row' : 'none';
+        });
+
+        if (icone) {
+            icone.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(-90deg)';
+        }
+    }
+
+    function PrepararEdicao(id, codigoCliente, durabilidade, troca, armazenagem, servico) {
+        document.getElementById('DurabilidadeGelo').value = durabilidade;
+        document.getElementById('AutorizacaoTrocaGelo').value = troca;
+        document.getElementById('AutorizacaoArmazenagem').value = armazenagem;
+        document.getElementById('ServicoContratado').value = servico;
+
+        document.querySelectorAll('.chk-cliente, .chk-grupo').forEach(chk => chk.checked = false);
+        
+        let chkEdit = document.getElementById('cliente_' + codigoCliente);
+        if(chkEdit) {
+            chkEdit.checked = true;
+            UpdateParentStatus(chkEdit);
+            
+            let parentUl = chkEdit.closest('.luft-tree-children');
+            if(parentUl) {
+                parentUl.style.display = 'block';
+                let icon = parentUl.closest('li').querySelector('.toggle-icon');
+                if(icon) icon.classList.add('open');
+            }
+        }
+        AtualizarContagem();
+
+        const form = document.getElementById('FormServico');
+        form.action = URL_EDITAR_BASE.replace('0', id);
+        
+        document.getElementById('FormTitle').innerHTML = '<i class="ph-bold ph-pencil-simple text-warning"></i> Editando Parametrização';
+        
+        const btnSubmit = document.getElementById('BtnSubmit');
+        btnSubmit.innerHTML = '<i class="ph-bold ph-check-circle"></i> Atualizar Configuração';
+        btnSubmit.classList.remove('btn-primary');
+        btnSubmit.classList.add('btn-success');
+        
+        document.getElementById('BtnCancel').style.display = 'flex';
+        
+        // Em telas pequenas rola pro topo do form
+        if(window.innerWidth < 1100) {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }
+
+    function CancelarEdicao() {
+        const form = document.getElementById('FormServico');
+        form.reset();
+        
+        document.querySelectorAll('.chk-cliente, .chk-grupo').forEach(chk => {
+            chk.checked = false;
+            chk.indeterminate = false;
+        });
+        AtualizarContagem();
+        
+        form.action = URL_SALVAR;
+        document.getElementById('FormTitle').innerHTML = '<i class="ph-bold ph-plus-circle text-primary"></i> Nova Parametrização Lote';
+        
+        const btnSubmit = document.getElementById('BtnSubmit');
+        btnSubmit.innerHTML = '<i class="ph-bold ph-floppy-disk"></i> Salvar Lote';
+        btnSubmit.classList.remove('btn-success');
+        btnSubmit.classList.add('btn-primary');
+        
+        document.getElementById('BtnCancel').style.display = 'none';
+    }
+</script>
+{% endblock %}

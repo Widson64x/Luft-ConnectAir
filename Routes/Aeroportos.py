@@ -84,7 +84,7 @@ def Gerenciar():
 
     # Chamada corrigida
     Historico = AeroportoService.ListarRemessasAeroportos()
-    return render_template('Aeroportos/Manager.html', 
+    return render_template('Pages/Aeroportos/Manager.html', 
                            ListaRemessas=Historico, 
                            ExibirModal=ModalConfirmacao, 
                            DadosModal=DadosConfirmacao)
@@ -105,7 +105,7 @@ def Excluir(id_remessa):
 @RequerPermissao('cadastros.aeroportos.visualizar') # Ajuste a permissão conforme necessário
 def RankingIndex():
     Dados = AeroportoService.ListarAeroportosPorEstado()
-    return render_template('Aeroportos/Ranking.html', Dados=Dados)
+    return render_template('Pages/Aeroportos/Ranking.html', Dados=Dados)
 
 @AeroportoBp.route('/API/SalvarRanking', methods=['POST'])
 @login_required

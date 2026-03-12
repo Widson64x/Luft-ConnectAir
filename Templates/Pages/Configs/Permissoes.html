@@ -1,0 +1,465 @@
+{% extends "Layout/BaseLayout.html" %}
+{% import 'luftcore/components.html' as ui %}
+
+{% block titulo %}Controle de Acesso | Luft-ConnectAir{% endblock %}
+
+{% block conteudo %}
+<style>
+    .luft-perm-container {
+        display: flex; flex-direction: column; gap: var(--luft-space-6); 
+        height: 100%; overflow: hidden;
+    }
+    .luft-tabs-header {
+        display: flex; gap: var(--luft-space-4); margin-bottom: var(--luft-space-4);
+        border-bottom: 1px solid var(--luft-border); padding-bottom: 0; flex-shrink: 0;
+    }
+    .luft-tab-btn {
+        padding: var(--luft-space-3) var(--luft-space-2); background: transparent; border: none; 
+        border-bottom: 3px solid transparent; font-weight: 600; font-size: var(--luft-text-sm); 
+        color: var(--luft-text-muted); cursor: pointer; transition: 0.2s; 
+        display: flex; align-items: center; gap: var(--luft-space-2);
+    }
+    .luft-tab-btn:hover:not(.ativo) { color: var(--luft-text-main); }
+    .luft-tab-btn.ativo { color: var(--luft-primary-600); border-bottom-color: var(--luft-primary-600); }
+
+    .luft-split-view {
+        display: flex; gap: var(--luft-space-6); width: 100%;
+        height: calc(100vh - 260px); min-height: 400px;
+    }
+    
+    .luft-sidebar-list {
+        width: 320px; background: var(--luft-bg-panel); border-radius: var(--luft-radius-xl);
+        border: 1px solid var(--luft-border); display: flex; flex-direction: column; flex-shrink: 0;
+        height: 100%; overflow: hidden; 
+    }
+    .luft-sidebar-search { padding: var(--luft-space-4); border-bottom: 1px solid var(--luft-border-light); }
+    
+    .luft-list-content { flex: 1; overflow-y: auto; padding: var(--luft-space-2); } 
+    
+    .luft-list-item {
+        padding: var(--luft-space-3) var(--luft-space-4); margin-bottom: var(--luft-space-1); 
+        border-radius: var(--luft-radius-lg); cursor: pointer; transition: all 0.2s; 
+        border-left: 3px solid transparent; display: flex; justify-content: space-between; align-items: center;
+    }
+    .luft-list-item:hover { background: var(--luft-bg-panel-hover); }
+    .luft-list-item.ativo { background: var(--luft-primary-100); border-left-color: var(--luft-primary-600); }
+
+    .luft-main-panel {
+        flex: 1; background: var(--luft-bg-panel); border-radius: var(--luft-radius-xl);
+        border: 1px solid var(--luft-border); display: flex; flex-direction: column; position: relative;
+        height: 100%; overflow: hidden;
+    }
+    .luft-panel-header {
+        padding: var(--luft-space-5) var(--luft-space-6); border-bottom: 1px solid var(--luft-border); 
+        display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
+    }
+    .luft-panel-scroll { flex: 1; overflow-y: auto; padding: var(--luft-space-6); background: var(--luft-bg-app); }
+
+    .empty-state {
+        display: flex; flex-direction: column; align-items: center; justify-content: center; 
+        height: 100%; width: 100%; color: var(--luft-text-muted); text-align: center;
+    }
+    .empty-state i { font-size: 4rem; opacity: 0.2; margin-bottom: 12px; }
+    .empty-state h3 { font-size: 1.25rem; font-weight: 500; margin: 0; }
+
+    .luft-category-block {
+        background: var(--luft-bg-panel); border-radius: var(--luft-radius-xl);
+        border: 1px solid var(--luft-border); margin-bottom: var(--luft-space-6); 
+        overflow: hidden; box-shadow: var(--luft-shadow-sm);
+    }
+    .luft-category-header {
+        padding: var(--luft-space-3) var(--luft-space-5); background: var(--luft-primary-50);
+        border-bottom: 1px solid var(--luft-border-light); display: flex; align-items: center;
+    }
+    .luft-perm-item {
+        display: flex; justify-content: space-between; align-items: center; 
+        padding: var(--luft-space-4) var(--luft-space-5); border-bottom: 1px solid var(--luft-border-light); 
+        transition: background 0.2s;
+    }
+    .luft-perm-item:last-child { border-bottom: none; }
+    .luft-perm-item:hover { background: var(--luft-bg-panel-hover); }
+    .luft-perm-key { font-family: monospace; font-size: var(--luft-text-xs); background: var(--luft-slate-100); padding: 2px 6px; border-radius: 4px; color: var(--luft-text-muted); }
+
+    .luft-toggle { position: relative; display: inline-block; width: 44px; height: 24px; margin-left: 10px; }
+    .luft-toggle input { opacity: 0; width: 0; height: 0; }
+    .luft-toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--luft-slate-300); transition: .3s; border-radius: 24px; }
+    .luft-toggle-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; box-shadow: var(--luft-shadow-sm); }
+    .luft-toggle input:checked + .luft-toggle-slider { background-color: var(--luft-success-500); }
+    .luft-toggle input:checked + .luft-toggle-slider:before { transform: translateX(20px); }
+    .luft-toggle input:disabled + .luft-toggle-slider { opacity: 0.5; cursor: not-allowed; }
+
+    .luft-status-badge { display: none; margin-right: 12px; }
+    .btn-reset { font-size: var(--luft-text-xs); color: var(--luft-text-muted); text-decoration: underline; cursor: pointer; background: none; border: none; margin-left: 12px; display: none; }
+    .btn-reset:hover { color: var(--luft-danger-600); }
+</style>
+
+<div class="luft-perm-container">
+    
+    <div class="d-flex justify-content-between align-items-center flex-shrink-0">
+        <div>
+            <h1 class="text-2xl font-bold text-main m-0">Controle de Acesso</h1>
+            <p class="text-sm text-muted">Gerencie permissões por grupos ou exceções por usuário.</p>
+        </div>
+
+        {% if PodeCriar %}
+        <div>
+            <button class="btn btn-primary" onclick="LuftCore.abrirModal('modalPermissao')">
+                <i class="ph-bold ph-plus"></i> Nova Permissão
+            </button>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="luft-tabs-header">
+        <button class="luft-tab-btn ativo" onclick="MudarAba('grupo')">
+            <i class="ph-bold ph-users-three text-lg"></i> Por Grupos
+        </button>
+        <button class="luft-tab-btn" onclick="MudarAba('usuario')">
+            <i class="ph-bold ph-user text-lg"></i> Por Usuários (Exceções)
+        </button>
+    </div>
+
+    <div class="luft-split-view">
+        <aside class="luft-sidebar-list">
+            <div class="luft-sidebar-search">
+                <div class="relative w-full">
+                    <i class="ph-bold ph-magnifying-glass absolute text-muted" style="left: 12px; top: 50%; transform: translateY(-50%);"></i>
+                    <input type="text" id="filtroLateral" class="form-control" placeholder="Buscar..." style="padding-left: 36px;" onkeyup="FiltrarLateral(this.value)">
+                </div>
+            </div>
+            
+            <div class="luft-list-content" id="listaGrupos">
+                {% for grupo in Grupos %}
+                <div class="luft-list-item" data-nome="{{ grupo.Nome_UsuarioGrupo }}" onclick="CarregarGrupo(this, '{{ grupo.codigo_usuariogrupo }}', '{{ grupo.Sigla_UsuarioGrupo }}')">
+                    <span class="font-semibold text-sm text-main">{{ grupo.Sigla_UsuarioGrupo }}</span>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="luft-list-content d-none" id="listaUsuarios">
+                {% for user in Usuarios %}
+                <div class="luft-list-item" data-nome="{{ user.Nome_Usuario }}" onclick="CarregarUsuario(this, '{{ user.Codigo_Usuario }}', '{{ user.Nome_Usuario }}')">
+                    <div class="d-flex flex-col">
+                        <span class="font-semibold text-sm text-main">{{ user.Nome_Usuario }}</span>
+                        <span class="text-xs text-muted bg-slate-100 rounded-sm px-2 py-1 mt-1 d-inline-block">
+                            {{ user.Login_Usuario }} | {{ user.Nome_UsuarioGrupo or 'Sem Grupo' }}
+                        </span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </aside>
+
+        <main class="luft-main-panel">
+            <div id="estadoVazio" class="empty-state">
+                <i class="ph-duotone ph-hand-pointing"></i>
+                <h3 id="msgVazio">Selecione um grupo ao lado</h3>
+            </div>
+
+            <div id="painelPermissoes" class="d-none h-full flex-col">
+                <div class="luft-panel-header">
+                    <div>
+                        <h2 id="tituloSelecionado" class="text-lg font-bold text-main m-0">...</h2>
+                        <p id="subtituloSelecionado" class="text-sm text-muted m-0">...</p>
+                    </div>
+                    <div class="relative" style="width: 250px;">
+                        <i class="ph-bold ph-funnel absolute text-muted" style="left: 12px; top: 50%; transform: translateY(-50%);"></i>
+                        <input type="text" class="form-control" placeholder="Filtrar permissões..." style="padding-left: 36px;" onkeyup="FiltrarPermissoes(this.value)">
+                    </div>
+                </div>
+
+                <div class="luft-panel-scroll">
+                    {% for Categoria, ListaPerms in PermissoesPorCategoria.items() %}
+                        <div class="luft-category-block">
+                            <div class="luft-category-header">
+                                <span class="text-sm font-bold text-primary" style="text-transform: uppercase;"><i class="ph-bold ph-squares-four mr-2"></i> {{ Categoria }}</span>
+                            </div>
+                            <div>
+                                {% for perm in ListaPerms %}
+                                <div class="luft-perm-item">
+                                    <div>
+                                        <h4 class="text-sm font-semibold text-main mb-1">{{ perm.Descricao_Permissao }}</h4>
+                                        <span class="luft-perm-key">{{ perm.Chave_Permissao }}</span>
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        <span class="luft-badge luft-badge-gray luft-status-badge herdado" id="badge-inherit-{{ perm.Id_Permissao }}">Herdado</span>
+                                        <span class="luft-badge luft-badge-success luft-status-badge forcado" id="badge-allow-{{ perm.Id_Permissao }}">Permitido Manual</span>
+                                        <span class="luft-badge luft-badge-danger luft-status-badge bloqueado" id="badge-deny-{{ perm.Id_Permissao }}">Bloqueado Manual</span>
+
+                                        <label class="luft-toggle">
+                                            <input type="checkbox" 
+                                                class="check-perm" 
+                                                id="chk-{{ perm.Id_Permissao }}"
+                                                data-id="{{ perm.Id_Permissao }}"
+                                                {% if not PodeEditar %} disabled {% endif %}
+                                                onchange="ProcessarClick(this)">
+                                            <span class="luft-toggle-slider"></span>
+                                        </label>
+
+                                        {% if PodeEditar %}
+                                        <button class="btn-reset" id="btn-reset-{{ perm.Id_Permissao }}" onclick="ResetarPermissao('{{ perm.Id_Permissao }}')">
+                                            Restaurar Padrão
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+{% call ui.modal('modalPermissao', 'Nova Permissão', 'md', 'ph-key') %}
+    <p class="text-sm text-muted mb-4">A chave será gerada automaticamente no padrão <b>SISTEMA.MÓDULO.[EXCEÇÃO].AÇÃO</b></p>
+    
+    <form action="{{ url_for('Seguranca.CriarNovaPermissao') }}" method="POST">
+        <div class="form-group mb-4">
+            <label class="form-label font-bold">Módulo do Sistema</label>
+            <input type="text" name="modulo" class="form-control" list="listaCats" placeholder="Ex: RELATORIOS" required oninput="PreverChave()">
+            <datalist id="listaCats">
+                {% for k in PermissoesPorCategoria.keys() %}
+                    <option value="{{ k }}">
+                {% endfor %}
+            </datalist>
+            <small class="text-muted text-xs mt-1">Selecione ou digite um novo módulo. Será usado como Categoria na tela.</small>
+        </div>
+
+        <div class="form-group mb-4">
+            <label class="form-label font-bold">Ação (Permissão)</label>
+            <select name="acao" class="form-control" required onchange="PreverChave()">
+                <option value="VISUALIZAR">VISUALIZAR (Leitura)</option>
+                <option value="CRIAR">CRIAR (Inserção)</option>
+                <option value="EDITAR">EDITAR (Atualização)</option>
+                <option value="DELETAR">DELETAR (Exclusão)</option>
+                <option value="EXPORTAR">EXPORTAR (Excel/PDF)</option>
+                <option value="IMPRIMIR">IMPRIMIR</option>
+                <option value="APROVAR">APROVAR (Ações Críticas)</option>
+                <option value="SINCRONIZAR">SINCRONIZAR (Sincroniza dados)</option>
+                <option value="DEBUG">DEBUG (Permissões de ADM)</option>
+            </select>
+        </div>
+
+        <div class="form-group mb-4">
+            <label class="form-label font-bold">Regra de Exceção (Opcional)</label>
+            <input type="text" name="excecao" id="inputExcecao" class="form-control" placeholder="Ex: CONSOLIDADO" oninput="PreverChave()">
+            <small class="text-muted text-xs mt-1">Use apenas se a permissão for para uma tela/função específica dentro do Módulo.</small>
+        </div>
+
+        {{ ui.input('descricao', 'Descrição da Permissão', placeholder='Ex: Permite visualizar a DRE consolidada') }}
+        
+        <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 mt-4 mb-2">
+            <span class="text-xs text-muted block mb-1">Preview da Chave:</span>
+            <code id="chavePreview" class="text-primary font-bold text-sm">1.MODULO.ACAO</code>
+        </div>
+        
+        <div class="d-flex gap-2 mt-6">
+            <button type="submit" class="btn btn-primary w-full">Criar Permissão</button>
+            <button type="button" class="btn btn-outline w-full" onclick="LuftCore.fecharModal('modalPermissao')">Cancelar</button>
+        </div>
+    </form>
+
+    <script>
+        function PreverChave() {
+            const mod = document.querySelector('input[name="modulo"]').value.toUpperCase().trim().replace(/ /g, '_') || 'MODULO';
+            const acao = document.querySelector('select[name="acao"]').value.toUpperCase().trim() || 'ACAO';
+            const exc = document.getElementById('inputExcecao').value.toUpperCase().trim().replace(/ /g, '_');
+            
+            let preview = `${mod}`;
+            if(exc) preview += `.${exc}`;
+            preview += `.${acao}`;
+            
+            document.getElementById('chavePreview').innerText = preview;
+        }
+    </script>
+{% endcall %}
+
+<script>
+    const PODE_EDITAR = {{ 'true' if PodeEditar else 'false' }};
+
+    let MODO = 'Grupo'; 
+    let ID_ATUAL = null;
+    let DADOS_ATUAIS = null;
+    
+    function MudarAba(novaAba) {
+        document.querySelectorAll('.luft-tab-btn').forEach(b => b.classList.remove('ativo'));
+        event.currentTarget.classList.add('ativo');
+
+        document.getElementById('listaGrupos').classList.toggle('d-none', novaAba !== 'grupo');
+        document.getElementById('listaGrupos').classList.toggle('d-block', novaAba === 'grupo');
+        document.getElementById('listaUsuarios').classList.toggle('d-none', novaAba !== 'usuario');
+        document.getElementById('listaUsuarios').classList.toggle('d-block', novaAba === 'usuario');
+        
+        document.getElementById('painelPermissoes').classList.remove('d-flex');
+        document.getElementById('painelPermissoes').classList.add('d-none');
+        document.getElementById('estadoVazio').classList.remove('d-none');
+        
+        document.getElementById('msgVazio').innerText = (novaAba === 'grupo') ? 'Selecione um grupo ao lado' : 'Selecione um usuário ao lado';
+        
+        MODO = (novaAba === 'grupo') ? 'Grupo' : 'Usuario';
+        ID_ATUAL = null;
+        document.querySelectorAll('.luft-list-item').forEach(i => i.classList.remove('ativo'));
+    }
+
+    async function CarregarGrupo(el, id, nome) {
+        if(MODO !== 'Grupo') return;
+        ID_ATUAL = id;
+        AtivarItemLista(el);
+        PrepararPainel(nome, 'Editando permissões gerais do grupo');
+
+        try {
+            // Mudou de Configuracoes.BuscarAcessosGrupo para Seguranca.BuscarAcessosGrupo
+            const resp = await fetch("{{ url_for('Seguranca.BuscarAcessosGrupo') }}?idGrupo=" + id);
+            const dados = await resp.json();
+            const ativos = new Set(dados.ids_ativos);
+            
+            document.querySelectorAll('.check-perm').forEach(chk => {
+                const idPerm = parseInt(chk.dataset.id);
+                chk.checked = ativos.has(idPerm);
+                chk.disabled = !PODE_EDITAR;
+                ConfigurarVisualUsuario(idPerm, null, null, null); 
+            });
+        } catch (e) { alert('Erro ao carregar grupo.'); console.error(e); }
+    }
+
+    async function CarregarUsuario(el, id, nome) {
+        if(MODO !== 'Usuario') return;
+        ID_ATUAL = id;
+        AtivarItemLista(el);
+        PrepararPainel(nome, 'Editando exceções e heranças');
+
+        try {
+            // Mudou de Configuracoes.BuscarAcessosUsuario para Seguranca.BuscarAcessosUsuario
+            const resp = await fetch("{{ url_for('Seguranca.BuscarAcessosUsuario') }}?idUsuario=" + id);
+            DADOS_ATUAIS = await resp.json();
+            
+            const heranca = new Set(DADOS_ATUAIS.heranca_grupo);
+            const permitidos = new Set(DADOS_ATUAIS.usuario_permitidos);
+            const bloqueados = new Set(DADOS_ATUAIS.usuario_bloqueados);
+
+            document.querySelectorAll('.check-perm').forEach(chk => {
+                const idPerm = parseInt(chk.dataset.id);
+                let isChecked = false;
+                let tipoStatus = 'herdado';
+
+                if (permitidos.has(idPerm)) {
+                    isChecked = true;
+                    tipoStatus = 'forcado';
+                } else if (bloqueados.has(idPerm)) {
+                    isChecked = false;
+                    tipoStatus = 'bloqueado';
+                } else {
+                    isChecked = heranca.has(idPerm);
+                    tipoStatus = 'herdado';
+                }
+
+                chk.checked = isChecked;
+                chk.disabled = !PODE_EDITAR;
+                ConfigurarVisualUsuario(idPerm, tipoStatus, isChecked, heranca.has(idPerm));
+            });
+        } catch (e) { alert('Erro ao carregar usuário.'); console.error(e); }
+    }
+
+    async function ProcessarClick(chk) {
+        if (!PODE_EDITAR) {
+            chk.checked = !chk.checked;
+            alert('Você não tem permissão para editar.');
+            return;
+        }
+
+        if (!ID_ATUAL) return;
+        const idPerm = chk.dataset.id;
+        const novoEstado = chk.checked; 
+
+        if (MODO === 'Grupo') {
+            await EnviarAPI('Grupo', ID_ATUAL, idPerm, novoEstado ? 'Adicionar' : 'Remover');
+            return;
+        }
+
+        if (MODO === 'Usuario') {
+            const acao = novoEstado ? 'Permitir' : 'Bloquear';
+            await EnviarAPI('Usuario', ID_ATUAL, idPerm, acao);
+            ConfigurarVisualUsuario(idPerm, novoEstado ? 'forcado' : 'bloqueado', novoEstado, null);
+        }
+    }
+
+    async function ResetarPermissao(idPerm) {
+        if (!confirm('Voltar a herdar do grupo?')) return;
+        await EnviarAPI('Usuario', ID_ATUAL, idPerm, 'Resetar');
+        const heranca = new Set(DADOS_ATUAIS.heranca_grupo);
+        const herdaAtivo = heranca.has(parseInt(idPerm));
+        
+        const chk = document.getElementById('chk-' + idPerm);
+        chk.checked = herdaAtivo;
+        ConfigurarVisualUsuario(idPerm, 'herdado', herdaAtivo, null);
+    }
+
+    function ConfigurarVisualUsuario(idPerm, tipoStatus, isChecked, herancaValor) {
+        const badgeInherit = document.getElementById(`badge-inherit-${idPerm}`);
+        const badgeAllow = document.getElementById(`badge-allow-${idPerm}`);
+        const badgeDeny = document.getElementById(`badge-deny-${idPerm}`);
+        const btnReset = document.getElementById(`btn-reset-${idPerm}`);
+
+        if(badgeInherit) badgeInherit.style.display = 'none';
+        if(badgeAllow) badgeAllow.style.display = 'none';
+        if(badgeDeny) badgeDeny.style.display = 'none';
+        if(btnReset) btnReset.style.display = 'none';
+
+        if (MODO === 'Grupo') return;
+
+        if (tipoStatus === 'herdado') badgeInherit.style.display = 'inline-block';
+        else if (tipoStatus === 'forcado') { badgeAllow.style.display = 'inline-block'; btnReset.style.display = 'inline-block'; }
+        else if (tipoStatus === 'bloqueado') { badgeDeny.style.display = 'inline-block'; btnReset.style.display = 'inline-block'; }
+    }
+
+    async function EnviarAPI(tipo, alvo, perm, acao) {
+        try {
+            // Mudou de Configuracoes.SalvarVinculo para Seguranca.SalvarVinculo
+            const resp = await fetch("{{ url_for('Seguranca.SalvarVinculo') }}", {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ Tipo: tipo, IdAlvo: alvo, IdPermissao: perm, Acao: acao })
+            });
+            const d = await resp.json();
+            if(!d.sucesso) alert('Erro: ' + d.erro);
+        } catch(e) { console.error(e); alert('Erro de conexão'); }
+    }
+
+    function AtivarItemLista(el) {
+        document.querySelectorAll('.luft-list-item').forEach(i => i.classList.remove('ativo'));
+        el.classList.add('ativo');
+    }
+    
+    function PrepararPainel(titulo, subtitulo) {
+        document.getElementById('estadoVazio').classList.add('d-none');
+        document.getElementById('painelPermissoes').classList.remove('d-none');
+        document.getElementById('painelPermissoes').classList.add('d-flex');
+        
+        document.getElementById('tituloSelecionado').innerText = titulo;
+        document.getElementById('subtituloSelecionado').innerText = subtitulo;
+        document.querySelector('.luft-panel-scroll').scrollTop = 0;
+    }
+
+    function FiltrarLateral(val) {
+        val = val.toLowerCase();
+        const listaId = MODO === 'Grupo' ? 'listaGrupos' : 'listaUsuarios';
+        document.querySelectorAll(`#${listaId} .luft-list-item`).forEach(el => {
+            el.style.display = el.innerText.toLowerCase().includes(val) ? 'flex' : 'none';
+        });
+    }
+
+    function FiltrarPermissoes(val) {
+        val = val.toLowerCase();
+        document.querySelectorAll('.luft-perm-item').forEach(el => {
+            el.style.display = el.innerText.toLowerCase().includes(val) ? 'flex' : 'none';
+        });
+        document.querySelectorAll('.luft-category-block').forEach(cat => {
+            const visible = cat.querySelectorAll('.luft-perm-item[style="display: flex;"], .luft-perm-item:not([style*="display: none"])').length > 0;
+            cat.style.display = visible ? 'block' : 'none';
+        });
+    }
+</script>
+{% endblock %}

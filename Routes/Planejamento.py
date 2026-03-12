@@ -33,7 +33,7 @@ COORDENADAS_UFS = {
 @RequerPermissao('planejamento.visualizar')
 def Dashboard():
     LogService.Info("Routes.Planejamento", f"Usuário {current_user.id} acessou Dashboard Planejamento.")
-    return render_template('Planejamento/Index.html')
+    return render_template('Pages/Planejamento/Index.html')
 
 @PlanejamentoBp.route('/API/Listar')
 @login_required
@@ -107,7 +107,7 @@ def MontarPlanejamento(filial, serie, ctc):
     else:
         flash("Atenção: Não foram encontrados aeroportos viáveis próximos à origem ou destino.", "warning")
 
-    return render_template('Planejamento/Editor.html', 
+    return render_template('Pages/Planejamento/Editor.html', 
                            Ctc=DadosUnificados, 
                            Origem=CoordOrigem, Destino=CoordDestino,
                            AeroOrigem=AeroOrigemPrincipal,
@@ -273,7 +273,7 @@ def MapaGlobal():
                 continue
         
         DadosMapa = list(Agrupamento.values())
-        return render_template('Planejamento/Map.html', Dados=DadosMapa)
+        return render_template('Pages/Planejamento/Map.html', Dados=DadosMapa)
     except Exception as e:
         LogService.Error("Routes.Planejamento", "Erro fatal ao renderizar Mapa Global", e)
         flash("Erro de Conexão: Não foi possível carregar os dados do mapa. Tente novamente em instantes.", "danger")

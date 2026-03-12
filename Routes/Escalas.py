@@ -11,7 +11,7 @@ EscalasBp = Blueprint('Escalas', __name__)
 @RequerPermissao('cadastros.malha.visualizar')
 def Mapa():
     """Renderiza a tela principal do mapa de escalas."""
-    return render_template('Escalas/Index.html')
+    return render_template('Pages/Escalas/Index.html')
 
 @EscalasBp.route('/Api/OtimizarRotas', methods=['GET'])
 @login_required
