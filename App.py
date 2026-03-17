@@ -1,6 +1,7 @@
 from flask import Flask, render_template, redirect, url_for
 from flask_login import LoginManager, login_required, current_user
 import os 
+from werkzeug.middleware.proxy_fix import ProxyFix
 from luftcore.extensions.flask_extension import LuftCorePackages, LuftUser
 
 from Conexoes import ObterSessaoSqlServer
@@ -32,9 +33,10 @@ Prefix = ConfiguracaoAtual.ROUTE_PREFIX
 
 # Define a aplicação Flask, configurando o caminho para arquivos estáticos com o prefixo
 app = Flask(ConfiguracaoAtual.APP_NAME,
-            static_url_path=f'{Prefix}/Static',
-            static_folder='Static',
-            template_folder='templates') # Adicionado para garantir que ache o HTML
+            static_url_path=f'{Prefix}/Static', 
+            static_folder='Static')
+
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 # Chave secreta para sessões, criptografia ou outras operações sensíveis.
 app.secret_key = ConfiguracaoAtual.APP_SECRET_KEY # Trocar por algo seguro depois

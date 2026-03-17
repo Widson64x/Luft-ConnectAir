@@ -17,18 +17,22 @@ except ImportError:
     print("Instale rodando: pip install waitress")
     sys.exit(1)
 
-if __name__ == "__main__": # Méto python padrão para execução direta, se __name_ for "__main__", significa que este script está sendo executado diretamente, e não importado como módulo
+if __name__ == "__main__": 
     # Configurações do ambiente
-    # Em produção com NGINX na frente, geralmente rodamos em localhost
     host = os.environ.get("HOST", "127.0.0.1")
-    
-    # Porta interna do serviço (O NGINX vai redirecionar a porta 80 para cá)
     port = int(os.environ.get("PORT", "9007"))
 
+    # Pega o prefixo usando a mesma lógica do App.py
+    from Configuracoes import ConfiguracaoAtual
+    prefix = ConfiguracaoAtual.ROUTE_PREFIX
+    
+    # Se o prefixo for vazio, definimos o padrão para o ConnectAir
+    if not prefix:
+        prefix = "/Luft-ConnectAir"
+
     print(f"--> INICIANDO SERVIDOR WSGI (WAITRESS) PARA O Luft-ConnectAir")
-    print(f"--> Endereço: http://{host}:{port}")
+    print(f"--> Endereço: http://{host}:{port}{prefix}")
     print(f"--> Modo: Produção (Serviço Windows)")
     
-    # Inicia o servidor Waitress
-    # threads=6 é um bom padrão para aplicações médias, ajuste conforme a carga
-    serve(app, host=host, port=port, threads=6)
+    # Inicia o servidor Waitress com o url_prefix!
+    serve(app, host=host, port=port, threads=6, url_prefix=prefix)
