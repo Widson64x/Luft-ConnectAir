@@ -1,0 +1,218 @@
+{% extends "Layout/BaseLayout.html" %}
+{% import 'luftcore/components.html' as ui %}
+
+{% block titulo %}Gestão de Tabelas de Frete | Luft-ConnectAir{% endblock %}
+
+{% block conteudo %}
+
+<style>
+    /* --- ESTRUTURA E LAYOUT --- */
+    .luft-manager-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        animation: slideUpFade 0.5s ease-out forwards;
+    }
+
+    .luft-manager-grid {
+        display: grid;
+        grid-template-columns: 350px minmax(0, 1fr);
+        gap: 24px;
+        align-items: start;
+    }
+    @media (max-width: 1100px) { 
+        .luft-manager-grid { grid-template-columns: 1fr; } 
+    }
+
+    @keyframes slideUpFade { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Upload Area */
+    .luft-upload-container {
+        border: 2px dashed var(--luft-border);
+        border-radius: 12px;
+        background: var(--luft-bg-app);
+        text-align: center;
+        padding: 40px 20px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    .luft-upload-container:hover, .luft-upload-container.drag-ativo {
+        border-color: var(--luft-primary-500);
+        background: rgba(59, 130, 246, 0.05);
+        transform: translateY(-4px);
+    }
+    .luft-upload-icon { font-size: 3rem; color: var(--luft-primary-600); margin-bottom: 16px; }
+
+    /* Tabela de Histórico */
+    .luft-manager-tabela { width: 100%; border-collapse: collapse; white-space: nowrap; }
+    .luft-manager-tabela th {
+        background: var(--luft-bg-app); color: var(--luft-text-muted);
+        font-weight: 700; text-transform: uppercase; font-size: 0.75rem;
+        padding: 16px 24px; text-align: left;
+        border-bottom: 1px solid var(--luft-border);
+    }
+    .luft-manager-tabela td {
+        padding: 16px 24px; border-bottom: 1px solid var(--luft-border);
+        color: var(--luft-text-main); vertical-align: middle;
+    }
+    .luft-manager-tabela tr:hover td { background-color: var(--luft-bg-app); }
+
+    /* Modal Substituição */
+    .luft-modal-backdrop-custom {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+        z-index: 2000; display: flex; align-items: center; justify-content: center;
+    }
+    .luft-modal-card-custom {
+        background: var(--luft-bg-panel); width: 420px; padding: 30px; 
+        border-radius: 16px; text-align: center; border: 1px solid var(--luft-border);
+        box-shadow: var(--luft-shadow-lg); animation: slideUpFade 0.3s ease;
+    }
+</style>
+
+{% if ExibirModal %}
+<div class="luft-modal-backdrop-custom">
+    <div class="luft-modal-card-custom">
+        <i class="ph-duotone ph-warning-circle text-warning" style="font-size: 3.5rem; margin-bottom: 15px;"></i>
+        <h3 class="font-black text-main" style="font-size: 1.3rem; margin-bottom: 10px;">Tabela Existente</h3>
+        <p class="text-muted font-medium mb-4" style="line-height: 1.5;">
+            Já existe uma tabela de frete ativa para <strong>{{ DadosModal.mes_ref.strftime('%m/%Y') }}</strong>.<br>
+            Deseja substituir os dados atuais?
+        </p>
+        
+        <form method="POST" id="form-substituicao" class="d-flex justify-content-center gap-3">
+            <input type="hidden" name="confirmar_substituicao" value="true">
+            <input type="hidden" name="caminho_temp" value="{{ DadosModal.caminho_temp }}">
+            <input type="hidden" name="nome_arquivo" value="{{ DadosModal.nome_arquivo }}">
+            <input type="hidden" name="mes_ref" value="{{ DadosModal.mes_ref }}">
+            
+            <a href="{{ url_for('Frete.gerenciar') }}" class="btn btn-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-warning" id="btn-confirmar-substituicao">
+                <i class="ph-bold ph-arrows-clockwise"></i> Substituir
+            </button>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<div class="luft-manager-wrapper">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-4">
+        <div>
+            <h2 class="font-black text-main m-0 d-flex align-items-center gap-2" style="font-size: 1.8rem; letter-spacing: -0.5px;">
+                <i class="ph-duotone ph-currency-dollar text-primary"></i> Tabelas de Frete
+            </h2>
+            <p class="text-muted mt-1 font-medium">Importação e gestão de tarifas aéreas e cortes de peso.</p>
+        </div>
+    </div>
+
+    <div class="luft-manager-grid">
+        
+        <div class="luft-card" style="padding: 0; height: fit-content; overflow: hidden;">
+            <div class="d-flex justify-content-between align-items-center" style="padding: 20px 24px; border-bottom: 1px solid var(--luft-border); background: transparent;">
+                <h3 class="font-bold text-main m-0 text-lg d-flex align-items-center gap-2">
+                    <i class="ph-bold ph-upload-simple text-primary"></i> Nova Tabela
+                </h3>
+            </div>
+            
+            <div style="padding: 24px;">
+                <form method="POST" enctype="multipart/form-data" id="form-upload-tabelafrete">
+                    <label class="form-label text-xs font-bold text-muted mb-2 text-uppercase d-block">ARQUIVO TARIFÁRIO (.XLSX)</label>
+                    
+                    <div class="luft-upload-container" id="area-upload">
+                        <i class="ph-duotone ph-file-xls luft-upload-icon"></i>
+                        <div class="font-bold text-main">Clique ou arraste aqui</div>
+                        <div class="text-xs text-muted mt-1">Suporta arquivos .xlsx</div>
+                        <input type="file" id="inputArquivoExcel" name="arquivo_xlsx" accept=".xlsx" style="display: none;">
+                    </div>
+
+                    <div class="luft-alert luft-alert-info mt-4" style="margin-bottom: 0;">
+                        <i class="ph-fill ph-info luft-alert-icon"></i>
+                        <div class="luft-alert-content">
+                            <h4 class="luft-alert-title">Nota</h4>
+                            <p class="luft-alert-text">O sistema detecta automaticamente as colunas de serviços e separa origens agrupadas.</p>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="luft-card" style="padding: 0; display: flex; flex-direction: column; overflow: hidden; min-width: 0;">
+            <div class="d-flex justify-content-between align-items-center" style="padding: 20px 24px; border-bottom: 1px solid var(--luft-border); background: transparent;">
+                <h3 class="font-bold text-main m-0 text-lg d-flex align-items-center gap-2">
+                    <i class="ph-bold ph-clock-counter-clockwise text-primary"></i> Histórico de Versões
+                </h3>
+                <span class="luft-badge luft-badge-secondary">{{ ListaRemessas|length }} Registros</span>
+            </div>
+            
+            <div style="overflow-x: auto; min-height: 300px;">
+                <table class="luft-manager-tabela">
+                    <thead>
+                        <tr>
+                            <th>Referência</th>
+                            <th>Tipo</th>
+                            <th>Arquivo</th>
+                            <th>Responsável</th>
+                            <th>Status</th>
+                            <th style="text-align: center;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for remessa in ListaRemessas %}
+                        <tr>
+                            <td class="font-black text-main" style="font-family: monospace; font-size: 1rem;">{{ remessa.DataReferencia.strftime('%m/%Y') }}</td>
+                            <td>
+                                {% if remessa.TipoAcao == 'Substituicao' %}
+                                    <span class="text-warning font-bold">Substituição</span>
+                                {% else %}
+                                    <span class="text-primary font-bold">Importação</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2 font-medium">
+                                    <i class="ph-fill ph-file-xls text-success text-lg"></i>
+                                    {{ remessa.NomeArquivoOriginal[:30] }}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="font-bold text-main">{{ remessa.UsuarioResponsavel }}</div>
+                                <div class="text-xs text-muted">{{ remessa.DataUpload.strftime('%d/%m %H:%M') }}</div>
+                            </td>
+                            <td>
+                                {% if remessa.Ativo %}
+                                    <span class="luft-badge luft-badge-success"><i class="ph-fill ph-check-circle"></i> Ativo</span>
+                                {% else %}
+                                    <span class="luft-badge luft-badge-secondary">Arquivado</span>
+                                {% endif %}
+                            </td>
+                            <td style="text-align: center;">
+                                <div class="d-flex justify-content-center">
+                                    <a href="{{ url_for('Frete.excluir', id_remessa=remessa.Id) }}" 
+                                       class="btn btn-secondary d-flex align-items-center justify-content-center text-danger btn-excluir-tabela" title="Excluir" style="width: 36px; height: 36px; padding: 0;">
+                                       <i class="ph-bold ph-trash text-lg"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" style="text-align: center; padding: 60px; color: var(--luft-text-muted);">
+                                <i class="ph-duotone ph-currency-dollar text-muted" style="font-size: 3.5rem; margin-bottom: 10px;"></i><br>
+                                <span class="font-bold text-main">Nenhuma tabela de frete importada.</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const rotasTabelasFrete = {
+        gerenciar: "{{ url_for('Frete.gerenciar') }}"
+    };
+</script>
+<script src="{{ url_for('static', filename='JS/TabelasFrete/Manager.js') }}"></script>
+
+{% endblock %}

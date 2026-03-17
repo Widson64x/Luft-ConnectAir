@@ -1,0 +1,107 @@
+{% extends "Layout/BaseLayout.html" %}
+{% import 'luftcore/components.html' as ui %}
+
+{% block titulo %}Torre de Controle Global | Luft-ConnectAir{% endblock %}
+
+{% block conteudo %}
+{% include "Components/_ModalCtc.html" %}
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+    /* --- ESTRUTURA DO MAPA GLOBAL --- */
+    .luft-mapglobal-wrapper { display: grid; grid-template-columns: 420px 1fr; gap: 20px; height: calc(100vh - 120px); animation: slideUpFade 0.5s ease-out forwards; }
+    @keyframes slideUpFade { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+
+    .luft-mapglobal-sidebar { display: flex; flex-direction: column; overflow: hidden; }
+
+    .luft-mapglobal-map {
+        border-radius: 16px; border: 1px solid var(--luft-border);
+        position: relative; height: 100%; width: 100%; overflow: hidden; z-index: 1;
+        box-shadow: var(--luft-shadow-sm);
+    }
+
+    /* Abas de Filtro */
+    .luft-mapglobal-tabs { display: flex; background: var(--luft-bg-app); border: 1px solid var(--luft-border); padding: 6px; border-radius: 10px; gap: 4px; margin-top: 16px; }
+    
+    .luft-mapglobal-tab {
+        flex: 1; background: transparent; border: none; border-radius: 8px;
+        padding: 8px 4px; cursor: pointer; font-weight: 600; font-size: 0.75rem;
+        color: var(--luft-text-muted); display: flex; align-items: center; justify-content: center; gap: 6px;
+        transition: all 0.2s; white-space: nowrap;
+    }
+
+    .luft-mapglobal-tab:hover { background: var(--luft-border); color: var(--luft-text-main); }
+    .luft-mapglobal-tab.active { background: rgba(59, 130, 246, 0.1); color: var(--luft-primary-600); }
+
+    /* Custom Markers do Leaflet */
+    .map-marker { display: flex; flex-direction: column; align-items: center; justify-content: center; transition: transform 0.2s; }
+    .map-marker:hover { transform: scale(1.1); z-index: 9999 !important; }
+    
+    .marker-bubble {
+        width: 100%; height: 100%; background: var(--luft-bg-panel); border-radius: 50%;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); border: 2px solid var(--luft-bg-panel);
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        overflow: hidden; position: relative;
+    }
+    
+    .marker-header { width: 100%; color: white; font-weight: 800; font-size: 13px; padding: 3px 0; text-align: center; position: absolute; top: 0; }
+    .bg-blue { background: var(--luft-primary-600); }
+    .bg-red { background: var(--luft-danger); }
+    
+    .marker-body { margin-top: 18px; display: flex; flex-direction: column; align-items: center; line-height: 1.1; color: var(--luft-text-main); }
+    .marker-docs { font-weight: 900; font-size: 15px; }
+    .marker-vols { font-size: 10px; color: var(--luft-text-muted); }
+    .marker-value { font-size: 11px; font-weight: 700; color: var(--luft-success); margin-top: 2px; background: rgba(34, 197, 94, 0.1); padding: 2px 6px; border-radius: 8px; }
+    
+    .map-marker.is-urgente .marker-bubble { border-color: rgba(239, 68, 68, 0.3); }
+    .map-marker.is-urgente::before { content: ''; position: absolute; top: -5px; left: -5px; right: -5px; bottom: -5px; border-radius: 50%; border: 2px solid var(--luft-danger); animation: pulse-radar 2s infinite; opacity: 0; z-index: -1; }
+    
+    @keyframes pulse-radar { 0% { transform: scale(0.8); opacity: 0.8; } 100% { transform: scale(1.4); opacity: 0; } }
+</style>
+
+<div class="luft-mapglobal-wrapper">
+    <div class="luft-card p-0 luft-mapglobal-sidebar">
+        <div class="p-4" style="background: var(--luft-bg-app); border-bottom: 1px solid var(--luft-border);">
+            <h2 class="font-black text-main m-0 d-flex align-items-center gap-2" style="font-size: 1.2rem;">
+                <i class="ph-duotone ph-radar text-primary"></i> Expedição Aérea
+            </h2>
+            <p class="text-xs text-muted mt-1">Selecione um filtro e um cluster no mapa</p>
+            
+            <div class="luft-mapglobal-tabs">
+                <button class="luft-mapglobal-tab active" onclick="mudarFiltroMapa('TODOS')" id="btn-todos">
+                    <i class="ph-bold ph-squares-four"></i> Global
+                </button>
+                <button class="luft-mapglobal-tab" onclick="mudarFiltroMapa('DIARIO')" id="btn-diario">
+                    <i class="ph-bold ph-sun"></i> Do Dia
+                </button>
+                <button class="luft-mapglobal-tab" onclick="mudarFiltroMapa('BACKLOG')" id="btn-backlog">
+                    <i class="ph-bold ph-clock-counter-clockwise"></i> Backlog
+                </button>
+                <button class="luft-mapglobal-tab" onclick="mudarFiltroMapa('REVERSA')" id="btn-reversa">
+                    <i class="ph-bold ph-arrow-u-up-left"></i> Reversa
+                </button>
+            </div>
+        </div>
+        
+        <div id="lista-ctcs" class="p-4" style="flex: 1; overflow-y: auto;">
+            <div style="text-align: center; padding: 40px; color: var(--luft-text-muted);">
+                <i class="ph-duotone ph-map-pin" style="font-size: 3rem; display:block; margin-bottom:10px;"></i>
+                Clique em uma região no mapa para ver os detalhes.
+            </div>
+        </div>
+    </div>
+
+    <div class="luft-mapglobal-map" id="map"></div>
+</div>
+
+<script>
+    // Injeção de Dados Backend
+    const dadosMapaGlobal = {{ Dados | tojson | safe }};
+    const rotasMapaGlobal = {
+        montarRota: "{{ url_for('Planejamento.montarPlanejamento', filial='__F__', serie='__S__', ctc='__C__') }}"
+    };
+</script>
+<script src="{{ url_for('static', filename='JS/Planejamento/Map.js') }}"></script>
+{% endblock %}

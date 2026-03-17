@@ -1,0 +1,277 @@
+{% extends "Layout/BaseLayout.html" %}
+{% import 'luftcore/components.html' as ui %}
+
+{% block titulo %}Gestão de Reversa | Luft-ConnectAir{% endblock %}
+
+{% block conteudo %}
+{% include "Components/_ModalCtc.html" %}
+
+<style>
+    /* --- ESTRUTURA E LAYOUT (LuftCore) --- */
+    .luft-reversa-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        animation: slideUpFade 0.5s ease-out forwards;
+    }
+
+    @keyframes slideUpFade { 
+        from { opacity: 0; transform: translateY(15px); } 
+        to { opacity: 1; transform: translateY(0); } 
+    }
+
+    /* Tabs de Navegação (Filtros) */
+    .luft-tabs-wrapper { 
+        display: flex; 
+        gap: 8px; 
+        border-bottom: 2px solid var(--luft-border); 
+        padding-bottom: 12px; 
+        overflow-x: auto;
+    }
+    
+    .luft-tab-btn { 
+        background: transparent; border: none; font-weight: 600; 
+        color: var(--luft-text-muted); padding: 8px 16px; 
+        border-radius: 8px; cursor: pointer; transition: 0.2s; 
+        display: flex; align-items: center; gap: 8px; white-space: nowrap;
+    }
+    
+    .luft-tab-btn:hover { background: var(--luft-bg-app); color: var(--luft-text-main); }
+    .luft-tab-btn.active { background: rgba(59, 130, 246, 0.1); color: var(--luft-primary-600); }
+
+    /* Tabela */
+    .luft-reversa-tabela { width: 100%; border-collapse: collapse; white-space: nowrap; }
+    .luft-reversa-tabela th {
+        background: var(--luft-bg-app); color: var(--luft-text-muted);
+        font-weight: 700; text-transform: uppercase; font-size: 0.75rem;
+        padding: 16px 20px; text-align: left; border-bottom: 1px solid var(--luft-border);
+        position: sticky; top: 0; z-index: 10;
+    }
+    .luft-reversa-tabela td {
+        padding: 16px 20px; border-bottom: 1px solid var(--luft-border);
+        color: var(--luft-text-main); vertical-align: middle;
+    }
+    .luft-reversa-tabela tbody tr:hover td { background-color: var(--luft-bg-app); cursor: pointer; }
+
+    /* Checkbox Customizado */
+    .luft-checkbox-wrapper {
+        display: flex; justify-content: center; align-items: center; height: 100%;
+    }
+    .luft-custom-check {
+        appearance: none; width: 22px; height: 22px;
+        border: 2px solid var(--luft-border); border-radius: 6px;
+        cursor: pointer; display: grid; place-content: center;
+        transition: all 0.2s ease-in-out; background: var(--luft-bg-panel);
+    }
+    .luft-custom-check::before {
+        content: ""; width: 10px; height: 10px; transform: scale(0);
+        transition: 0.2s transform ease-in-out; box-shadow: inset 1em 1em white;
+        transform-origin: center; clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+    }
+    .luft-custom-check:checked {
+        background-color: var(--luft-primary-600); border-color: var(--luft-primary-600);
+    }
+    .luft-custom-check:checked::before { transform: scale(1); }
+    .luft-custom-check:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    /* Estado Vazio */
+    .luft-empty-state { text-align: center; padding: 60px 20px; color: var(--luft-text-muted); }
+    .luft-empty-state i { font-size: 4rem; opacity: 0.5; margin-bottom: 16px; display: block; }
+</style>
+
+<div class="luft-reversa-wrapper">
+
+    <div class="d-flex justify-content-between align-items-end flex-wrap gap-4 mb-2">
+        <div>
+            <h2 class="font-black text-main m-0 d-flex align-items-center gap-2" style="font-size: 1.8rem; letter-spacing: -0.5px;">
+                <i class="ph-duotone ph-airplane-landing text-primary"></i> Controle de Reversa
+            </h2>
+            <p class="text-muted mt-1 font-medium">Gerenciamento e liberação de CTCs de devolução aérea sem AWB.</p>
+        </div>
+        <div class="text-xs text-muted font-bold text-uppercase d-flex align-items-center gap-2">
+            <i class="ph-bold ph-clock"></i> Atualizado em: <strong id="last-update" class="text-main text-sm">--:--</strong>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;">
+        
+        <div class="luft-card hover-lift p-4 d-flex align-items-center gap-4">
+            <div class="d-flex align-items-center justify-content-center rounded-xl bg-info-light text-info" style="width: 52px; height: 52px; font-size: 1.6rem; flex-shrink: 0;">
+                <i class="ph-duotone ph-files"></i>
+            </div>
+            <div>
+                <p class="text-muted text-xs font-bold mb-1" style="text-transform: uppercase; letter-spacing: 0.5px;">Total de Registros</p>
+                <h3 class="text-2xl font-black text-main m-0" id="count-total">{{ Lista|length }}</h3>
+            </div>
+        </div>
+
+        <div class="luft-card hover-lift p-4 d-flex align-items-center gap-4">
+            <div class="d-flex align-items-center justify-content-center rounded-xl bg-warning-light text-warning" style="width: 52px; height: 52px; font-size: 1.6rem; flex-shrink: 0;">
+                <i class="ph-duotone ph-hourglass-medium"></i>
+            </div>
+            <div>
+                <p class="text-muted text-xs font-bold mb-1" style="text-transform: uppercase; letter-spacing: 0.5px;">Aguardando Liberação</p>
+                {% set pendentes = Lista | selectattr("is_liberado", "equalto", False) | list | length %}
+                <h3 class="text-2xl font-black text-warning m-0" id="count-pendente">{{ pendentes }}</h3>
+            </div>
+        </div>
+
+        <div class="luft-card hover-lift p-4 d-flex align-items-center gap-4">
+            <div class="d-flex align-items-center justify-content-center rounded-xl bg-success-light text-success" style="width: 52px; height: 52px; font-size: 1.6rem; flex-shrink: 0;">
+                <i class="ph-duotone ph-check-circle"></i>
+            </div>
+            <div>
+                <p class="text-muted text-xs font-bold mb-1" style="text-transform: uppercase; letter-spacing: 0.5px;">Prontos p/ Planejamento</p>
+                {% set liberados = Lista | selectattr("is_liberado", "equalto", True) | list | length %}
+                <h3 class="text-2xl font-black text-success m-0" id="count-liberado">{{ liberados }}</h3>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="luft-card" style="padding: 0; display: flex; flex-direction: column; overflow: hidden;">
+        
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-4" style="padding: 20px 24px; border-bottom: 1px solid var(--luft-border); background: transparent;">
+            
+            <div class="luft-tabs-wrapper" style="border-bottom: none; padding-bottom: 0; margin-bottom: 0;">
+                <button class="luft-tab-btn active" onclick="definirFiltro('todos', this)" id="btn-todos">
+                    <i class="ph-bold ph-list"></i> Todos
+                </button>
+                <button class="luft-tab-btn" onclick="definirFiltro('pendente', this)" id="btn-pendente">
+                    <i class="ph-bold ph-hourglass"></i> Pendentes
+                </button>
+                <button class="luft-tab-btn" onclick="definirFiltro('liberado', this)" id="btn-liberado">
+                    <i class="ph-bold ph-check"></i> Liberados
+                </button>
+            </div>
+
+            <div style="min-width: 300px; flex: 1; max-width: 400px;">
+                <div class="relative">
+                    <i class="ph-bold ph-magnifying-glass absolute" style="left: 14px; top: 50%; transform: translateY(-50%); color: var(--luft-text-muted);"></i>
+                    <input type="text" id="searchInput" class="form-control pl-10" placeholder="Pesquisar CTC, Cidade, Remetente..." onkeyup="filtrarTabela()" style="padding-left: 40px; border-radius: 50px;">
+                </div>
+            </div>
+        </div>
+
+        <div style="overflow-x: auto; max-height: 60vh; overflow-y: auto;">
+            <table class="luft-reversa-tabela" id="mainTable">
+                <thead>
+                    <tr>
+                        <th style="width: 80px; text-align: center;">
+                            <div class="d-flex flex-column align-items-center gap-1">
+                                <div class="luft-checkbox-wrapper">
+                                    <input type="checkbox" class="luft-custom-check" id="chk-todos" onclick="alternarTodos(this)" title="Selecionar e salvar todos visíveis">
+                                </div>
+                                <span class="text-xs text-muted font-bold" style="font-size: 0.65rem;">TODOS</span>
+                            </div>
+                        </th>
+                        <th>Detalhes do Documento</th>
+                        <th>Rota</th>
+                        <th>Remetente / Destinatário</th>
+                        <th style="text-align: center;">Volumes</th>
+                        <th style="text-align: center;">Peso</th>
+                        <th>Status / Responsável</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% if Lista %}
+                    {% for item in Lista %}
+                    <tr class="data-row"
+                        data-status="{{ 'liberado' if item.is_liberado else 'pendente' }}"
+                        data-search="{{ item.ctc }} {{ item.filial }} {{ item.remetente }} {{ item.destinatario }} {{ item.cidade_origem }} {{ item.cidade_destino }}"
+                        ondblclick="AbrirModalGlobal('{{ item.filial }}', '{{ item.serie }}', '{{ item.ctc }}')"
+                        title="Duplo clique para ver detalhes">
+
+                        <td style="text-align: center;" onclick="event.stopPropagation()">
+                            <div class="luft-checkbox-wrapper">
+                                <input type="checkbox" class="luft-custom-check chk-action"
+                                       id="chk-{{ item.filial }}-{{ item.ctc }}"
+                                       data-filial="{{ item.filial }}"
+                                       data-serie="{{ item.serie }}"
+                                       data-ctc="{{ item.ctc }}"
+                                       {% if item.is_liberado %}checked{% endif %}>
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="font-bold text-primary" style="font-family: monospace; font-size: 1rem;">{{ item.ctc }}</div>
+                            <div class="text-xs text-muted mt-1">Filial: {{ item.filial }} | Série: {{ item.serie }}</div>
+                            <div class="text-xs text-muted mt-1"><i class="ph-bold ph-calendar-blank"></i> {{ item.data_emissao }}</div>
+                        </td>
+
+                        <td>
+                            <div class="d-flex align-items-center gap-2 font-bold text-main" style="font-size: 0.9rem;">
+                                {{ item.cidade_origem }}
+                                <i class="ph-bold ph-arrow-right text-muted" style="font-size: 0.8rem;"></i>
+                                {{ item.cidade_destino }}
+                            </div>
+                        </td>
+
+                        <td style="max-width: 250px;">
+                            <div class="font-medium text-main" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px;" title="{{ item.remetente }}">
+                                <i class="ph-bold ph-package text-muted"></i> {{ item.remetente }}
+                            </div>
+                            <div class="text-xs text-muted" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ item.destinatario }}">
+                                <i class="ph-bold ph-user text-muted"></i> {{ item.destinatario }}
+                            </div>
+                        </td>
+
+                        <td style="text-align: center;">
+                            <span class="font-black text-main">{{ item.volumes }}</span>
+                        </td>
+
+                        <td style="text-align: center;">
+                            <span class="font-bold text-muted">{{ item.peso|round(1) }} Kg</span>
+                        </td>
+
+                        <td>
+                            <div id="status-display-{{ item.filial }}-{{ item.ctc }}">
+                                {% if item.is_liberado %}
+                                <div class="luft-badge luft-badge-success"><i class="ph-fill ph-check-circle"></i> Liberado</div>
+                                <div class="text-xs text-muted mt-1 font-medium">Por: {{ item.responsavel }}</div>
+                                {% else %}
+                                <div class="luft-badge luft-badge-warning"><i class="ph-fill ph-clock"></i> Pendente</div>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr id="no-data-row">
+                        <td colspan="7">
+                            <div class="luft-empty-state">
+                                <i class="ph-duotone ph-check-circle"></i>
+                                <h3 class="font-bold text-main m-0">Tudo Limpo!</h3>
+                                <p class="text-muted mt-2">Nenhuma devolução pendente para o modal aéreo neste momento.</p>
+                            </div>
+                        </td>
+                    </tr>
+                {% endif %}
+
+                    <tr id="no-search-results" style="display: none;">
+                        <td colspan="7">
+                            <div class="luft-empty-state">
+                                <i class="ph-duotone ph-magnifying-glass"></i>
+                                <h3 class="font-bold text-main m-0">Nenhum resultado</h3>
+                                <p class="text-muted mt-2">Não encontramos nada com os filtros atuais.</p>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="d-flex justify-content-end align-items-center" style="padding: 16px 24px; border-top: 1px solid var(--luft-border); background: transparent;">
+            <div class="text-xs font-bold text-muted text-uppercase">Exibindo <span id="visible-count">0</span> registros</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const rotasReversa = {
+        atualizarStatus: "{{ url_for('Reversa.atualizarStatus') }}"
+    };
+</script>
+<script src="{{ url_for('static', filename='JS/Reversa/Index.js') }}"></script>
+
+{% endblock %}

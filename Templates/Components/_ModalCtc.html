@@ -275,7 +275,7 @@
 
         try {
             // Ajuste a URL conforme sua rota
-            const url = '{{ url_for("Global.ApiCtcDetalhes", filial="__FIL__", serie="__SER__", ctc="__NUM__") }}'
+            const url = '{{ url_for("Global.apiCtcDetalhes", filial="__FIL__", serie="__SER__", ctc="__NUM__") }}'
                 .replace('__FIL__', filial).replace('__SER__', serie).replace('__NUM__', ctc);
             
             const response = await fetch(url);

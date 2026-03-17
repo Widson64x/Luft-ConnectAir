@@ -4,62 +4,66 @@ from flask_login import login_required, current_user
 from Services.AcompanhamentoService import AcompanhamentoService
 from Services.LogService import LogService
 from Services.PermissaoService import RequerPermissao
+from luftcore.extensions.flask_extension import require_ajax
 
-AcompanhamentoBP = Blueprint('Acompanhamento', __name__, url_prefix='/Acompanhamento')
+AcompanhamentoBP = Blueprint('Acompanhamento', __name__)
 
 @AcompanhamentoBP.route('/Painel', methods=['GET'])
-@RequerPermissao('acompanhamento.visualizar')
 @login_required
-def Painel():
+@RequerPermissao('ACOMPANHAMENTO.PAINEL.VISUALIZAR')
+def painel():
     LogService.Info("AcompanhamentoRoute", "Acessando rota /Painel.")
     try:
-        resumo = AcompanhamentoService.BuscarResumoPainel()
+        dadosResumo = AcompanhamentoService.BuscarResumoPainel()
         
-        # Define padrão: Hoje até Hoje (ou últimos 3 dias se preferir)
-        hoje = datetime.now().strftime('%Y-%m-%d')
+        dataHoje = datetime.now().strftime('%Y-%m-%d')
         
         return render_template(
-            'Acompanhamento/Index.html', 
-            resumo=resumo, 
-            data_inicio=hoje, 
-            data_fim=hoje
+            'Pages/Acompanhamento/Index.html', 
+            resumo=dadosResumo, 
+            data_inicio=dataHoje, 
+            data_fim=dataHoje
         )
     except Exception as e:
         LogService.Error("AcompanhamentoRoute", "Erro ao renderizar Painel.", e)
-        hoje = datetime.now().strftime('%Y-%m-%d')
-        return render_template('Acompanhamento/Index.html', resumo={}, data_inicio=hoje, data_fim=hoje)
+        dataHoje = datetime.now().strftime('%Y-%m-%d')
+        return render_template('Pages/Acompanhamento/Index.html', resumo={}, data_inicio=dataHoje, data_fim=dataHoje)
 
 @AcompanhamentoBP.route('/Api/ListarAwbs', methods=['GET'])
 @login_required
-def ApiListarAwbs():
-    filtros = {
+@require_ajax
+@RequerPermissao('ACOMPANHAMENTO.PAINEL.VISUALIZAR')
+def apiListarAwbs():
+    dictFiltros = {
         'DataInicio': request.args.get('dataInicio'),
         'DataFim': request.args.get('dataFim'),
         'NumeroAwb': request.args.get('numeroAwb'),
         'FilialCtc': request.args.get('filialCtc') 
     }
-    LogService.Debug("AcompanhamentoRoute", f"API /ListarAwbs chamada. Parametros: {filtros}")
-    dados = AcompanhamentoService.ListarAwbs(filtros)
-    return jsonify(dados)
+    LogService.Debug("AcompanhamentoRoute", f"API /ListarAwbs chamada. Parametros: {dictFiltros}")
+    listaDados = AcompanhamentoService.ListarAwbs(dictFiltros)
+    return jsonify(listaDados)
 
 @AcompanhamentoBP.route('/Api/Historico/<path:numero_awb>', methods=['GET'])
 @login_required
-def ApiHistorico(numero_awb):
+@require_ajax
+@RequerPermissao('ACOMPANHAMENTO.PAINEL.VISUALIZAR')
+def apiHistorico(numero_awb):
     LogService.Debug("AcompanhamentoRoute", f"API /Historico chamada para {numero_awb}")
-    historico = AcompanhamentoService.ObterHistoricoAwb(numero_awb)
-    return jsonify(historico)
+    listaHistorico = AcompanhamentoService.ObterHistoricoAwb(numero_awb)
+    return jsonify(listaHistorico)
 
 @AcompanhamentoBP.route('/Api/DetalhesVooModal', methods=['GET'])
 @login_required
-def ApiDetalhesVooModal():
-    numero = request.args.get('numeroVoo')
-    data = request.args.get('dataRef') 
+@require_ajax
+def apiDetalhesVooModal():
+    numeroVooConsulta = request.args.get('numeroVoo')
+    dataRefConsulta = request.args.get('dataRef') 
     
-    LogService.Debug("AcompanhamentoRoute", f"API /DetalhesVooModal chamada para voo {numero} em {data}")
-    detalhes = AcompanhamentoService.BuscarDetalhesVooModal(numero, data)
+    LogService.Debug("AcompanhamentoRoute", f"API /DetalhesVooModal chamada para voo {numeroVooConsulta} em {dataRefConsulta}")
+    dictDetalhes = AcompanhamentoService.BuscarDetalhesVooModal(numeroVooConsulta, dataRefConsulta)
     
-    if detalhes:
-        return jsonify({'sucesso': True, 'dados': detalhes})
+    if dictDetalhes:
+        return jsonify({'sucesso': True, 'dados': dictDetalhes})
     else:
         return jsonify({'sucesso': False, 'msg': 'Voo não encontrado na malha prevista.'})
-    

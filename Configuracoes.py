@@ -86,11 +86,11 @@ class ConfiguracaoDesenvolvimento(ConfiguracaoBase):
     PG_DB_NAME = os.getenv("PGDB_NAME_DEV", "Luft-ConnectAir_DEV")
 
 class ConfiguracaoHomologacao(ConfiguracaoBase):
-    DEBUG = False
+    DEBUG = True
     PG_DB_NAME = os.getenv("PGDB_NAME_HOMOLOG", "Luft-ConnectAir_HOMOLOG")
 
 class ConfiguracaoProducao(ConfiguracaoBase):
-    DEBUG = False
+    DEBUG = True
     PG_DB_NAME = os.getenv("PGDB_NAME_PROD", "Luft-ConnectAir")
 
 # Mapa de seleção do ambiente

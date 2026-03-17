@@ -8,56 +8,44 @@ EscalasBp = Blueprint('Escalas', __name__)
 
 @EscalasBp.route('/Mapa')
 @login_required
-@RequerPermissao('cadastros.malha.visualizar')
-def Mapa():
-    """Renderiza a tela principal do mapa de escalas."""
-    return render_template('Escalas/Index.html')
+@RequerPermissao('CADASTROS.MALHA.VISUALIZAR')
+def mapa():
+    return render_template('Cadastros/Escalas/Index.html')
 
 @EscalasBp.route('/Api/OtimizarRotas', methods=['GET'])
 @login_required
-@RequerPermissao('cadastros.malha.visualizar')
-def ApiOtimizarRotas():
-    """
-    Rota API que processa a inteligência de rotas.
-    Recebe: inicio, fim, origem, destino, peso
-    Retorna: JSON com as opções (recomendada, mais_rapida, etc.)
-    """
+@RequerPermissao('CADASTROS.MALHA.VISUALIZAR')
+def apiOtimizarRotas():
     try:
-        # 1. Captura Argumentos
-        data_inicio_str = request.args.get('inicio')
-        data_fim_str = request.args.get('fim')
-        origem = request.args.get('origem', '').upper()
-        destino = request.args.get('destino', '').upper()
-        peso_str = request.args.get('peso', '100')
+        dataInicioStr = request.args.get('inicio')
+        dataFimStr = request.args.get('fim')
+        origemBusca = request.args.get('origem', '').upper()
+        destinoBusca = request.args.get('destino', '').upper()
+        pesoStr = request.args.get('peso', '100')
 
-        # 2. Validações Básicas
-        if not (data_inicio_str and data_fim_str and origem and destino):
+        if not (dataInicioStr and dataFimStr and origemBusca and destinoBusca):
             return jsonify({'erro': 'Parâmetros incompletos.'}), 400
 
-        # 3. Conversão de Tipos
         try:
-            dt_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d')
-            dt_fim = datetime.strptime(data_fim_str, '%Y-%m-%d')
-            peso = float(peso_str)
+            dtInicio = datetime.strptime(dataInicioStr, '%Y-%m-%d')
+            dtFim = datetime.strptime(dataFimStr, '%Y-%m-%d')
+            pesoTotalBusca = float(pesoStr)
         except ValueError:
             return jsonify({'erro': 'Formato de data ou peso inválido.'}), 400
 
-        # 4. Chama o Serviço de Inteligência
-        # O serviço retorna um dict: {'recomendada': [...], 'menor_custo': [...], ...}
-        opcoes = MalhaService.BuscarOpcoesDeRotas(
-            data_inicio=dt_inicio,
-            data_fim=dt_fim,
-            lista_origens=origem,   # Antes era origem_iata
-            lista_destinos=destino, # Antes era destino_iata
-            peso_total=peso
+        opcoesRotas = MalhaService.BuscarOpcoesDeRotas(
+            data_inicio=dtInicio,
+            data_fim=dtFim,
+            lista_origens=origemBusca,   
+            lista_destinos=destinoBusca, 
+            peso_total=pesoTotalBusca
         )
 
-        # Verifica se alguma rota foi encontrada
-        total_rotas = sum(1 for v in opcoes.values() if v)
-        if total_rotas == 0:
+        totalRotas = sum(1 for v in opcoesRotas.values() if v)
+        if totalRotas == 0:
             return jsonify({'status': 'vazio', 'mensagem': 'Nenhuma combinação de rotas encontrada para estes parâmetros.'})
 
-        return jsonify({'status': 'sucesso', 'dados': opcoes})
+        return jsonify({'status': 'sucesso', 'dados': opcoesRotas})
 
     except Exception as e:
         return jsonify({'erro': f'Erro interno: {str(e)}'}), 500

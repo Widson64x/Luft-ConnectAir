@@ -1,125 +1,118 @@
 from flask import Blueprint, jsonify, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
+from luftcore.extensions.flask_extension import require_ajax
 from datetime import datetime
 from Services.MalhaService import MalhaService
 from Services.LogService import LogService
-from Services.PermissaoService import RequerPermissao # <--- Import Adicionado
+from Services.PermissaoService import RequerPermissao
+
 MalhaBp = Blueprint('Malha', __name__)
 
-@MalhaBp.route('/Malha/API/Rotas')
+@MalhaBp.route('/API/Rotas')
 @login_required
-@RequerPermissao('cadastros.malha.editar')
-def ApiRotas():
-    Inicio = request.args.get('inicio')
-    Fim = request.args.get('fim')
-    Origem = request.args.get('origem')
-    Destino = request.args.get('destino')
-    NumeroVoo = request.args.get('numero_voo') # Novo parâmetro capturado
+@require_ajax
+@RequerPermissao('CADASTROS.MALHA.VISUALIZAR')
+def apiRotas():
+    strInicio = request.args.get('inicio')
+    strFim = request.args.get('fim')
+    strOrigem = request.args.get('origem')
+    strDestino = request.args.get('destino')
+    numeroVooReq = request.args.get('numero_voo') 
     
-    if not Inicio or not Fim:
+    if not strInicio or not strFim:
         return jsonify([])
 
     try:
-        from datetime import datetime
-        DataIni = datetime.strptime(Inicio, '%Y-%m-%d').date()
-        DataFim = datetime.strptime(Fim, '%Y-%m-%d').date()
+        dataIni = datetime.strptime(strInicio, '%Y-%m-%d').date()
+        dataFim = datetime.strptime(strFim, '%Y-%m-%d').date()
         
-        LogService.Info("Routes.Malha", f"API Rota Solicitada por {current_user.Login}: {Origem}->{Destino} ({Inicio} a {Fim})")
+        LogService.Info("Routes.Malha", f"API Rota Solicitada por {current_user.Login}: {strOrigem}->{strDestino} ({strInicio} a {strFim})")
 
-        # Chama a busca inteligente passando o novo parâmetro
-        Dados = MalhaService.BuscarRotasInteligentes(DataIni, DataFim, Origem, Destino, NumeroVoo)
+        dadosRetorno = MalhaService.BuscarRotasInteligentes(dataIni, dataFim, strOrigem, strDestino, numeroVooReq)
         
-        return jsonify(Dados)
+        return jsonify(dadosRetorno)
     except Exception as e:
         LogService.Error("Routes.Malha", "Erro na API de Rotas", e)
         return jsonify({'erro': str(e)}), 500
 
-@MalhaBp.route('/Malha/Gerenciar', methods=['GET', 'POST'])
+@MalhaBp.route('/Gerenciar', methods=['GET', 'POST'])
 @login_required
-@RequerPermissao('cadastros.malha.editar')
-def Gerenciar():
-    # Variáveis para controlar o Modal de Confirmação
-    ModalConfirmacao = False
-    DadosConfirmacao = {}
+@RequerPermissao('CADASTROS.MALHA.EDITAR')
+def gerenciar():
+    modalConfirmacao = False
+    dadosConfirmacao = {}
 
     if request.method == 'POST':
-        # --- FLUXO 1: Upload Inicial ---
         if 'arquivo_xlsx' in request.files:
-            Arquivo = request.files['arquivo_xlsx']
-            if Arquivo.filename == '':
+            arquivoUp = request.files['arquivo_xlsx']
+            if arquivoUp.filename == '':
                 flash('Selecione um arquivo.', 'warning')
             else:
                 LogService.Info("Routes.Malha", f"Upload de Malha iniciado por {current_user.Login}")
-                Sucesso, Info = MalhaService.AnalisarArquivo(Arquivo)
+                sucessoAnalise, infoAnalise = MalhaService.AnalisarArquivo(arquivoUp)
                 
-                if not Sucesso:
-                    LogService.Warning("Routes.Malha", f"Upload falhou na análise: {Info}")
-                    flash(Info, 'danger')
+                if not sucessoAnalise:
+                    LogService.Warning("Routes.Malha", f"Upload falhou na análise: {infoAnalise}")
+                    flash(infoAnalise, 'danger')
                 else:
-                    # Se detectou conflito (já existe malha ativa), abre o Modal
-                    if Info['conflito']:
+                    if infoAnalise['conflito']:
                         LogService.Info("Routes.Malha", "Conflito de malha detectado. Aguardando confirmação do usuário.")
-                        ModalConfirmacao = True
-                        DadosConfirmacao = Info
+                        modalConfirmacao = True
+                        dadosConfirmacao = infoAnalise
                     else:
-                        # Se NÃO tem conflito, processa direto como 'Importação'
-                        Ok, Msg = MalhaService.ProcessarMalhaFinal(
-                            Info['caminho_temp'], 
-                            Info['mes_ref'], 
-                            Info['nome_arquivo'], 
+                        okProcesso, msgProcesso = MalhaService.ProcessarMalhaFinal(
+                            infoAnalise['caminho_temp'], 
+                            infoAnalise['mes_ref'], 
+                            infoAnalise['nome_arquivo'], 
                             current_user.Login, 
                             'Importacao'
                         )
-                        if Ok: flash(Msg, 'success')
-                        else: flash(Msg, 'danger')
-                        return redirect(url_for('Malha.Gerenciar'))
+                        if okProcesso: flash(msgProcesso, 'success')
+                        else: flash(msgProcesso, 'danger')
+                        return redirect(url_for('Malha.gerenciar'))
 
-        # --- FLUXO 2: Confirmação de Substituição (Vem do Modal) ---
         elif 'confirmar_substituicao' in request.form:
-            CaminhoTemp = request.form.get('caminho_temp')
-            NomeOriginal = request.form.get('nome_arquivo')
+            caminhoTempForm = request.form.get('caminho_temp')
+            nomeOriginalForm = request.form.get('nome_arquivo')
             
-            # Recupera a data do formulário (Ex: "2026-01-01" ou "2026-01-01 00:00:00")
-            MesStr = request.form.get('mes_ref')
+            mesStrForm = request.form.get('mes_ref')
             
-            # BLINDAGEM: Remove o horário se vier junto (corrige o erro 'unconverted data remains')
-            if MesStr and ' ' in MesStr:
-                MesStr = MesStr.split(' ')[0]
+            if mesStrForm and ' ' in mesStrForm:
+                mesStrForm = mesStrForm.split(' ')[0]
             
             try:
                 LogService.Info("Routes.Malha", f"Usuário {current_user.Login} confirmou substituição de malha.")
-                # Converte string para objeto date
-                DataRef = datetime.strptime(MesStr, '%Y-%m-%d').date()
+                dataRefObj = datetime.strptime(mesStrForm, '%Y-%m-%d').date()
                 
-                Ok, Msg = MalhaService.ProcessarMalhaFinal(
-                    CaminhoTemp, 
-                    DataRef, 
-                    NomeOriginal, 
+                okSubs, msgSubs = MalhaService.ProcessarMalhaFinal(
+                    caminhoTempForm, 
+                    dataRefObj, 
+                    nomeOriginalForm, 
                     current_user.Login, 
                     'Substituicao'
                 )
-                if Ok: flash(Msg, 'success')
-                else: flash(Msg, 'danger')
+                if okSubs: flash(msgSubs, 'success')
+                else: flash(msgSubs, 'danger')
                 
             except Exception as e:
                 LogService.Error("Routes.Malha", "Erro ao processar data na confirmação", e)
                 flash(f"Erro ao processar data: {e}", 'danger')
 
-            return redirect(url_for('Malha.Gerenciar'))
+            return redirect(url_for('Malha.gerenciar'))
 
-    Historico = MalhaService.ListarRemessas()
+    listaHistorico = MalhaService.ListarRemessas()
     
-    return render_template('Malha/Manager.html', 
-                           ListaRemessas=Historico, 
-                           ExibirModal=ModalConfirmacao, 
-                           DadosModal=DadosConfirmacao)
+    return render_template('Cadastros/Malha/Manager.html', 
+                           ListaRemessas=listaHistorico, 
+                           ExibirModal=modalConfirmacao, 
+                           DadosModal=dadosConfirmacao)
 
-@MalhaBp.route('/Malha/Excluir/<int:id_remessa>')
+@MalhaBp.route('/Excluir/<int:id_remessa>')
 @login_required
-@RequerPermissao('cadastros.malha.editar')
-def Excluir(id_remessa):
+@RequerPermissao('CADASTROS.MALHA.DELETAR')
+def excluir(id_remessa):
     LogService.Warning("Routes.Malha", f"Solicitação de exclusão de remessa {id_remessa} por {current_user.Login}")
-    Sucesso, Mensagem = MalhaService.ExcluirRemessa(id_remessa)
-    if Sucesso: flash(Mensagem, 'info')
-    else: flash(Mensagem, 'danger')
-    return redirect(url_for('Malha.Gerenciar'))
+    sucessoExcluir, msgExcluir = MalhaService.ExcluirRemessa(id_remessa)
+    if sucessoExcluir: flash(msgExcluir, 'info')
+    else: flash(msgExcluir, 'danger')
+    return redirect(url_for('Malha.gerenciar'))
