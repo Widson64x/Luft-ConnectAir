@@ -3,33 +3,26 @@ from flask import Blueprint, render_template, request, jsonify, flash, redirect,
 from flask_login import login_required, current_user
 from collections import defaultdict
 
-# Conexões do ConnectAir
 from Conexoes import ObterSessaoSqlServer
-
-# Models do ConnectAir
 from Models.SQL_SERVER.Permissoes import Tb_PLN_Permissao, Tb_PLN_PermissaoGrupo, Tb_PLN_PermissaoUsuario, Tb_PLN_Sistema
-from Models.SQL_SERVER.Usuario import Usuario, UsuarioGrupo  # Ajuste os nomes dos models conforme o seu sistema
+from Models.SQL_SERVER.Usuario import Usuario, UsuarioGrupo  
 
-# Service que acabamos de atualizar
 from Services.PermissaoService import PermissaoService, RequerPermissao
 from luftcore.extensions.flask_extension import require_ajax
 
-SISTEMA_ID = int(os.getenv("SISTEMA_ID", 1))
+sistemaId = int(os.getenv("SISTEMA_ID", 1))
 
-# Criando o Blueprint 'Seguranca' (Mesmo nome usado nos url_for do HTML)
 Seguranca_BP = Blueprint('Seguranca', __name__, url_prefix='/Seguranca')
 
 @Seguranca_BP.route('/Permissoes')
 @login_required
 @RequerPermissao('SISTEMA.SEGURANCA.VISUALIZAR')
-def Index():
-    Sessao = ObterSessaoSqlServer()
+def index():
+    sessaoDb = ObterSessaoSqlServer()
     try:
-        # Busca Dados Gerais de Grupos
-        Grupos = Sessao.query(UsuarioGrupo).order_by(UsuarioGrupo.Sigla_UsuarioGrupo).all()
+        listaGrupos = sessaoDb.query(UsuarioGrupo).order_by(UsuarioGrupo.Sigla_UsuarioGrupo).all()
         
-        # Busca Usuários fazendo o Join com o Grupo (Igual estava antes)
-        Usuarios = Sessao.query(
+        listaUsuarios = sessaoDb.query(
             Usuario.Codigo_Usuario, 
             Usuario.Nome_Usuario, 
             Usuario.Login_Usuario, 
@@ -39,161 +32,154 @@ def Index():
             Usuario.codigo_usuariogrupo == UsuarioGrupo.codigo_usuariogrupo
         ).order_by(Usuario.Nome_Usuario).all()
         
-        # Busca todas as permissões deste sistema
-        Permissoes = Sessao.query(Tb_PLN_Permissao).filter_by(Id_Sistema=SISTEMA_ID).order_by(
+        listaPermissoes = sessaoDb.query(Tb_PLN_Permissao).filter_by(Id_Sistema=sistemaId).order_by(
             Tb_PLN_Permissao.Categoria_Permissao, 
             Tb_PLN_Permissao.Descricao_Permissao
         ).all()
         
-        # Agrupa permissões por categoria para a tela
-        PermissoesPorCategoria = defaultdict(list)
-        for perm in Permissoes:
-            categoria = perm.Categoria_Permissao or 'Geral'
-            PermissoesPorCategoria[categoria].append(perm)
+        permissoesPorCategoria = defaultdict(list)
+        for perm in listaPermissoes:
+            categoriaPerm = perm.Categoria_Permissao or 'Geral'
+            permissoesPorCategoria[categoriaPerm].append(perm)
 
-        # Checa se o usuário atual pode editar/criar (para desabilitar/habilitar botões no HTML)
-        PodeEditar = PermissaoService.VerificarPermissao(current_user, 'SISTEMA.CONFIGURACOES.EDITAR')
-        PodeCriar = PermissaoService.VerificarPermissao(current_user, 'SISTEMA.CONFIGURACOES.CRIAR')
+        podeEditar = PermissaoService.VerificarPermissao(current_user, 'SISTEMA.CONFIGURACOES.EDITAR')
+        podeCriar = PermissaoService.VerificarPermissao(current_user, 'SISTEMA.CONFIGURACOES.CRIAR')
 
         return render_template('Pages/Configs/Permissoes.html', 
-                               Usuarios=Usuarios, 
-                               Grupos=Grupos, 
-                               PermissoesPorCategoria=PermissoesPorCategoria,
-                               PodeEditar=PodeEditar,
-                               PodeCriar=PodeCriar)
+                               Usuarios=listaUsuarios, 
+                               Grupos=listaGrupos, 
+                               PermissoesPorCategoria=permissoesPorCategoria,
+                               PodeEditar=podeEditar,
+                               PodeCriar=podeCriar)
     finally:
-        Sessao.close()
+        sessaoDb.close()
 
 @Seguranca_BP.route('/Permissoes/Criar', methods=['POST'])
 @login_required
 @RequerPermissao('SISTEMA.SEGURANCA.CRIAR')
-def CriarNovaPermissao():
-    modulo = request.form.get('modulo', '').upper().strip().replace(' ', '_')
-    acao = request.form.get('acao', '').upper().strip()
-    excecao = request.form.get('excecao', '').upper().strip().replace(' ', '_')
-    descricao = request.form.get('descricao', '').strip()
+def criarNovaPermissao():
+    moduloReq = request.form.get('modulo', '').upper().strip().replace(' ', '_')
+    acaoReq = request.form.get('acao', '').upper().strip()
+    excecaoReq = request.form.get('excecao', '').upper().strip().replace(' ', '_')
+    descricaoReq = request.form.get('descricao', '').strip()
 
-    if not modulo or not acao or not descricao:
+    if not moduloReq or not acaoReq or not descricaoReq:
         flash("Preencha todos os campos obrigatórios.", "danger")
-        return redirect(url_for('Seguranca.Index'))
+        return redirect(url_for('Seguranca.index'))
 
-    # Monta a chave da permissão no padrão: SISTEMA.MODULO.ACAO ou SISTEMA.MODULO.EXCECAO.ACAO
-    chave = f"{modulo}.{excecao}.{acao}" if excecao else f"{modulo}.{acao}"
+    chavePermissao = f"{moduloReq}.{excecaoReq}.{acaoReq}" if excecaoReq else f"{moduloReq}.{acaoReq}"
 
-    Sessao = ObterSessaoSqlServer()
+    sessaoDb = ObterSessaoSqlServer()
     try:
-        # Verifica se já existe
-        existe = Sessao.query(Tb_PLN_Permissao).filter_by(Id_Sistema=SISTEMA_ID, Chave_Permissao=chave).first()
-        if existe:
-            flash(f"A permissão com a chave '{chave}' já existe!", "warning")
-            return redirect(url_for('Seguranca.Index'))
+        permissaoExistente = sessaoDb.query(Tb_PLN_Permissao).filter_by(Id_Sistema=sistemaId, Chave_Permissao=chavePermissao).first()
+        if permissaoExistente:
+            flash(f"A permissão com a chave '{chavePermissao}' já existe!", "warning")
+            return redirect(url_for('Seguranca.index'))
 
-        NovaPermissao = Tb_PLN_Permissao(
-            Id_Sistema=SISTEMA_ID,
-            Chave_Permissao=chave,
-            Descricao_Permissao=descricao,
-            Categoria_Permissao=modulo
+        novaPermissaoObj = Tb_PLN_Permissao(
+            Id_Sistema=sistemaId,
+            Chave_Permissao=chavePermissao,
+            Descricao_Permissao=descricaoReq,
+            Categoria_Permissao=moduloReq
         )
-        Sessao.add(NovaPermissao)
-        Sessao.commit()
+        sessaoDb.add(novaPermissaoObj)
+        sessaoDb.commit()
         flash("Permissão criada com sucesso!", "success")
         
     except Exception as e:
-        Sessao.rollback()
+        sessaoDb.rollback()
         flash(f"Erro ao criar permissão: {str(e)}", "danger")
     finally:
-        Sessao.close()
+        sessaoDb.close()
 
-    return redirect(url_for('Seguranca.Index'))
+    return redirect(url_for('Seguranca.index'))
 
 @Seguranca_BP.route('/Api/AcessosGrupo', methods=['GET'])
 @login_required
 @require_ajax
 @RequerPermissao('SISTEMA.SEGURANCA.VISUALIZAR')
-def BuscarAcessosGrupo():
-    id_grupo = request.args.get('idGrupo')
-    if not id_grupo: return jsonify({"erro": "ID do grupo não informado"}), 400
+def buscarAcessosGrupo():
+    idGrupoReq = request.args.get('idGrupo')
+    if not idGrupoReq: return jsonify({"erro": "ID do grupo não informado"}), 400
 
-    Sessao = ObterSessaoSqlServer()
+    sessaoDb = ObterSessaoSqlServer()
     try:
-        vinculos = Sessao.query(Tb_PLN_PermissaoGrupo).filter_by(Codigo_UsuarioGrupo=id_grupo).all()
-        ids_ativos = [v.Id_Permissao for v in vinculos]
-        return jsonify({"ids_ativos": ids_ativos})
+        vinculosGrupo = sessaoDb.query(Tb_PLN_PermissaoGrupo).filter_by(Codigo_UsuarioGrupo=idGrupoReq).all()
+        idsAtivos = [vinculo.Id_Permissao for vinculo in vinculosGrupo]
+        return jsonify({"ids_ativos": idsAtivos})
     finally:
-        Sessao.close()
+        sessaoDb.close()
 
 @Seguranca_BP.route('/Api/AcessosUsuario', methods=['GET'])
 @login_required
 @require_ajax
 @RequerPermissao('SISTEMA.SEGURANCA.VISUALIZAR')
-def BuscarAcessosUsuario():
-    id_usuario = request.args.get('idUsuario')
-    if not id_usuario: return jsonify({"erro": "ID do usuário não informado"}), 400
+def buscarAcessosUsuario():
+    idUsuarioReq = request.args.get('idUsuario')
+    if not idUsuarioReq: return jsonify({"erro": "ID do usuário não informado"}), 400
 
-    Sessao = ObterSessaoSqlServer()
+    sessaoDb = ObterSessaoSqlServer()
     try:
-        usuario = Sessao.query(Usuario).filter_by(Codigo_Usuario=id_usuario).first()
-        if not usuario: return jsonify({"erro": "Usuário não encontrado"}), 404
+        usuarioObj = sessaoDb.query(Usuario).filter_by(Codigo_Usuario=idUsuarioReq).first()
+        if not usuarioObj: return jsonify({"erro": "Usuário não encontrado"}), 404
 
-        id_grupo = usuario.codigo_usuariogrupo
+        idGrupoUser = usuarioObj.codigo_usuariogrupo
         
-        # Permissões herdadas do grupo
-        heranca = []
-        if id_grupo:
-            vinculos_grupo = Sessao.query(Tb_PLN_PermissaoGrupo).filter_by(Codigo_UsuarioGrupo=id_grupo).all()
-            heranca = [v.Id_Permissao for v in vinculos_grupo]
+        permissoesHeranca = []
+        if idGrupoUser:
+            vinculosDoGrupo = sessaoDb.query(Tb_PLN_PermissaoGrupo).filter_by(Codigo_UsuarioGrupo=idGrupoUser).all()
+            permissoesHeranca = [v.Id_Permissao for v in vinculosDoGrupo]
 
-        # Permissões/Exceções específicas do usuário
-        vinculos_usuario = Sessao.query(Tb_PLN_PermissaoUsuario).filter_by(Codigo_Usuario=id_usuario).all()
+        vinculosDoUsuario = sessaoDb.query(Tb_PLN_PermissaoUsuario).filter_by(Codigo_Usuario=idUsuarioReq).all()
         
-        permitidos = [v.Id_Permissao for v in vinculos_usuario if v.Conceder]
-        bloqueados = [v.Id_Permissao for v in vinculos_usuario if not v.Conceder]
+        permissoesAtivas = [v.Id_Permissao for v in vinculosDoUsuario if v.Conceder]
+        permissoesBloqueadas = [v.Id_Permissao for v in vinculosDoUsuario if not v.Conceder]
 
         return jsonify({
-            "heranca_grupo": heranca,
-            "usuario_permitidos": permitidos,
-            "usuario_bloqueados": bloqueados
+            "heranca_grupo": permissoesHeranca,
+            "usuario_permitidos": permissoesAtivas,
+            "usuario_bloqueados": permissoesBloqueadas
         })
     finally:
-        Sessao.close()
+        sessaoDb.close()
 
 @Seguranca_BP.route('/Api/SalvarVinculo', methods=['POST'])
 @login_required
 @require_ajax
 @RequerPermissao('SISTEMA.SEGURANCA.EDITAR')
-def SalvarVinculo():
-    dados = request.get_json()
-    tipo = dados.get('Tipo') # 'Grupo' ou 'Usuario'
-    id_alvo = dados.get('IdAlvo')
-    id_permissao = dados.get('IdPermissao')
-    acao = dados.get('Acao') # 'Adicionar', 'Remover', 'Permitir', 'Bloquear', 'Resetar'
+def salvarVinculo():
+    dadosRequisicao = request.get_json()
+    tipoAlvo = dadosRequisicao.get('Tipo') 
+    idAlvoReq = dadosRequisicao.get('IdAlvo')
+    idPermissaoReq = dadosRequisicao.get('IdPermissao')
+    acaoRequerida = dadosRequisicao.get('Acao') 
 
-    Sessao = ObterSessaoSqlServer()
+    sessaoDb = ObterSessaoSqlServer()
     try:
-        if tipo == 'Grupo':
-            vinculo = Sessao.query(Tb_PLN_PermissaoGrupo).filter_by(Codigo_UsuarioGrupo=id_alvo, Id_Permissao=id_permissao).first()
+        if tipoAlvo == 'Grupo':
+            vinculoExistente = sessaoDb.query(Tb_PLN_PermissaoGrupo).filter_by(Codigo_UsuarioGrupo=idAlvoReq, Id_Permissao=idPermissaoReq).first()
             
-            if acao == 'Adicionar' and not vinculo:
-                Sessao.add(Tb_PLN_PermissaoGrupo(Codigo_UsuarioGrupo=id_alvo, Id_Permissao=id_permissao))
-            elif acao == 'Remover' and vinculo:
-                Sessao.delete(vinculo)
+            if acaoRequerida == 'Adicionar' and not vinculoExistente:
+                sessaoDb.add(Tb_PLN_PermissaoGrupo(Codigo_UsuarioGrupo=idAlvoReq, Id_Permissao=idPermissaoReq))
+            elif acaoRequerida == 'Remover' and vinculoExistente:
+                sessaoDb.delete(vinculoExistente)
                 
-        elif tipo == 'Usuario':
-            vinculo = Sessao.query(Tb_PLN_PermissaoUsuario).filter_by(Codigo_Usuario=id_alvo, Id_Permissao=id_permissao).first()
+        elif tipoAlvo == 'Usuario':
+            vinculoExistente = sessaoDb.query(Tb_PLN_PermissaoUsuario).filter_by(Codigo_Usuario=idAlvoReq, Id_Permissao=idPermissaoReq).first()
 
-            if acao == 'Resetar':
-                if vinculo: Sessao.delete(vinculo)
+            if acaoRequerida == 'Resetar':
+                if vinculoExistente: sessaoDb.delete(vinculoExistente)
             else:
-                conceder = (acao == 'Permitir')
-                if vinculo:
-                    vinculo.Conceder = conceder
+                concederAcesso = (acaoRequerida == 'Permitir')
+                if vinculoExistente:
+                    vinculoExistente.Conceder = concederAcesso
                 else:
-                    Sessao.add(Tb_PLN_PermissaoUsuario(Codigo_Usuario=id_alvo, Id_Permissao=id_permissao, Conceder=conceder))
+                    sessaoDb.add(Tb_PLN_PermissaoUsuario(Codigo_Usuario=idAlvoReq, Id_Permissao=idPermissaoReq, Conceder=concederAcesso))
 
-        Sessao.commit()
+        sessaoDb.commit()
         return jsonify({"sucesso": True})
     except Exception as e:
-        Sessao.rollback()
+        sessaoDb.rollback()
         return jsonify({"sucesso": False, "erro": str(e)})
     finally:
-        Sessao.close()
+        sessaoDb.close()

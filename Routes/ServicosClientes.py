@@ -5,26 +5,23 @@ from luftcore.extensions.flask_extension import require_ajax
 from Services.PermissaoService import RequerPermissao
 from Services.ServicoClienteService import ServicoClienteService
 
-# Blueprint para os Serviços dos Clientes
-ServicosClientesBp = Blueprint('ServicosClientes', __name__, url_prefix='/Planejamento/Servicos')
+ServicosClientesBp = Blueprint('ServicosClientes', __name__)
 
 @ServicosClientesBp.route('/', methods=['GET'])
 @login_required
 @RequerPermissao('PLANEJAMENTO.SERVICOS_CLIENTES.VISUALIZAR')
-def Gerenciar():
-    """Renderiza a tela de cadastro enviando a lista de clientes para a Árvore de Seleção"""
-    ListaClientes = ServicoClienteService.ObterClientesParaSelecao()
-    return render_template('Cadastros/ServicoCliente/Manager.html', Clientes=ListaClientes)
+def gerenciar():
+    listaClientesView = ServicoClienteService.ObterClientesParaSelecao()
+    return render_template('Cadastros/ServicoCliente/Manager.html', Clientes=listaClientesView)
 
 @ServicosClientesBp.route('/DadosCliente/<int:CodigoCliente>', methods=['GET'])
 @login_required
 @require_ajax
 @RequerPermissao('PLANEJAMENTO.SERVICOS_CLIENTES.VISUALIZAR')
-def ObterDadosCliente(CodigoCliente):
-    """Endpoint para obter os dados de um cliente específico via Fetch API no Frontend"""
-    DadosCliente = ServicoClienteService.ObterDadosCliente(CodigoCliente)
-    if DadosCliente:
-        return jsonify(DadosCliente)
+def obterDadosCliente(CodigoCliente):
+    dadosClienteObj = ServicoClienteService.ObterDadosCliente(CodigoCliente)
+    if dadosClienteObj:
+        return jsonify(dadosClienteObj)
     else:
         return jsonify({"Erro": "Cliente não encontrado"}), 404
 
@@ -32,110 +29,96 @@ def ObterDadosCliente(CodigoCliente):
 @login_required
 @require_ajax
 @RequerPermissao('PLANEJAMENTO.SERVICOS_CLIENTES.VISUALIZAR')
-def ListaServicosContratados():
-    """ Traz a lista de serviços contratados para exibir na mesma tela de Manager """
-    listaServicos = ServicoClienteService.ListarServicosContratados()
+def listaServicosContratados():
+    listaServicosObj = ServicoClienteService.ListarServicosContratados()
     
-    resultado = []
-    # Agora desempacotamos a tupla (servico, cliente, grupo) que vem do banco
-    for servico, cliente, grupo in listaServicos:
+    resultadoJson = []
+    for servicoItem, clienteItem, grupoItem in listaServicosObj:
         
-        # Mesmo tratamento para quem não tem grupo
-        nome_grupo = grupo.Descricao_ClienteGrupo if grupo else 'Z_Sem Grupo'
+        nomeGrupo = grupoItem.Descricao_ClienteGrupo if grupoItem else 'Z_Sem Grupo'
         
-        resultado.append({
-            "Id": servico.Id,
-            "CodigoCliente": servico.CodigoCliente,
-            "Cnpj": cliente.CNPJ_Cliente if cliente else "",
-            "RazaoSocial": cliente.Nome_RazaoSocialCliente if cliente else "",
-            "Fantasia": cliente.Nome_FantasiaCliente if cliente else "",
-            "Grupo": nome_grupo, # <--- Enviando o grupo para o JS
-            "DurabilidadeGelo": servico.DurabilidadeGelo,
-            "AutorizacaoTrocaGelo": servico.AutorizacaoTrocaGelo,
-            "AutorizacaoArmazenagem": servico.AutorizacaoArmazenagem,
-            "ServicoContratado": servico.ServicoContratado
+        resultadoJson.append({
+            "Id": servicoItem.Id,
+            "CodigoCliente": servicoItem.CodigoCliente,
+            "Cnpj": clienteItem.CNPJ_Cliente if clienteItem else "",
+            "RazaoSocial": clienteItem.Nome_RazaoSocialCliente if clienteItem else "",
+            "Fantasia": clienteItem.Nome_FantasiaCliente if clienteItem else "",
+            "Grupo": nomeGrupo, 
+            "DurabilidadeGelo": servicoItem.DurabilidadeGelo,
+            "AutorizacaoTrocaGelo": servicoItem.AutorizacaoTrocaGelo,
+            "AutorizacaoArmazenagem": servicoItem.AutorizacaoArmazenagem,
+            "ServicoContratado": servicoItem.ServicoContratado
         })
 
-    return jsonify(resultado)
+    return jsonify(resultadoJson)
 
 @ServicosClientesBp.route('/Salvar', methods=['POST'])
 @login_required
 @RequerPermissao('PLANEJAMENTO.SERVICOS_CLIENTES.EDITAR')
-def SalvarServico():
-    """Recebe o Form Submit da tela para Cadastrar serviços em LOTE"""
-    UsuarioLogado = current_user.Login if current_user and hasattr(current_user, 'Login') else "UsuarioDesconhecido"
+def salvarServico():
+    usuarioLogadoReq = current_user.Login if current_user and hasattr(current_user, 'Login') else "UsuarioDesconhecido"
     
-    # Pega os dados básicos do formulário (sem a lista de arrays)
-    DadosFormulario = request.form.to_dict()
+    dadosFormularioDict = request.form.to_dict()
+    clientesSelecionadosList = request.form.getlist('clientes_selecionados[]')
     
-    # Extrai o array de clientes seleccionados gerado pelo Treeview
-    clientes_selecionados = request.form.getlist('clientes_selecionados[]')
-    
-    if not clientes_selecionados:
+    if not clientesSelecionadosList:
         flash("Nenhum cliente selecionado. Por favor, marque pelo menos um cliente na árvore.", "warning")
-        return redirect(url_for('ServicosClientes.Gerenciar'))
+        return redirect(url_for('ServicosClientes.gerenciar'))
 
-    sucessos = 0
-    erro_msg = ""
+    contadorSucessos = 0
+    erroMensagemStr = ""
 
-    # Processa cada cliente selecionado no lote
-    for codigo_cliente in clientes_selecionados:
-        # Injeta o código do cliente no dicionário para reaproveitar a sua função existente no Service
-        DadosFormulario['CodigoCliente'] = codigo_cliente
+    for codigoClienteForm in clientesSelecionadosList:
+        dadosFormularioDict['CodigoCliente'] = codigoClienteForm
         
-        Resultado = ServicoClienteService.CadastrarNovoServico(DadosFormulario, UsuarioLogado)
+        resultadoOperacao = ServicoClienteService.CadastrarNovoServico(dadosFormularioDict, usuarioLogadoReq)
         
-        if Resultado["Sucesso"]:
-            sucessos += 1
+        if resultadoOperacao["Sucesso"]:
+            contadorSucessos += 1
         else:
-            erro_msg = Resultado["Mensagem"] # Guarda o erro caso algum falhe
+            erroMensagemStr = resultadoOperacao["Mensagem"] 
 
-    # Verifica o resultado da operação em lote
-    if sucessos == len(clientes_selecionados):
-        flash(f"Parâmetros aplicados com sucesso para {sucessos} cliente(s)!", "success")
-    elif sucessos > 0:
-        flash(f"Salvo parcialmente: {sucessos} aplicados com sucesso, mas houve erro(s): {erro_msg}", "warning")
+    if contadorSucessos == len(clientesSelecionadosList):
+        flash(f"Parâmetros aplicados com sucesso para {contadorSucessos} cliente(s)!", "success")
+    elif contadorSucessos > 0:
+        flash(f"Salvo parcialmente: {contadorSucessos} aplicados com sucesso, mas houve erro(s): {erroMensagemStr}", "warning")
     else:
-        flash(f"Erro ao salvar o lote: {erro_msg}", "danger")
+        flash(f"Erro ao salvar o lote: {erroMensagemStr}", "danger")
         
-    return redirect(url_for('ServicosClientes.Gerenciar'))
+    return redirect(url_for('ServicosClientes.gerenciar'))
 
 @ServicosClientesBp.route('/Editar/<int:IdServico>', methods=['POST'])
 @login_required
 @RequerPermissao('PLANEJAMENTO.SERVICOS_CLIENTES.EDITAR')
-def EditarServico(IdServico):
-    """Recebe os dados do formulário para atualizar um serviço EXISTENTE"""
-    UsuarioLogado = current_user.Login if current_user and hasattr(current_user, 'Login') else "UsuarioDesconhecido"
+def editarServico(IdServico):
+    usuarioLogadoReq = current_user.Login if current_user and hasattr(current_user, 'Login') else "UsuarioDesconhecido"
     
-    DadosFormulario = request.form.to_dict()
-    clientes_selecionados = request.form.getlist('clientes_selecionados[]')
+    dadosFormularioDict = request.form.to_dict()
+    clientesSelecionadosList = request.form.getlist('clientes_selecionados[]')
     
-    # Como removemos o <select name="CodigoCliente">, precisamos garantir que o código
-    # do cliente seja injectado no dicionário (apanhando o único que ficou marcado na árvore)
-    if clientes_selecionados:
-        DadosFormulario['CodigoCliente'] = clientes_selecionados[0]
+    if clientesSelecionadosList:
+        dadosFormularioDict['CodigoCliente'] = clientesSelecionadosList[0]
         
-    Resultado = ServicoClienteService.EditarServico(IdServico, DadosFormulario, UsuarioLogado)
+    resultadoOperacao = ServicoClienteService.EditarServico(IdServico, dadosFormularioDict, usuarioLogadoReq)
 
-    if Resultado["Sucesso"]:
-        flash(Resultado["Mensagem"], "success")
+    if resultadoOperacao["Sucesso"]:
+        flash(resultadoOperacao["Mensagem"], "success")
     else:
-        flash(f"Erro ao editar: {Resultado['Mensagem']}", "danger")
+        flash(f"Erro ao editar: {resultadoOperacao['Mensagem']}", "danger")
         
-    return redirect(url_for('ServicosClientes.Gerenciar'))
+    return redirect(url_for('ServicosClientes.gerenciar'))
 
 @ServicosClientesBp.route('/Excluir/<int:IdServico>', methods=['POST'])
 @login_required
 @RequerPermissao('PLANEJAMENTO.SERVICOS_CLIENTES.DELETAR')
-def ExcluirServico(IdServico):
-    """Exclui um serviço específico pelo ID"""
-    UsuarioLogado = current_user.Login if current_user and hasattr(current_user, 'Login') else "UsuarioDesconhecido"
+def excluirServico(IdServico):
+    usuarioLogadoReq = current_user.Login if current_user and hasattr(current_user, 'Login') else "UsuarioDesconhecido"
     
-    Resultado = ServicoClienteService.ExcluirServico(IdServico, UsuarioLogado)
+    resultadoOperacao = ServicoClienteService.ExcluirServico(IdServico, usuarioLogadoReq)
 
-    if Resultado["Sucesso"]:
-        flash(Resultado["Mensagem"], "success")
+    if resultadoOperacao["Sucesso"]:
+        flash(resultadoOperacao["Mensagem"], "success")
     else:
-        flash(f"Erro ao excluir: {Resultado['Mensagem']}", "danger")
+        flash(f"Erro ao excluir: {resultadoOperacao['Mensagem']}", "danger")
         
-    return redirect(url_for('ServicosClientes.Gerenciar'))
+    return redirect(url_for('ServicosClientes.gerenciar'))

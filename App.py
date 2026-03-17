@@ -127,7 +127,7 @@ app.register_blueprint(AuthBp, url_prefix=f'{Prefix}/auth')
 
 # Os demais módulos assumem o prefixo base, pois suas rotas internas já possuem nomes (ex: /malha/...)
 app.register_blueprint(ConfiguracoesBp, url_prefix=f'{Prefix}/Configuracoes')
-app.register_blueprint(Seguranca_BP)
+app.register_blueprint(Seguranca_BP, url_prefix=f'{Prefix}/Seguranca')
 app.register_blueprint(CortesBp, url_prefix=f'{Prefix}/Cortes')
 app.register_blueprint(PlanejamentoBp, url_prefix=f'{Prefix}/Planejamento')
 app.register_blueprint(EscalasBp, url_prefix=f'{Prefix}/Escalas')

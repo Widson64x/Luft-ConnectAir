@@ -10,11 +10,10 @@ ReversaBp = Blueprint('Reversa', __name__)
 @ReversaBp.route('/Gerenciamento')
 @login_required
 @RequerPermissao('REVERSA.LOGISTICA.VISUALIZAR')
-def Index():
-    """Renderiza a tela de listagem"""
+def index():
     try:
-        ListaDevolucoes = ReversaService.ListarDevolucoesPendentes()
-        return render_template('Pages/Reversa/Index.html', Lista=ListaDevolucoes)
+        listaDevolucoes = ReversaService.ListarDevolucoesPendentes()
+        return render_template('Pages/Reversa/Index.html', Lista=listaDevolucoes)
     except Exception as e:
         LogService.Error("Rotas.Reversa", "Erro ao renderizar index", e)
         return "Erro ao carregar dados", 500
@@ -23,23 +22,22 @@ def Index():
 @login_required
 @require_ajax
 @RequerPermissao('REVERSA.LOGISTICA.EDITAR')
-def AtualizarStatus():
-    """API chamada pelo checkbox para liberar/bloquear"""
-    dados = request.get_json()
+def atualizarStatus():
+    dadosRequisicao = request.get_json()
     
-    filial = dados.get('filial')
-    serie = dados.get('serie')
-    ctc = dados.get('ctc')
-    liberado = dados.get('liberado') # Boolean
+    filialReq = dadosRequisicao.get('filial')
+    serieReq = dadosRequisicao.get('serie')
+    ctcReq = dadosRequisicao.get('ctc')
+    statusLiberado = dadosRequisicao.get('liberado')
 
-    if not all([filial, serie, ctc]):
+    if not all([filialReq, serieReq, ctcReq]):
         return jsonify({'sucesso': False, 'msg': 'Dados inválidos'}), 400
 
-    sucesso, msg = ReversaService.AtualizarStatusReversa(
-        filial, serie, ctc, liberado, current_user.Login # Ou current_user.Login
+    sucessoAtualizacao, msgRetorno = ReversaService.AtualizarStatusReversa(
+        filialReq, serieReq, ctcReq, statusLiberado, current_user.Login 
     )
 
-    if sucesso:
+    if sucessoAtualizacao:
         return jsonify({'sucesso': True})
     else:
-        return jsonify({'sucesso': False, 'msg': msg}), 500
+        return jsonify({'sucesso': False, 'msg': msgRetorno}), 500

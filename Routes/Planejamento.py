@@ -32,7 +32,7 @@ COORDENADAS_UFS = {
 @PlanejamentoBp.route('/Dashboard')
 @login_required
 @RequerPermissao('PLANEJAMENTO.ROTAS.VISUALIZAR')
-def Dashboard():
+def dashboard():
     LogService.Info("Routes.Planejamento", f"Usuário {current_user.id} acessou Dashboard Planejamento.")
     return render_template('Pages/Planejamento/Index.html')
 
@@ -40,95 +40,89 @@ def Dashboard():
 @login_required
 @require_ajax
 @RequerPermissao('PLANEJAMENTO.ROTAS.VISUALIZAR')
-def ApiCtcsHoje():
+def apiCtcsHoje():
     LogService.Debug("Routes.Planejamento", "API Listar CTCs requisitada.")
-    Dados = PlanejamentoService.BuscarCtcsPlanejamento()
-    return jsonify(Dados)
+    dadosCtc = PlanejamentoService.BuscarCtcsPlanejamento()
+    return jsonify(dadosCtc)
 
 @PlanejamentoBp.route('/Montar/<string:filial>/<string:serie>/<string:ctc>')
 @login_required
 @RequerPermissao('PLANEJAMENTO.ROTAS.EDITAR')
-def MontarPlanejamento(filial, serie, ctc):
+def montarPlanejamento(filial, serie, ctc):
     LogService.Info("Routes.Planejamento", f"Iniciando Montagem Planejamento: {filial}-{serie}-{ctc}")
     
-    # 1. Busca Dados do CTC
-    DadosCtc = PlanejamentoService.ObterCtcDetalhado(filial, serie, ctc)
-    if not DadosCtc: 
+    dadosCtc = PlanejamentoService.ObterCtcDetalhado(filial, serie, ctc)
+    if not dadosCtc: 
         flash(f"Erro: O CTC {filial}-{serie}-{ctc} não foi encontrado ou já foi processado.", "danger")
-        return redirect(url_for('Planejamento.Dashboard'))
+        return redirect(url_for('Planejamento.dashboard'))
 
-    # 2. Geografia
-    CoordOrigem = BuscarCoordenadasCidade(DadosCtc['origem_cidade'], DadosCtc['origem_uf'])
-    CoordDestino = BuscarCoordenadasCidade(DadosCtc['destino_cidade'], DadosCtc['destino_uf'])
+    coordOrigem = BuscarCoordenadasCidade(dadosCtc['origem_cidade'], dadosCtc['origem_uf'])
+    coordDestino = BuscarCoordenadasCidade(dadosCtc['destino_cidade'], dadosCtc['destino_uf'])
     
-    # 3. Consolidação e Unificação
-    CtcsCandidatos = PlanejamentoService.BuscarCtcsConsolidaveis(
-        DadosCtc['origem_cidade'], DadosCtc['origem_uf'],
-        DadosCtc['destino_cidade'], DadosCtc['destino_uf'],
-        DadosCtc['data_emissao_real'], filial, ctc, DadosCtc['tipo_carga'],
-        servico_alvo=DadosCtc.get('servico_contratado') 
+    ctcsCandidatos = PlanejamentoService.BuscarCtcsConsolidaveis(
+        dadosCtc['origem_cidade'], dadosCtc['origem_uf'],
+        dadosCtc['destino_cidade'], dadosCtc['destino_uf'],
+        dadosCtc['data_emissao_real'], filial, ctc, dadosCtc['tipo_carga'],
+        servico_alvo=dadosCtc.get('servico_contratado') 
     )
-    DadosUnificados = PlanejamentoService.UnificarConsolidacao(DadosCtc, CtcsCandidatos)
+    dadosUnificados = PlanejamentoService.UnificarConsolidacao(dadosCtc, ctcsCandidatos)
 
-    if DadosUnificados.get('is_consolidado'):
-        flash(f"Lote virtual criado: {DadosUnificados.get('qtd_docs')} CTCs foram consolidados para esta rota.", "success")
+    if dadosUnificados.get('is_consolidado'):
+        flash(f"Lote virtual criado: {dadosUnificados.get('qtd_docs')} CTCs foram consolidados para esta rota.", "success")
 
-    # Verifica se já existe planejamento salvo
-    PlanejamentoSalvo = PlanejamentoService.ObterPlanejamentoPorCtc(filial, serie, ctc)
+    planejamentoSalvo = PlanejamentoService.ObterPlanejamentoPorCtc(filial, serie, ctc)
     
-    # 4. Aeroportos (Aumentamos o limite para 5 para forçar a achar Hubs maiores como POA, FLN, CWB)
-    ListaOrigem = BuscarTopAeroportos(CoordOrigem['lat'], CoordOrigem['lon'], limite=5)
-    ListaDestino = BuscarTopAeroportos(CoordDestino['lat'], CoordDestino['lon'], limite=5)
-    IatasOrigem = [a['iata'] for a in ListaOrigem]
-    IatasDestino = [a['iata'] for a in ListaDestino]
+    listaOrigem = BuscarTopAeroportos(coordOrigem['lat'], coordOrigem['lon'], limite=5)
+    listaDestino = BuscarTopAeroportos(coordDestino['lat'], coordDestino['lon'], limite=5)
+    iatasOrigem = [a['iata'] for a in listaOrigem]
+    iatasDestino = [a['iata'] for a in listaDestino]
     
-    AeroOrigemPrincipal = ListaOrigem[0] if ListaOrigem else None
-    AeroDestinoPrincipal = ListaDestino[0] if ListaDestino else None
+    aeroOrigemPrincipal = listaOrigem[0] if listaOrigem else None
+    aeroDestinoPrincipal = listaDestino[0] if listaDestino else None
 
-    # 5. Busca de Rotas 
-    OpcoesRotas = {}
-    if IatasOrigem and IatasDestino:
-        DataInicioBusca = DadosUnificados['data_busca'] 
-        PesoTotal = float(DadosUnificados.get('peso_taxado', 0.0))
-        if PesoTotal <= 0: PesoTotal = float(DadosUnificados.get('peso_fisico', 10.0))
+    opcoesRotas = {}
+    if iatasOrigem and iatasDestino:
+        dataInicioBusca = dadosUnificados['data_busca'] 
+        pesoTotal = float(dadosUnificados.get('peso_taxado', 0.0))
+        if pesoTotal <= 0: pesoTotal = float(dadosUnificados.get('peso_fisico', 10.0))
         
-        DataLimite = DataInicioBusca + timedelta(days=7)
+        dataLimite = dataInicioBusca + timedelta(days=7)
         
-        OpcoesRotas = MalhaService.BuscarOpcoesDeRotas(
-            DataInicioBusca, 
-            DataLimite, 
-            IatasOrigem, 
-            IatasDestino, 
-            PesoTotal,
-            tipo_carga=DadosUnificados.get('tipo_carga'),
-            servico_contratado=DadosUnificados.get('servico_contratado')
+        opcoesRotas = MalhaService.BuscarOpcoesDeRotas(
+            dataInicioBusca, 
+            dataLimite, 
+            iatasOrigem, 
+            iatasDestino, 
+            pesoTotal,
+            tipo_carga=dadosUnificados.get('tipo_carga'),
+            servico_contratado=dadosUnificados.get('servico_contratado')
         )
         
-        if not OpcoesRotas:
+        if not opcoesRotas:
             flash("Atenção: Nenhuma rota aérea ativa foi encontrada para os parâmetros informados.", "warning")
     else:
         flash("Atenção: Não foram encontrados aeroportos viáveis próximos à origem ou destino.", "warning")
 
     return render_template('Pages/Planejamento/Editor.html', 
-                           Ctc=DadosUnificados, 
-                           Origem=CoordOrigem, Destino=CoordDestino,
-                           AeroOrigem=AeroOrigemPrincipal,
-                           AeroDestino=AeroDestinoPrincipal,
-                           OpcoesRotas=OpcoesRotas,
-                           PlanejamentoSalvo=PlanejamentoSalvo) 
+                           Ctc=dadosUnificados, 
+                           Origem=coordOrigem, Destino=coordDestino,
+                           AeroOrigem=aeroOrigemPrincipal,
+                           AeroDestino=aeroDestinoPrincipal,
+                           OpcoesRotas=opcoesRotas,
+                           PlanejamentoSalvo=planejamentoSalvo) 
 
 @PlanejamentoBp.route('/API/Cancelar', methods=['POST'])
 @login_required
 @require_ajax
 @RequerPermissao('PLANEJAMENTO.ROTAS.EDITAR')
-def CancelarPlanejamentoRota():
-    dados = request.json
-    id_plan = dados.get('id_planejamento')
+def cancelarPlanejamentoRota():
+    dadosRequisicao = request.json
+    idPlan = dadosRequisicao.get('id_planejamento')
     
-    if not id_plan: 
+    if not idPlan: 
         return jsonify({'sucesso': False, 'msg': 'ID de planejamento inválido para cancelamento.'})
     
-    sucesso, msg = PlanejamentoService.CancelarPlanejamento(id_plan, current_user.id)
+    sucesso, msg = PlanejamentoService.CancelarPlanejamento(idPlan, current_user.id)
     
     if sucesso:
         msg = "Planejamento cancelado com sucesso. Os CTCs retornaram para a fila de pendências."
@@ -139,63 +133,61 @@ def CancelarPlanejamentoRota():
 @login_required
 @require_ajax
 @RequerPermissao('PLANEJAMENTO.ROTAS.EDITAR')
-def SalvarPlanejamento():
+def salvarPlanejamento():
     try:
-        dados_front = request.json
-        if not dados_front: 
+        dadosFront = request.json
+        if not dadosFront: 
             return jsonify({'sucesso': False, 'msg': 'Nenhum dado recebido do formulário.'}), 400
 
-        filial = dados_front.get('filial')
-        serie = dados_front.get('serie')
-        ctc = dados_front.get('ctc')
+        filial = dadosFront.get('filial')
+        serie = dadosFront.get('serie')
+        ctc = dadosFront.get('ctc')
         
         LogService.Info("Routes.Planejamento", f"Recebendo requisição de salvamento para {filial}-{serie}-{ctc}")
 
-        rota_completa = dados_front.get('rota_completa', []) 
+        rotaCompleta = dadosFront.get('rota_completa', []) 
 
-        DadosCtc = PlanejamentoService.ObterCtcDetalhado(filial, serie, ctc)
-        CtcsCandidatos = PlanejamentoService.BuscarCtcsConsolidaveis(
-            DadosCtc['origem_cidade'], DadosCtc['origem_uf'],
-            DadosCtc['destino_cidade'], DadosCtc['destino_uf'],
-            DadosCtc['data_emissao_real'], filial, ctc,
-            DadosCtc['tipo_carga'],
-            servico_alvo=DadosCtc.get('servico_contratado') 
+        dadosCtc = PlanejamentoService.ObterCtcDetalhado(filial, serie, ctc)
+        ctcsCandidatos = PlanejamentoService.BuscarCtcsConsolidaveis(
+            dadosCtc['origem_cidade'], dadosCtc['origem_uf'],
+            dadosCtc['destino_cidade'], dadosCtc['destino_uf'],
+            dadosCtc['data_emissao_real'], filial, ctc,
+            dadosCtc['tipo_carga'],
+            servico_alvo=dadosCtc.get('servico_contratado') 
         )
-        DadosUnificados = PlanejamentoService.UnificarConsolidacao(DadosCtc, CtcsCandidatos)
+        dadosUnificados = PlanejamentoService.UnificarConsolidacao(dadosCtc, ctcsCandidatos)
         
-        # Geografia
-        CoordOrigem = BuscarCoordenadasCidade(DadosCtc['origem_cidade'], DadosCtc['origem_uf'])
-        CoordDestino = BuscarCoordenadasCidade(DadosCtc['destino_cidade'], DadosCtc['destino_uf'])
+        coordOrigem = BuscarCoordenadasCidade(dadosCtc['origem_cidade'], dadosCtc['origem_uf'])
+        coordDestino = BuscarCoordenadasCidade(dadosCtc['destino_cidade'], dadosCtc['destino_uf'])
         
-        AeroOrigem = None
-        AeroDestino = None
+        aeroOrigem = None
+        aeroDestino = None
 
-        if CoordOrigem:
-            AeroOrigem = BuscarAeroportoEstrategico(
-                CoordOrigem['lat'], CoordOrigem['lon'], CoordOrigem['uf']
+        if coordOrigem:
+            aeroOrigem = BuscarAeroportoEstrategico(
+                coordOrigem['lat'], coordOrigem['lon'], coordOrigem['uf']
             )
             
-        if CoordDestino:
-            AeroDestino = BuscarAeroportoEstrategico(
-                CoordDestino['lat'], CoordDestino['lon'], CoordDestino['uf']
+        if coordDestino:
+            aeroDestino = BuscarAeroportoEstrategico(
+                coordDestino['lat'], coordDestino['lon'], coordDestino['uf']
             )
         
-        # Grava
-        Id = PlanejamentoService.RegistrarPlanejamento(
-            DadosUnificados, 
-            CtcsCandidatos, 
+        idPlanejamento = PlanejamentoService.RegistrarPlanejamento(
+            dadosUnificados, 
+            ctcsCandidatos, 
             current_user.id if current_user.is_authenticated else "Anonimo",
             status_inicial='Em Planejamento',
-            aero_origem=AeroOrigem['iata'] if AeroOrigem else None,
-            aero_destino=AeroDestino['iata'] if AeroDestino else None,
-            lista_trechos=rota_completa
+            aero_origem=aeroOrigem['iata'] if aeroOrigem else None,
+            aero_destino=aeroDestino['iata'] if aeroDestino else None,
+            lista_trechos=rotaCompleta
         )
         
-        if Id: 
-            LogService.Info("Routes.Planejamento", f"Planejamento salvo com sucesso. ID Retornado: {Id}")
+        if idPlanejamento: 
+            LogService.Info("Routes.Planejamento", f"Planejamento salvo com sucesso. ID Retornado: {idPlanejamento}")
             return jsonify({
                 'sucesso': True, 
-                'id_planejamento': Id, 
+                'id_planejamento': idPlanejamento, 
                 'msg': 'Planejamento registrado com sucesso! O lote foi encaminhado para a próxima etapa.'
             })
         
@@ -204,53 +196,52 @@ def SalvarPlanejamento():
 
     except Exception as e:
         LogService.Error("Routes.Planejamento", "Exceção ao salvar planejamento", e)
-        msg_erro = str(e)
+        msgErro = str(e)
         
-        # Tratamento específico para retornar amigável ao SweetAlert/Toastr se for a Trava
-        if "TRAVA DE CORTE" in msg_erro:
-            return jsonify({'sucesso': False, 'msg': msg_erro}), 400
+        if "TRAVA DE CORTE" in msgErro:
+            return jsonify({'sucesso': False, 'msg': msgErro}), 400
             
-        return jsonify({'sucesso': False, 'msg': f"Erro ao registrar planejamento: {msg_erro}"}), 500
+        return jsonify({'sucesso': False, 'msg': f"Erro ao registrar planejamento: {msgErro}"}), 500
 
 @PlanejamentoBp.route('/API/Exportar')
 @login_required
 @RequerPermissao('PLANEJAMENTO.ROTAS.EXPORTAR')
-def ExportarPlanejamentosExcel():
+def exportarPlanejamentosExcel():
     LogService.Info("Routes.Planejamento", f"Usuário {current_user.id} solicitou exportação de planejamento.")
     
-    ArquivoGerado = PlanejamentoService.GerarExcelPlanejamentos()
+    arquivoGerado = PlanejamentoService.GerarExcelPlanejamentos()
     
-    if not ArquivoGerado:
+    if not arquivoGerado:
         flash("Erro de Conexão: Não foi possível gerar o arquivo de planejamento no momento. Tente novamente.", "danger")
-        return redirect(url_for('Planejamento.Dashboard'))
+        return redirect(url_for('Planejamento.dashboard'))
 
-    NomeArquivo = f'Planejamento_Aereo_{datetime.now().strftime("%Y%m%d_%H%M")}.xlsx'
+    nomeArquivo = f'Planejamento_Aereo_{datetime.now().strftime("%Y%m%d_%H%M")}.xlsx'
     
     return send_file(
-        ArquivoGerado,
+        arquivoGerado,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         as_attachment=True,
-        download_name=NomeArquivo
+        download_name=nomeArquivo
     )
 
 @PlanejamentoBp.route('/Mapa-Global')
 @login_required
 @RequerPermissao('PLANEJAMENTO.MAPA.VISUALIZAR')
-def MapaGlobal():
+def mapaGlobal():
     try:
         LogService.Debug("Routes.Planejamento", "Gerando Mapa Global...")
-        ListaCtcs = PlanejamentoService.BuscarCtcsPlanejamento()
-        Agrupamento = {}
+        listaCtcs = PlanejamentoService.BuscarCtcsPlanejamento()
+        agrupamentoCtcs = {}
 
-        for c in ListaCtcs:
+        for ctcItem in listaCtcs:
             try:
-                _, UfOrig = c['origem'].split('/')
-                UfOrig = UfOrig.strip().upper()
+                _, ufOrig = ctcItem['origem'].split('/')
+                ufOrig = ufOrig.strip().upper()
                 
-                if UfOrig not in Agrupamento:
-                    Agrupamento[UfOrig] = {
-                        'uf': UfOrig,
-                        'coords': COORDENADAS_UFS.get(UfOrig, {'lat': -15, 'lon': -47}),
+                if ufOrig not in agrupamentoCtcs:
+                    agrupamentoCtcs[ufOrig] = {
+                        'uf': ufOrig,
+                        'coords': COORDENADAS_UFS.get(ufOrig, {'lat': -15, 'lon': -47}),
                         'qtd_docs': 0,
                         'qtd_vols': 0,
                         'valor_total': 0.0,
@@ -258,26 +249,25 @@ def MapaGlobal():
                         'lista_ctcs': []
                     }
                 
-                # Atualiza Totais
-                Agrupamento[UfOrig]['qtd_docs'] += 1
-                Agrupamento[UfOrig]['qtd_vols'] += int(c['volumes'])
-                Agrupamento[UfOrig]['valor_total'] += c['raw_val_mercadoria']
+                agrupamentoCtcs[ufOrig]['qtd_docs'] += 1
+                agrupamentoCtcs[ufOrig]['qtd_vols'] += int(ctcItem['volumes'])
+                agrupamentoCtcs[ufOrig]['valor_total'] += ctcItem['raw_val_mercadoria']
                 
-                if 'URGENTE' in str(c['prioridade']).upper():
-                    Agrupamento[UfOrig]['tem_urgencia'] = True
-                    c['eh_urgente'] = True 
+                if 'URGENTE' in str(ctcItem['prioridade']).upper():
+                    agrupamentoCtcs[ufOrig]['tem_urgencia'] = True
+                    ctcItem['eh_urgente'] = True 
                 else:
-                    c['eh_urgente'] = False
+                    ctcItem['eh_urgente'] = False
 
-                Agrupamento[UfOrig]['lista_ctcs'].append(c)
+                agrupamentoCtcs[ufOrig]['lista_ctcs'].append(ctcItem)
 
             except Exception as e:
                 LogService.Warning("Routes.Planejamento", f"Erro ao agrupar item no mapa: {e}")
                 continue
         
-        DadosMapa = list(Agrupamento.values())
-        return render_template('Pages/Planejamento/Map.html', Dados=DadosMapa)
+        dadosMapa = list(agrupamentoCtcs.values())
+        return render_template('Pages/Planejamento/Map.html', Dados=dadosMapa)
     except Exception as e:
         LogService.Error("Routes.Planejamento", "Erro fatal ao renderizar Mapa Global", e)
         flash("Erro de Conexão: Não foi possível carregar os dados do mapa. Tente novamente em instantes.", "danger")
-        return redirect(url_for('Planejamento.Dashboard'))
+        return redirect(url_for('Planejamento.dashboard'))

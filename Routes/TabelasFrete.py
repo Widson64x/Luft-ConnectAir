@@ -6,32 +6,32 @@ from Services.LogService import LogService
 
 FreteBp = Blueprint('Frete', __name__)
 
-@FreteBp.route('/Fretes/Gerenciar', methods=['GET', 'POST'])
+@FreteBp.route('/Gerenciar', methods=['GET', 'POST'])
 @login_required
 @RequerPermissao('CADASTROS.TABELAS_FRETE.VISUALIZAR')
-def Gerenciar():
+def gerenciar():
     if request.method == 'POST':
         if 'arquivo_xlsx' in request.files:
-            Arquivo = request.files['arquivo_xlsx']
-            if Arquivo.filename == '':
+            arquivoRecebido = request.files['arquivo_xlsx']
+            if arquivoRecebido.filename == '':
                 flash('Selecione um arquivo válido.', 'warning')
             else:
                 LogService.Info("Routes.Frete", f"Upload iniciado por {current_user.Login}")
-                Sucesso, Msg = TabelaFreteService.ProcessarArquivo(Arquivo, current_user.Login)
+                sucessoProcesso, msgProcesso = TabelaFreteService.ProcessarArquivo(arquivoRecebido, current_user.Login)
                 
-                if Sucesso: flash(Msg, 'success')
-                else: flash(Msg, 'danger')
+                if sucessoProcesso: flash(msgProcesso, 'success')
+                else: flash(msgProcesso, 'danger')
                 
-                return redirect(url_for('Frete.Gerenciar'))
+                return redirect(url_for('Frete.gerenciar'))
 
-    Historico = TabelaFreteService.ListarRemessas()
-    return render_template('Cadastros/TabelasFrete/Manager.html', ListaRemessas=Historico)
+    listaHistorico = TabelaFreteService.ListarRemessas()
+    return render_template('Cadastros/TabelasFrete/Manager.html', ListaRemessas=listaHistorico)
 
-@FreteBp.route('/Fretes/Excluir/<int:id_remessa>')
+@FreteBp.route('/Excluir/<int:id_remessa>')
 @login_required
 @RequerPermissao('CADASTROS.TABELAS_FRETE.DELETAR')
-def Excluir(id_remessa):
-    Sucesso, Msg = TabelaFreteService.ExcluirRemessa(id_remessa)
-    if Sucesso: flash(Msg, 'info')
-    else: flash(Msg, 'danger')
-    return redirect(url_for('Frete.Gerenciar'))
+def excluir(id_remessa):
+    sucessoExclusao, msgExclusao = TabelaFreteService.ExcluirRemessa(id_remessa)
+    if sucessoExclusao: flash(msgExclusao, 'info')
+    else: flash(msgExclusao, 'danger')
+    return redirect(url_for('Frete.gerenciar'))

@@ -9,29 +9,29 @@ CortesBp = Blueprint('Cortes', __name__)
 @CortesBp.route('/Gerenciar')
 @login_required
 @RequerPermissao('CADASTROS.CORTES.VISUALIZAR')
-def Gerenciar():
-    arvore_filiais = CorteService.ListarFiliaisAgrupadas()
-    return render_template('Cadastros/Cortes/Manager.html', ArvoreFiliais=arvore_filiais)
+def gerenciar():
+    arvoreFiliais = CorteService.ListarFiliaisAgrupadas()
+    return render_template('Cadastros/Cortes/Manager.html', ArvoreFiliais=arvoreFiliais)
 
 @CortesBp.route('/API/Listar/Planejamento')
 @login_required
 @require_ajax
 @RequerPermissao('CADASTROS.CORTES.VISUALIZAR')
-def ApiListarPlanejamento():
+def apiListarPlanejamento():
     return jsonify(CorteService.ListarCortesPlanejamentoAgrupado())
 
 @CortesBp.route('/API/Listar/Emissao')
 @login_required
 @require_ajax
 @RequerPermissao('CADASTROS.CORTES.VISUALIZAR')
-def ApiListarEmissao():
+def apiListarEmissao():
     return jsonify(CorteService.ListarCortesEmissaoAgrupado())
 
 @CortesBp.route('/API/Salvar/Planejamento', methods=['POST'])
 @login_required
 @require_ajax
 @RequerPermissao('CADASTROS.CORTES.EDITAR')
-def ApiSalvarPlanejamento():
+def apiSalvarPlanejamento():
     sucesso, msg = CorteService.SalvarCortePlanejamento(request.json, current_user.Login)
     if sucesso: return jsonify({'status': 'ok', 'msg': msg})
     return jsonify({'status': 'erro', 'msg': msg}), 500
@@ -40,7 +40,7 @@ def ApiSalvarPlanejamento():
 @login_required
 @require_ajax
 @RequerPermissao('CADASTROS.CORTES.EDITAR')
-def ApiSalvarEmissao():
+def apiSalvarEmissao():
     sucesso, msg = CorteService.SalvarCorteEmissao(request.json, current_user.Login)
     if sucesso: return jsonify({'status': 'ok', 'msg': msg})
     return jsonify({'status': 'erro', 'msg': msg}), 500
@@ -49,11 +49,11 @@ def ApiSalvarEmissao():
 @login_required
 @require_ajax
 @RequerPermissao('CADASTROS.CORTES.DELETAR')
-def ApiExcluirEmMassa(tipo):
-    dados = request.json
-    ids = dados.get('ids', [])
-    if not ids: return jsonify({'status': 'erro', 'msg': 'Nenhum ID selecionado'}), 400
+def apiExcluirEmMassa(tipo):
+    dadosRequisicao = request.json
+    listaIds = dadosRequisicao.get('ids', [])
+    if not listaIds: return jsonify({'status': 'erro', 'msg': 'Nenhum ID selecionado'}), 400
     
-    sucesso, msg = CorteService.ExcluirCortesEmMassa(tipo, ids, current_user.Login)
+    sucesso, msg = CorteService.ExcluirCortesEmMassa(tipo, listaIds, current_user.Login)
     if sucesso: return jsonify({'status': 'ok'})
     return jsonify({'status': 'erro', 'msg': msg}), 500

@@ -8,27 +8,26 @@ ConfiguracoesBp = Blueprint('Configuracoes', __name__)
 @ConfiguracoesBp.route('/')
 @login_required
 @RequerPermissao('SISTEMA.CONFIGURACOES.VISUALIZAR')
-def Index():
+def index():
     return render_template('Pages/Configs/Index.html')
 
 @ConfiguracoesBp.route('/CiasAereas')
 @RequerPermissao('SISTEMA.CONFIGURACOES.VISUALIZAR')
-def GerenciarCias():
-    Lista = CiaAereaService.ObterTodasCias()
-    return render_template('Pages/Configs/CiasAereas.html', Cias=Lista)
+def gerenciarCias():
+    listaCias = CiaAereaService.ObterTodasCias()
+    return render_template('Pages/Configs/CiasAereas.html', Cias=listaCias)
 
 @ConfiguracoesBp.route('/API/CiasAereas/Salvar', methods=['POST'])
 @RequerPermissao('SISTEMA.CONFIGURACOES.EDITAR')
-def SalvarScoreCia():
+def salvarScoreCia():
     try:
-        data = request.json
-        cia = data.get('cia')
-        score = data.get('score')
+        dadosRequisicao = request.json
+        nomeCia = dadosRequisicao.get('cia')
+        valorScore = dadosRequisicao.get('score')
         
-        if not cia: return jsonify({'sucesso': False, 'msg': 'Nome obrigatório'}), 400
+        if not nomeCia: return jsonify({'sucesso': False, 'msg': 'Nome obrigatório'}), 400
 
-        # O Service já cria se não existir
-        if CiaAereaService.AtualizarScore(cia, int(score)):
+        if CiaAereaService.AtualizarScore(nomeCia, int(valorScore)):
             return jsonify({'sucesso': True})
         
         return jsonify({'sucesso': False, 'msg': 'Erro no Service'}), 500

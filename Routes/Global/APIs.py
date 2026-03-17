@@ -15,35 +15,31 @@ GlobalBp = Blueprint('Global', __name__)
 @login_required
 @require_ajax
 @RequerPermissao('ACOMPANHAMENTO.PAINEL.VISUALIZAR')
-def ApiCtcDetalhes(filial, serie, ctc):
-    """
-    API Global para buscar detalhes de um CTC.
-    Usada nos modais de detalhes em todo o sistema.
-    """
-    Dados = CtcService.ObterCtcCompleto(filial, serie, ctc)
+def apiCtcDetalhes(filial, serie, ctc):
+    dadosCtc = CtcService.ObterCtcCompleto(filial, serie, ctc)
     
-    if not Dados:
+    if not dadosCtc:
         LogService.Warning("Routes.Global", f"API Detalhes: CTC não encontrado {filial}-{serie}-{ctc}")
         return jsonify({'erro': 'CTC não encontrado'}), 404
         
-    return jsonify(Dados)
+    return jsonify(dadosCtc)
 
 @GlobalBp.route('/Api/DetalhesAwbModal', methods=['GET'])
-@login_required # Adicionado para garantir a segurança da API
+@login_required
 @require_ajax
 @RequerPermissao('ACOMPANHAMENTO.PAINEL.VISUALIZAR')
-def ApiDetalhesAwbModal():
-    cod_awb = request.args.get('codAwb')
-    LogService.Debug("Global", f"API /DetalhesAwbModal chamada. ID: {cod_awb}")
+def apiDetalhesAwbModal():
+    codAwb = request.args.get('codAwb')
+    LogService.Debug("Global", f"API /DetalhesAwbModal chamada. ID: {codAwb}")
     
-    if not cod_awb:
+    if not codAwb:
         LogService.Warning("Global", "API /DetalhesAwbModal chamada sem codAwb.")
         return jsonify({'sucesso': False, 'msg': 'Código AWB não informado.'})
         
-    dados = AwbService.BuscarDetalhesAwbCompleto(cod_awb)
+    dadosAwb = AwbService.BuscarDetalhesAwbCompleto(codAwb)
     
-    if dados:
-        return jsonify({'sucesso': True, 'dados': dados})
+    if dadosAwb:
+        return jsonify({'sucesso': True, 'dados': dadosAwb})
     else:
         return jsonify({'sucesso': False, 'msg': 'AWB não encontrada.'})
     
@@ -51,8 +47,7 @@ def ApiDetalhesAwbModal():
 @login_required
 @require_ajax
 @RequerPermissao('PLANEJAMENTO.ROTAS.VISUALIZAR')
-def ApiVoosHoje():
-    Hoje = datetime.now()
-    # Chama a função do Service que aceita a data
-    Quantidade = ObterTotalVoosData(Hoje)
-    return jsonify(Quantidade)  
+def apiVoosHoje():
+    hojeData = datetime.now()
+    quantidadeVoos = ObterTotalVoosData(hojeData)
+    return jsonify(quantidadeVoos)
