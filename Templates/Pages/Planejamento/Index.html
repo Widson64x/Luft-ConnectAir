@@ -257,8 +257,12 @@
 </div>
 
 <script>
-    const URL_API_LISTAR = "{{ url_for('Planejamento.ApiCtcsHoje') }}";
-    const URL_BASE_MONTAR = "{{ url_for('Planejamento.MontarPlanejamento', filial='__F__', serie='__S__', ctc='__C__') }}";
+    // Dicionário de rotas injetado pelo Jinja2 para ser consumido pelo JS
+    const rotasPlanejamento = {
+        listarCtcs: "{{ url_for('Planejamento.ApiCtcsHoje') }}",
+        // Usamos placeholders (__F__, __S__, __C__) para substituir no JS dinamicamente
+        montarRota: "{{ url_for('Planejamento.MontarPlanejamento', filial='__F__', serie='__S__', ctc='__C__') }}"
+    };
 </script>
-<script src="{{ url_for('static', filename='JS/Planejamento/Index.js') }}" defer></script>
+<script src="{{ url_for('static', filename='JS/Planejamento/Index.js') }}"></script>
 {% endblock %}

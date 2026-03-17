@@ -1,5 +1,8 @@
 from flask import Blueprint, jsonify, render_template, request, flash, redirect, url_for
 from flask_login import login_required, current_user
+from luftcore.extensions.flask_extension import require_ajax
+
+from Services.PermissaoService import RequerPermissao
 from Services.ServicoClienteService import ServicoClienteService
 
 # Blueprint para os Serviços dos Clientes
@@ -7,13 +10,16 @@ ServicosClientesBp = Blueprint('ServicosClientes', __name__, url_prefix='/Planej
 
 @ServicosClientesBp.route('/', methods=['GET'])
 @login_required
+@RequerPermissao('PLANEJAMENTO.SERVICOS_CLIENTES.VISUALIZAR')
 def Gerenciar():
     """Renderiza a tela de cadastro enviando a lista de clientes para a Árvore de Seleção"""
     ListaClientes = ServicoClienteService.ObterClientesParaSelecao()
-    return render_template('Pages/ServicoCliente/Manager.html', Clientes=ListaClientes)
+    return render_template('Cadastros/ServicoCliente/Manager.html', Clientes=ListaClientes)
 
 @ServicosClientesBp.route('/DadosCliente/<int:CodigoCliente>', methods=['GET'])
 @login_required
+@require_ajax
+@RequerPermissao('PLANEJAMENTO.SERVICOS_CLIENTES.VISUALIZAR')
 def ObterDadosCliente(CodigoCliente):
     """Endpoint para obter os dados de um cliente específico via Fetch API no Frontend"""
     DadosCliente = ServicoClienteService.ObterDadosCliente(CodigoCliente)
@@ -24,6 +30,8 @@ def ObterDadosCliente(CodigoCliente):
 
 @ServicosClientesBp.route('/Listagem', methods=['GET'])
 @login_required
+@require_ajax
+@RequerPermissao('PLANEJAMENTO.SERVICOS_CLIENTES.VISUALIZAR')
 def ListaServicosContratados():
     """ Traz a lista de serviços contratados para exibir na mesma tela de Manager """
     listaServicos = ServicoClienteService.ListarServicosContratados()
@@ -52,6 +60,7 @@ def ListaServicosContratados():
 
 @ServicosClientesBp.route('/Salvar', methods=['POST'])
 @login_required
+@RequerPermissao('PLANEJAMENTO.SERVICOS_CLIENTES.EDITAR')
 def SalvarServico():
     """Recebe o Form Submit da tela para Cadastrar serviços em LOTE"""
     UsuarioLogado = current_user.Login if current_user and hasattr(current_user, 'Login') else "UsuarioDesconhecido"
@@ -93,6 +102,7 @@ def SalvarServico():
 
 @ServicosClientesBp.route('/Editar/<int:IdServico>', methods=['POST'])
 @login_required
+@RequerPermissao('PLANEJAMENTO.SERVICOS_CLIENTES.EDITAR')
 def EditarServico(IdServico):
     """Recebe os dados do formulário para atualizar um serviço EXISTENTE"""
     UsuarioLogado = current_user.Login if current_user and hasattr(current_user, 'Login') else "UsuarioDesconhecido"
@@ -116,6 +126,7 @@ def EditarServico(IdServico):
 
 @ServicosClientesBp.route('/Excluir/<int:IdServico>', methods=['POST'])
 @login_required
+@RequerPermissao('PLANEJAMENTO.SERVICOS_CLIENTES.DELETAR')
 def ExcluirServico(IdServico):
     """Exclui um serviço específico pelo ID"""
     UsuarioLogado = current_user.Login if current_user and hasattr(current_user, 'Login') else "UsuarioDesconhecido"

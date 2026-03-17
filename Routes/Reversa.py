@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify
 from flask_login import login_required, current_user
+from luftcore.extensions.flask_extension import require_ajax
 from Services.PermissaoService import RequerPermissao
 from Services.ReversaService import ReversaService
 from Services.LogService import LogService
@@ -8,7 +9,7 @@ ReversaBp = Blueprint('Reversa', __name__)
  
 @ReversaBp.route('/Gerenciamento')
 @login_required
-@RequerPermissao('reversa.visualizar')
+@RequerPermissao('REVERSA.LOGISTICA.VISUALIZAR')
 def Index():
     """Renderiza a tela de listagem"""
     try:
@@ -20,7 +21,8 @@ def Index():
 
 @ReversaBp.route('/AtualizarStatus', methods=['POST'])
 @login_required
-@RequerPermissao('reversa.editar')
+@require_ajax
+@RequerPermissao('REVERSA.LOGISTICA.EDITAR')
 def AtualizarStatus():
     """API chamada pelo checkbox para liberar/bloquear"""
     dados = request.get_json()

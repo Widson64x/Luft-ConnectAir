@@ -92,10 +92,9 @@
     .luft-dashboard-module:hover {
         transform: translateY(-8px);
         box-shadow: var(--luft-shadow-lg);
-        border-color: rgba(59, 130, 246, 0.3); /* Utilizando azul primário padrão */
+        border-color: rgba(59, 130, 246, 0.3); 
     }
 
-    /* Fundo Gradiente Sutil no Hover */
     .luft-dashboard-module::before {
         content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
         background: radial-gradient(circle at top right, rgba(59, 130, 246, 0.08), transparent 70%);
@@ -103,7 +102,6 @@
     }
     .luft-dashboard-module:hover::before { opacity: 1; }
 
-    /* Ícone Flutuante */
     .luft-dashboard-module-icon {
         width: 64px; height: 64px;
         background: var(--luft-bg-app);
@@ -115,7 +113,6 @@
         margin-bottom: 20px; z-index: 2;
     }
     
-    /* Hover no Card afeta o Ícone */
     .luft-dashboard-module:hover .luft-dashboard-module-icon {
         background: var(--luft-primary-600);
         color: white;
@@ -139,7 +136,6 @@
     .luft-dashboard-module:hover .luft-dashboard-module-action { 
         opacity: 1; transform: translateX(0); background: rgba(59, 130, 246, 0.1); 
     }
-
 </style>
 
 <div class="luft-dashboard-wrapper">
@@ -279,52 +275,10 @@
 </div>
 
 <script>
-    // --- RELÓGIO HORÁRIO DE BRASÍLIA ---
-    function updateClock() {
-        const now = new Date();
-        const options = { timeZone: 'America/Sao_Paulo', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' };
-        const timeString = now.toLocaleTimeString('pt-BR', options);
-        document.getElementById('local-clock').innerText = timeString;
-    }
-    setInterval(updateClock, 1000); 
-    updateClock();
- 
-    // --- CARREGAR ESTATÍSTICAS REAIS ---
-    const API_STATS = "{{ url_for('Global.ApiVoosHoje') }}";
-
-    async function carregarStats() {
-        try {
-            const response = await fetch(API_STATS);
-            if (!response.ok) throw new Error('Erro na API');
-            
-            const total = await response.json();
-            
-            const elVoos = document.getElementById('voos-ativos');
-            const elApi = document.getElementById('status-api');
-            
-            if(elVoos) elVoos.innerText = total;
-            
-            if(elApi) {
-                elApi.innerText = "Online";
-                elApi.classList.remove("text-danger");
-                elApi.classList.add("text-success");
-            }
-
-        } catch (e) {
-            console.warn("Falha ao carregar stats:", e);
-            const elApi = document.getElementById('status-api');
-            if(elApi) {
-                elApi.innerText = "Off-line";
-                elApi.classList.remove("text-success");
-                elApi.classList.add("text-danger");
-            }
-        }
-    }
-
-    // Chama imediatamente e repete a cada 60s
-    carregarStats();
-    setInterval(carregarStats, 60000);
-
+    const rotasDashboard = {
+        apiVoosHoje: "{{ url_for('Global.ApiVoosHoje') }}"
+    };
 </script>
+<script src="{{ url_for('static', filename='JS/HomeDashboard.js') }}"></script>
 
 {% endblock %}

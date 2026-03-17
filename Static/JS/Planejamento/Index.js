@@ -1,361 +1,360 @@
 /**
  * Index.js - Controlador do Painel de Planejamento 
- * Atualizado para o padrão LuftCore
+ * Reestruturado com Classes e padronização camelCase
  */
 
-let DADOS_ORIGINAIS = [];
-let DADOS_VISIVEIS = [];
-let ORDEM_ATUAL = { col: 'data_raw', dir: 'desc' };
-let ABA_ATUAL = 'TODOS';
-let isAnimating = false;
+class GerenciadorPlanejamento {
+    constructor() {
+        this.dadosOriginais = [];
+        this.dadosVisiveis = [];
+        this.ordemAtual = { coluna: 'dataRaw', direcao: 'desc' };
+        this.abaAtual = 'TODOS';
+        this.estaAnimando = false;
 
-// Formatadores
-const fmtMoeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-const fmtNumero = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        this.formatadorMoeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+        this.formatadorNumero = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
 
-// ============================================================================
-// 1. INICIALIZAÇÃO
-// ============================================================================
-document.addEventListener('DOMContentLoaded', () => {
-    AtualizarDataExtenso();
-    BuscarDados();
-});
+    inicializar() {
+        this.atualizarDataExtenso();
+        this.buscarDados();
+        this.configurarOuvintes();
+    }
 
-function AtualizarDataExtenso() {
-    const opcoes = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    const dataHoje = new Date().toLocaleDateString('pt-BR', opcoes);
-    // Ajusta primeira letra para maiúscula
-    const dataFormatada = dataHoje.charAt(0).toUpperCase() + dataHoje.slice(1);
-    
-    const elem = document.getElementById('data-extenso');
-    if(elem) elem.innerText = dataFormatada;
-}
+    configurarOuvintes() {
+        const campoBusca = document.getElementById('input-busca');
+        const filtroPrioridade = document.getElementById('filtro-prioridade');
+        const filtroFilial = document.getElementById('filtro-filial');
+        const filtroMotivo = document.getElementById('filtro-motivo');
 
-// ============================================================================
-// 2. API E DADOS
-// ============================================================================
-async function BuscarDados() {
-    try {
-        const tabela = document.getElementById('table-body');
-        if(tabela) tabela.innerHTML = '<tr><td colspan="13" style="text-align:center; padding:60px; color:var(--luft-text-muted);"><i class="ph-bold ph-spinner ph-spin text-primary" style="font-size: 2rem; margin-bottom: 10px;"></i><br>Buscando dados no servidor...</td></tr>';
+        if (campoBusca) campoBusca.addEventListener('input', () => this.filtrarTabela());
+        if (filtroPrioridade) filtroPrioridade.addEventListener('change', () => this.filtrarTabela());
+        if (filtroFilial) filtroFilial.addEventListener('change', () => this.filtrarTabela());
+        if (filtroMotivo) filtroMotivo.addEventListener('change', () => this.filtrarTabela());
+    }
 
-        const resp = await fetch(URL_API_LISTAR);
-        if (!resp.ok) throw new Error("Erro na requisição");
+    atualizarDataExtenso() {
+        const opcoesData = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        const dataHoje = new Date().toLocaleDateString('pt-BR', opcoesData);
+        const dataFormatada = dataHoje.charAt(0).toUpperCase() + dataHoje.slice(1);
         
-        const dadosNovos = await resp.json();
+        const elementoData = document.getElementById('data-extenso');
+        if (elementoData) elementoData.innerText = dataFormatada;
+    }
 
-        // Pré-processamento para busca rápida e ordenação
-        dadosNovos.forEach(d => {
-            // Cria campo data numérico para ordenação (YYYYMMDDHHMM)
-            const partes = d.data_emissao.split('/'); // assumindo dd/mm/yyyy
-            const horaLimpa = d.hora_emissao ? d.hora_emissao.replace(':', '') : '0000';
-            d.data_raw = Number(`${partes[2]}${partes[1]}${partes[0]}${horaLimpa}`);
-
-            // Texto completo para o filtro de busca
-            d.busca_texto = `${d.ctc} ${d.remetente} ${d.destinatario} ${d.origem} ${d.destino} ${d.filial} ${d.tipo_carga} ${d.motivodoc} ${d.prioridade}`.toLowerCase();
-            
-            // Tratamento de valores numéricos
-            d.peso_fisico = Number(d.peso_fisico || 0);
-            d.peso_taxado = Number(d.peso_taxado || 0); // Mantém para ordenação principal
-            d.raw_val_mercadoria = Number(d.raw_val_mercadoria || 0);
-            d.volumes = Number(d.volumes || 0);
-            d.qtd_notas = Number(d.qtd_notas || 0);
-        });
-
-        if (DADOS_ORIGINAIS.length === 0) {
-            PopularSelects(dadosNovos);
+    async buscarDados() {
+        const corpoTabela = document.getElementById('table-body');
+        if (corpoTabela) {
+            corpoTabela.innerHTML = '<tr><td colspan="13" style="text-align:center; padding:60px; color:var(--luft-text-muted);"><i class="ph-bold ph-spinner ph-spin text-primary" style="font-size: 2rem; margin-bottom: 10px;"></i><br>Buscando dados no servidor...</td></tr>';
         }
 
-        DADOS_ORIGINAIS = dadosNovos;
-        FiltrarTabela();
+        try {
+            // Utilizando a rota injetada do HTML!
+            const resposta = await fetch(rotasPlanejamento.listarCtcs);
+            if (!resposta.ok) throw new Error("Falha na comunicação com o servidor");
+            
+            const dadosNovos = await resposta.json();
+            this.processarDados(dadosNovos);
 
-    } catch (e) {
-        console.error("Erro API:", e);
-        const tabela = document.getElementById('table-body');
-        if(tabela) tabela.innerHTML = `<tr><td colspan="13" class="text-danger font-bold" style="text-align:center; padding:40px;"><i class="ph-bold ph-warning-circle" style="font-size:2rem;"></i><br>Erro ao carregar: ${e.message}</td></tr>`;
+        } catch (erro) {
+            console.error("Erro ao buscar dados:", erro);
+            if (corpoTabela) {
+                corpoTabela.innerHTML = `<tr><td colspan="13" class="text-danger font-bold" style="text-align:center; padding:40px;"><i class="ph-bold ph-warning-circle" style="font-size:2rem;"></i><br>Erro ao carregar: ${erro.message}</td></tr>`;
+            }
+        }
     }
-}
 
-// ============================================================================
-// 3. TABELA E RENDERIZAÇÃO
-// ============================================================================
-function Renderizar() {
-    const tbody = document.getElementById('table-body');
-    const contador = document.getElementById('contador-registros');
-    
-    // Proteção contra erro de elemento nulo
-    if (!tbody || !contador) return;
+    processarDados(dados) {
+        dados.forEach(item => {
+            const partesData = item.data_emissao.split('/'); 
+            const horaLimpa = item.hora_emissao ? item.hora_emissao.replace(':', '') : '0000';
+            
+            item.dataRaw = Number(`${partesData[2]}${partesData[1]}${partesData[0]}${horaLimpa}`);
+            item.buscaTexto = `${item.ctc} ${item.remetente} ${item.destinatario} ${item.origem} ${item.destino} ${item.filial} ${item.tipo_carga} ${item.motivodoc} ${item.prioridade}`.toLowerCase();
+            
+            item.pesoFisico = Number(item.peso_fisico || 0);
+            item.pesoTaxado = Number(item.peso_taxado || 0); 
+            item.valorMercadoria = Number(item.raw_val_mercadoria || 0);
+            item.volumes = Number(item.volumes || 0);
+            item.quantidadeNotas = Number(item.qtd_notas || 0);
+        });
 
-    tbody.innerHTML = '';
+        if (this.dadosOriginais.length === 0) {
+            this.popularListasSelecao(dados);
+        }
 
-    if (DADOS_VISIVEIS.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="13" style="text-align: center; padding: 60px; color: var(--luft-text-muted);">
-                    <i class="ph-duotone ph-magnifying-glass" style="font-size: 3rem; margin-bottom: 15px; color: var(--luft-border);"></i><br>
-                    <span class="font-bold text-main">Nenhum registro encontrado</span><br>
-                    <span class="text-xs">Altere os filtros ou pesquise novamente.</span>
+        this.dadosOriginais = dados;
+        this.filtrarTabela();
+    }
+
+    renderizarTabela() {
+        const corpoTabela = document.getElementById('table-body');
+        const contadorRegistros = document.getElementById('contador-registros');
+        
+        if (!corpoTabela || !contadorRegistros) return;
+
+        corpoTabela.innerHTML = '';
+
+        if (this.dadosVisiveis.length === 0) {
+            corpoTabela.innerHTML = `
+                <tr>
+                    <td colspan="13" style="text-align: center; padding: 60px; color: var(--luft-text-muted);">
+                        <i class="ph-duotone ph-magnifying-glass" style="font-size: 3rem; margin-bottom: 15px; color: var(--luft-border);"></i><br>
+                        <span class="font-bold text-main">Nenhum registro encontrado</span><br>
+                        <span class="text-xs">Altere os filtros ou pesquise novamente.</span>
+                    </td>
+                </tr>`;
+            contadorRegistros.innerText = 'Mostrando 0 registros';
+            return;
+        }
+
+        const fragmentoDom = document.createDocumentFragment();
+
+        this.dadosVisiveis.forEach(linha => {
+            const tr = document.createElement('tr');
+            
+            const prioridade = (linha.prioridade || 'NORMAL').toUpperCase();
+            let iconePrioridade = '<i class="ph-bold ph-minus" title="NORMAL"></i>'; 
+            let classePrioridade = 'text-muted';
+
+            if (prioridade === 'S' || prioridade === 'URGENTE') {
+                classePrioridade = 'text-danger font-black'; 
+                iconePrioridade = '<i class="ph-fill ph-warning-circle text-lg"></i>';
+            } 
+            else if (prioridade === 'AGENDADA') {
+                classePrioridade = 'text-warning font-black'; 
+                iconePrioridade = '<i class="ph-fill ph-clock-countdown text-lg"></i>';
+            } 
+            
+            let crachaOrigem = '';
+            if (linha.origem_dados === 'DIARIO') crachaOrigem = '<span class="luft-badge luft-badge-info">Do Dia</span>';
+            else if (linha.origem_dados === 'BACKLOG') crachaOrigem = '<span class="luft-badge luft-badge-warning">Backlog</span>';
+            else if (linha.origem_dados === 'REVERSA') crachaOrigem = '<span class="luft-badge luft-badge-secondary">Reversa</span>';
+
+            // Utilizando a rota injetada e substituindo os placeholders
+            const linkMontagem = rotasPlanejamento.montarRota
+                .replace('__F__', linha.filial)
+                .replace('__S__', linha.serie)
+                .replace('__C__', linha.ctc);
+
+            tr.innerHTML = `
+                <td style="text-align: center; min-width: 110px;">
+                    <div class="d-flex align-items-center justify-content-center gap-2">
+                        <button class="btn btn-secondary d-flex align-items-center justify-content-center" style="padding: 6px; width: 36px; height: 36px;" onclick="abrirModalDetalhes('${linha.filial}', '${linha.serie}', '${linha.ctc}')" title="Ver Detalhes">
+                            <i class="ph-bold ph-file-text" style="font-size: 1.1rem;"></i>
+                        </button>
+                        <a href="${linkMontagem}" class="btn btn-primary d-flex align-items-center justify-content-center" style="padding: 6px; width: 36px; height: 36px;" title="Planejar Rota">
+                            <i class="ph-bold ph-airplane-tilt" style="font-size: 1.1rem;"></i>
+                        </a>
+                    </div>
                 </td>
-            </tr>`;
-        contador.innerText = 'Mostrando 0 registros';
-        return;
+                <td>
+                    ${linha.tem_planejamento 
+                        ? `<span class="luft-badge luft-badge-success"><i class="ph-fill ph-check-circle"></i> ${linha.status_planejamento}</span>`
+                        : `<span class="luft-badge luft-badge-warning"><i class="ph-fill ph-clock"></i> Pendente</span>`
+                    }
+                </td>
+                <td style="text-align: center;" class="${classePrioridade}">${iconePrioridade}</td>
+                <td>${crachaOrigem}</td>
+                <td>
+                    <span class="font-bold text-main d-block" style="font-family: monospace; font-size: 1rem;">${linha.ctc}</span>
+                    <span class="text-xs text-muted">Sér. ${linha.serie} | ${linha.filial}</span>
+                </td>
+                <td style="text-align: center;" class="font-medium text-main">${linha.unid_lastmile || '-'}</td>
+                <td>
+                    <span class="font-bold text-main d-block">${linha.data_emissao}</span>
+                    <span class="text-xs text-muted"><i class="ph-bold ph-clock"></i> ${linha.hora_emissao}</span>
+                </td>
+                <td>
+                    <div class="d-flex align-items-center gap-2 font-bold text-main mb-1">
+                        ${linha.origem.split('/')[0]}
+                        <i class="ph-bold ph-arrow-right text-muted" style="font-size: 0.8rem;"></i>
+                        ${linha.destino.split('/')[0]}
+                    </div>
+                    <span class="text-xs text-muted" style="max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block;">
+                        ${linha.origem.split('/')[1] || ''} &rarr; ${linha.destino.split('/')[1] || ''}
+                    </span>
+                </td>
+                <td>
+                    <div class="font-medium text-main mb-1" style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${linha.remetente}">
+                        ${linha.remetente}
+                    </div>
+                    <span class="luft-badge luft-badge-secondary" style="font-size: 0.65rem;">${linha.tipo_carga || 'NORMAL'}</span>
+                </td>
+                <td style="text-align: center;" class="font-black text-main">${linha.quantidadeNotas}</td>
+                <td style="text-align: right;" class="font-bold text-main">${linha.volumes}</td>
+                <td style="text-align: right; line-height: 1.3;">
+                    <div class="text-xs text-muted">${this.formatadorNumero.format(linha.pesoFisico)} Fís</div>
+                    <div class="font-black text-main">${this.formatadorNumero.format(linha.pesoTaxado)} Tax</div>
+                </td>
+                <td style="text-align: right; font-weight: 800; color: var(--luft-success);">${this.formatadorMoeda.format(linha.valorMercadoria)}</td>
+            `;
+            fragmentoDom.appendChild(tr);
+        });
+
+        corpoTabela.appendChild(fragmentoDom);
+        contadorRegistros.innerText = `Mostrando ${this.dadosVisiveis.length} registros`;
+        
+        this.atualizarIndicadoresDeDesempenho();
     }
 
-    // Fragmento para melhor performance
-    const fragment = document.createDocumentFragment();
+    mudarAbaVisivel(tipoAba) {
+        if (this.abaAtual === tipoAba || this.estaAnimando) return;
 
-    DADOS_VISIVEIS.forEach(row => {
-        const tr = document.createElement('tr');
+        this.estaAnimando = true;
+        const containerTransorte = document.getElementById('transition-container');
         
-        // --- LÓGICA DE PRIORIDADE (3 TIPOS) ---
-        const prio = (row.prioridade || 'NORMAL').toUpperCase();
-        let iconPrio = '<i class="ph-bold ph-minus" title="NORMAL"></i>'; // Default Normal
-        let classPrio = 'text-muted';
+        document.querySelectorAll('.luft-tab-btn').forEach(botao => botao.classList.remove('active'));
+        const botaoAtivo = document.getElementById(`tab-${tipoAba.toLowerCase()}`);
+        if(botaoAtivo) botaoAtivo.classList.add('active');
 
-        if (prio === 'S' || prio === 'URGENTE') {
-            classPrio = 'text-danger font-black'; 
-            iconPrio = '<i class="ph-fill ph-warning-circle text-lg"></i>';
-        } 
-        else if (prio === 'AGENDADA') {
-            classPrio = 'text-warning font-black'; 
-            iconPrio = '<i class="ph-fill ph-clock-countdown text-lg"></i>';
-        } 
-        
-        // Badge de Tipo (Origem Dados)
-        let badgeOrigem = '';
-        if(row.origem_dados === 'DIARIO') badgeOrigem = '<span class="luft-badge luft-badge-info">Do Dia</span>';
-        else if(row.origem_dados === 'BACKLOG') badgeOrigem = '<span class="luft-badge luft-badge-warning">Backlog</span>';
-        else if(row.origem_dados === 'REVERSA') badgeOrigem = '<span class="luft-badge luft-badge-secondary">Reversa</span>';
-
-        // Link de Montagem
-        const linkMontar = URL_BASE_MONTAR
-            .replace('__F__', row.filial)
-            .replace('__S__', row.serie)
-            .replace('__C__', row.ctc);
-
-        tr.innerHTML = `
-            <td style="text-align: center; min-width: 110px;">
-                <div class="d-flex align-items-center justify-content-center gap-2">
-                    <button class="btn btn-secondary d-flex align-items-center justify-content-center" style="padding: 6px; width: 36px; height: 36px;" onclick="AbrirModalGlobal('${row.filial}', '${row.serie}', '${row.ctc}')" title="Ver Detalhes">
-                        <i class="ph-bold ph-file-text" style="font-size: 1.1rem;"></i>
-                    </button>
-                    <a href="${linkMontar}" class="btn btn-primary d-flex align-items-center justify-content-center" style="padding: 6px; width: 36px; height: 36px;" title="Planejar Rota">
-                        <i class="ph-bold ph-airplane-tilt" style="font-size: 1.1rem;"></i>
-                    </a>
-                </div>
-            </td>
-            <td>
-                ${row.tem_planejamento 
-                    ? `<span class="luft-badge luft-badge-success"><i class="ph-fill ph-check-circle"></i> ${row.status_planejamento}</span>`
-                    : `<span class="luft-badge luft-badge-warning"><i class="ph-fill ph-clock"></i> Pendente</span>`
-                }
-            </td>
-            <td style="text-align: center;" class="${classPrio}">${iconPrio}</td>
-            <td>${badgeOrigem}</td>
-            <td>
-                <span class="font-bold text-main d-block" style="font-family: monospace; font-size: 1rem;">${row.ctc}</span>
-                <span class="text-xs text-muted">Sér. ${row.serie} | ${row.filial}</span>
-            </td>
-            <td style="text-align: center;" class="font-medium text-main">${row.unid_lastmile || '-'}</td>
-            <td>
-                <span class="font-bold text-main d-block">${row.data_emissao}</span>
-                <span class="text-xs text-muted"><i class="ph-bold ph-clock"></i> ${row.hora_emissao}</span>
-            </td>
-            <td>
-                <div class="d-flex align-items-center gap-2 font-bold text-main mb-1">
-                    ${row.origem.split('/')[0]}
-                    <i class="ph-bold ph-arrow-right text-muted" style="font-size: 0.8rem;"></i>
-                    ${row.destino.split('/')[0]}
-                </div>
-                <span class="text-xs text-muted" style="max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block;">
-                    ${row.origem.split('/')[1] || ''} &rarr; ${row.destino.split('/')[1] || ''}
-                </span>
-            </td>
-            <td>
-                <div class="font-medium text-main mb-1" style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${row.remetente}">
-                    ${row.remetente}
-                </div>
-                <span class="luft-badge luft-badge-secondary" style="font-size: 0.65rem;">${row.tipo_carga || 'NORMAL'}</span>
-            </td>
-            <td style="text-align: center;" class="font-black text-main">${row.qtd_notas}</td>
-            <td style="text-align: right;" class="font-bold text-main">${row.volumes}</td>
-            <td style="text-align: right; line-height: 1.3;">
-                <div class="text-xs text-muted">${fmtNumero.format(row.peso_fisico)} Fís</div>
-                <div class="font-black text-main">${fmtNumero.format(row.peso_taxado)} Tax</div>
-            </td>
-            <td style="text-align: right; font-weight: 800; color: var(--luft-success);">${fmtMoeda.format(row.raw_val_mercadoria)}</td>
-        `;
-        fragment.appendChild(tr);
-    });
-
-    tbody.appendChild(fragment);
-    contador.innerText = `Mostrando ${DADOS_VISIVEIS.length} registros`;
-    
-    AtualizarKPIs();
-}
-
-// ============================================================================
-// 4. LÓGICA DE FILTROS E ABAS
-// ============================================================================
-
-// Animação e Troca de Aba
-function MudarAba(tipo) {
-    if (ABA_ATUAL === tipo || isAnimating) return;
-
-    isAnimating = true;
-    const container = document.getElementById('transition-container');
-    
-    // Atualiza Botões com a nova classe do LuftCore (luft-tab-btn)
-    document.querySelectorAll('.luft-tab-btn').forEach(btn => btn.classList.remove('active'));
-    document.getElementById(`tab-${tipo.toLowerCase()}`).classList.add('active');
-
-    // Opacidade para transição suave
-    if(container) {
-        container.style.transition = 'opacity 0.2s';
-        container.style.opacity = '0';
-    }
-
-    setTimeout(() => {
-        ABA_ATUAL = tipo;
-        FiltrarTabela(); // Renderiza com os novos dados
-        
-        // Retorna a opacidade
-        if(container) {
-            container.style.opacity = '1';
+        if (containerTransorte) {
+            containerTransorte.style.transition = 'opacity 0.2s';
+            containerTransorte.style.opacity = '0';
         }
 
         setTimeout(() => {
-            isAnimating = false;
+            this.abaAtual = tipoAba;
+            this.filtrarTabela(); 
+            
+            if (containerTransorte) containerTransorte.style.opacity = '1';
+
+            setTimeout(() => { this.estaAnimando = false; }, 200);
         }, 200);
+    }
 
-    }, 200);
-}
-
-function FiltrarTabela() {
-    const termo = document.getElementById('input-busca')?.value.toLowerCase() || '';
-    const prio = document.getElementById('filtro-prioridade')?.value || 'TODOS';
-    const filial = document.getElementById('filtro-filial')?.value || 'TODOS';
-    const motivo = document.getElementById('filtro-motivo')?.value || 'TODOS';
-
-    DADOS_VISIVEIS = DADOS_ORIGINAIS.filter(item => {
-        // Filtro de Texto
-        const matchTexto = !termo || item.busca_texto.includes(termo);
+    filtrarTabela() {
+        const elementoBusca = document.getElementById('input-busca');
+        const termoBusca = elementoBusca ? elementoBusca.value.toLowerCase() : '';
         
-        // Filtros Select (3 Prioridades)
-        let matchPrio = true;
-        const pItem = (item.prioridade || 'NORMAL').toUpperCase();
+        const elementoPrioridade = document.getElementById('filtro-prioridade');
+        const filtroPrioridade = elementoPrioridade ? elementoPrioridade.value : 'TODOS';
+        
+        const elementoFilial = document.getElementById('filtro-filial');
+        const filtroFilial = elementoFilial ? elementoFilial.value : 'TODOS';
+        
+        const elementoMotivo = document.getElementById('filtro-motivo');
+        const filtroMotivo = elementoMotivo ? elementoMotivo.value : 'TODOS';
 
-        if (prio !== 'TODOS') {
-            if (prio === 'URGENTE') {
-                matchPrio = (pItem === 'S' || pItem === 'URGENTE');
-            } else if (prio === 'AGENDADA') {
-                matchPrio = (pItem === 'AGENDADA');
-            } else if (prio === 'NORMAL') {
-                // Normal é tudo que NÃO é Urgente nem Agendada
-                matchPrio = (pItem !== 'S' && pItem !== 'URGENTE' && pItem !== 'AGENDADA');
+        this.dadosVisiveis = this.dadosOriginais.filter(item => {
+            const combinouTexto = !termoBusca || item.buscaTexto.includes(termoBusca);
+            
+            let combinouPrioridade = true;
+            const prioridadeItem = (item.prioridade || 'NORMAL').toUpperCase();
+
+            if (filtroPrioridade !== 'TODOS') {
+                if (filtroPrioridade === 'URGENTE') {
+                    combinouPrioridade = (prioridadeItem === 'S' || prioridadeItem === 'URGENTE');
+                } else if (filtroPrioridade === 'AGENDADA') {
+                    combinouPrioridade = (prioridadeItem === 'AGENDADA');
+                } else if (filtroPrioridade === 'NORMAL') {
+                    combinouPrioridade = (prioridadeItem !== 'S' && prioridadeItem !== 'URGENTE' && prioridadeItem !== 'AGENDADA');
+                }
             }
+                              
+            const combinouFilial = (filtroFilial === 'TODOS') || (item.filial === filtroFilial);
+            const combinouMotivo = (filtroMotivo === 'TODOS') || (item.motivodoc === filtroMotivo);
+            const combinouAba = (this.abaAtual === 'TODOS') || (item.origem_dados === this.abaAtual);
+
+            return combinouTexto && combinouPrioridade && combinouFilial && combinouMotivo && combinouAba;
+        });
+
+        this.aplicarOrdenacao();
+        this.renderizarTabela();
+    }
+
+    atualizarIndicadoresDeDesempenho() {
+        const elementoTotal = document.getElementById('kpi-total');
+        const elementoPeso = document.getElementById('kpi-peso');
+        const elementoValor = document.getElementById('kpi-valor');
+        const elementoNotas = document.getElementById('kpi-notas');
+
+        if (!elementoTotal) return; 
+
+        let pesoAcumulado = 0;
+        let valorAcumulado = 0;
+        let notasAcumuladas = 0;
+
+        this.dadosVisiveis.forEach(dado => {
+            pesoAcumulado += dado.pesoTaxado;
+            valorAcumulado += dado.valorMercadoria;
+            notasAcumuladas += dado.quantidadeNotas;
+        });
+
+        elementoTotal.innerText = this.dadosVisiveis.length;
+        elementoPeso.innerText = this.formatadorNumero.format(pesoAcumulado);
+        elementoValor.innerText = valorAcumulado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        elementoNotas.innerText = notasAcumuladas;
+    }
+
+    ordenarTabela(colunaDesejada) {
+        if (this.ordemAtual.coluna === colunaDesejada) {
+            this.ordemAtual.direcao = this.ordemAtual.direcao === 'asc' ? 'desc' : 'asc';
+        } else {
+            this.ordemAtual.coluna = colunaDesejada;
+            this.ordemAtual.direcao = 'asc';
         }
-                          
-        const matchFilial = (filial === 'TODOS') || (item.filial === filial);
-        const matchMotivo = (motivo === 'TODOS') || (item.motivodoc === motivo);
         
-        // Filtro da Aba
-        const matchAba = (ABA_ATUAL === 'TODOS') || (item.origem_dados === ABA_ATUAL);
+        document.querySelectorAll('.luft-planejamento-tabela th i').forEach(icone => icone.className = 'ph-bold ph-caret-up-down text-muted');
+        
+        const cabecalhoAtual = document.querySelector(`th[onclick="ordenarTabela('${colunaDesejada}')"] i`);
+        if (cabecalhoAtual) {
+            cabecalhoAtual.className = this.ordemAtual.direcao === 'asc' ? 'ph-bold ph-caret-up text-primary' : 'ph-bold ph-caret-down text-primary';
+        }
 
-        return matchTexto && matchPrio && matchFilial && matchMotivo && matchAba;
-    });
-
-    AplicarOrdenacao();
-    Renderizar();
-}
-
-function AtualizarKPIs() {
-    const elTotal = document.getElementById('kpi-total');
-    const elPeso = document.getElementById('kpi-peso');
-    const elValor = document.getElementById('kpi-valor');
-    const elNotas = document.getElementById('kpi-notas');
-
-    if (!elTotal) return; 
-
-    let totalPeso = 0;
-    let totalValor = 0;
-    let totalNotas = 0;
-
-    DADOS_VISIVEIS.forEach(d => {
-        totalPeso += d.peso_taxado;
-        totalValor += d.raw_val_mercadoria;
-        totalNotas += d.qtd_notas;
-    });
-
-    elTotal.innerText = DADOS_VISIVEIS.length;
-    elPeso.innerText = fmtNumero.format(totalPeso);
-    elValor.innerText = totalValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    elNotas.innerText = totalNotas;
-}
-
-// ============================================================================
-// 5. HELPER FUNCTIONS
-// ============================================================================
-
-function Ordenar(coluna) {
-    if (ORDEM_ATUAL.col === coluna) {
-        ORDEM_ATUAL.dir = ORDEM_ATUAL.dir === 'asc' ? 'desc' : 'asc';
-    } else {
-        ORDEM_ATUAL.col = coluna;
-        ORDEM_ATUAL.dir = 'asc';
-    }
-    
-    // Atualiza ícones de ordenação para padrão cinza
-    document.querySelectorAll('.luft-planejamento-tabela th i').forEach(i => i.className = 'ph-bold ph-caret-up-down text-muted');
-    
-    // Pinta o ícone da coluna ativa de azul primário
-    const thAtual = document.querySelector(`th[onclick="Ordenar('${coluna}')"] i`);
-    if(thAtual) {
-        thAtual.className = ORDEM_ATUAL.dir === 'asc' ? 'ph-bold ph-caret-up text-primary' : 'ph-bold ph-caret-down text-primary';
+        this.aplicarOrdenacao();
+        this.renderizarTabela();
     }
 
-    AplicarOrdenacao();
-    Renderizar();
-}
+    aplicarOrdenacao() {
+        const colunaReferencia = this.ordemAtual.coluna;
+        const modificadorDirecao = this.ordemAtual.direcao === 'asc' ? 1 : -1;
 
-function AplicarOrdenacao() {
-    const col = ORDEM_ATUAL.col;
-    const dir = ORDEM_ATUAL.dir === 'asc' ? 1 : -1;
+        this.dadosVisiveis.sort((itemA, itemB) => {
+            let valorA = itemA[colunaReferencia];
+            let valorB = itemB[colunaReferencia];
 
-    DADOS_VISIVEIS.sort((a, b) => {
-        let valA = a[col];
-        let valB = b[col];
+            if (typeof valorA === 'string') valorA = valorA.toLowerCase();
+            if (typeof valorB === 'string') valorB = valorB.toLowerCase();
 
-        if (typeof valA === 'string') valA = valA.toLowerCase();
-        if (typeof valB === 'string') valB = valB.toLowerCase();
-
-        if (valA < valB) return -1 * dir;
-        if (valA > valB) return 1 * dir;
-        return 0;
-    });
-}
-
-function PopularSelects(dados) {
-    const filiais = new Set();
-    const motivos = new Set();
-
-    dados.forEach(d => {
-        if(d.filial) filiais.add(d.filial);
-        if(d.motivodoc) motivos.add(d.motivodoc);
-    });
-
-    const selFilial = document.getElementById('filtro-filial');
-    const selMotivo = document.getElementById('filtro-motivo');
-
-    if(selFilial) {
-        Array.from(filiais).sort().forEach(f => {
-            selFilial.innerHTML += `<option value="${f}">${f}</option>`;
+            if (valorA < valorB) return -1 * modificadorDirecao;
+            if (valorA > valorB) return 1 * modificadorDirecao;
+            return 0;
         });
     }
 
-    if(selMotivo) {
-        Array.from(motivos).sort().forEach(m => {
-            selMotivo.innerHTML += `<option value="${m}">${m}</option>`;
+    popularListasSelecao(dadosParaProcessar) {
+        const conjuntoFiliais = new Set();
+        const conjuntoMotivos = new Set();
+
+        dadosParaProcessar.forEach(item => {
+            if (item.filial) conjuntoFiliais.add(item.filial);
+            if (item.motivodoc) conjuntoMotivos.add(item.motivodoc);
         });
+
+        const selecaoFilial = document.getElementById('filtro-filial');
+        const selecaoMotivo = document.getElementById('filtro-motivo');
+
+        if (selecaoFilial) {
+            Array.from(conjuntoFiliais).sort().forEach(filial => {
+                selecaoFilial.innerHTML += `<option value="${filial}">${filial}</option>`;
+            });
+        }
+
+        if (selecaoMotivo) {
+            Array.from(conjuntoMotivos).sort().forEach(motivo => {
+                selecaoMotivo.innerHTML += `<option value="${motivo}">${motivo}</option>`;
+            });
+        }
     }
 }
+
+// Inicialização da classe e exposição de métodos para botões HTML existentes
+document.addEventListener('DOMContentLoaded', () => {
+    const gerenciador = new GerenciadorPlanejamento();
+    gerenciador.inicializar();
+
+    // Expõe os métodos no escopo global para que os on-clicks do HTML continuem funcionando
+    window.ordenarTabela = (coluna) => gerenciador.ordenarTabela(coluna);
+    window.mudarAbaVisivel = (aba) => gerenciador.mudarAbaVisivel(aba);
+});

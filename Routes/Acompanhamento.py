@@ -4,12 +4,13 @@ from flask_login import login_required, current_user
 from Services.AcompanhamentoService import AcompanhamentoService
 from Services.LogService import LogService
 from Services.PermissaoService import RequerPermissao
+from luftcore.extensions.flask_extension import require_ajax
 
 AcompanhamentoBP = Blueprint('Acompanhamento', __name__, url_prefix='/Acompanhamento')
 
 @AcompanhamentoBP.route('/Painel', methods=['GET'])
-@RequerPermissao('acompanhamento.visualizar')
 @login_required
+@RequerPermissao('ACOMPANHAMENTO.PAINEL.VISUALIZAR')
 def Painel():
     LogService.Info("AcompanhamentoRoute", "Acessando rota /Painel.")
     try:
@@ -31,6 +32,8 @@ def Painel():
 
 @AcompanhamentoBP.route('/Api/ListarAwbs', methods=['GET'])
 @login_required
+@require_ajax
+@RequerPermissao('ACOMPANHAMENTO.PAINEL.VISUALIZAR')
 def ApiListarAwbs():
     filtros = {
         'DataInicio': request.args.get('dataInicio'),
@@ -44,6 +47,8 @@ def ApiListarAwbs():
 
 @AcompanhamentoBP.route('/Api/Historico/<path:numero_awb>', methods=['GET'])
 @login_required
+@require_ajax
+@RequerPermissao('ACOMPANHAMENTO.PAINEL.VISUALIZAR')
 def ApiHistorico(numero_awb):
     LogService.Debug("AcompanhamentoRoute", f"API /Historico chamada para {numero_awb}")
     historico = AcompanhamentoService.ObterHistoricoAwb(numero_awb)
@@ -51,6 +56,7 @@ def ApiHistorico(numero_awb):
 
 @AcompanhamentoBP.route('/Api/DetalhesVooModal', methods=['GET'])
 @login_required
+@require_ajax
 def ApiDetalhesVooModal():
     numero = request.args.get('numeroVoo')
     data = request.args.get('dataRef') 

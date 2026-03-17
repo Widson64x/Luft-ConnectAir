@@ -2,6 +2,8 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 from flask_login import login_required
 from Services import MalhaService
+from Services.PermissaoService import RequerPermissao
+from luftcore.extensions.flask_extension import require_ajax
 from Services.Shared.AwbService import AwbService
 from Services.Shared.CtcService import CtcService
 from Services.LogService import LogService
@@ -11,6 +13,8 @@ GlobalBp = Blueprint('Global', __name__)
 
 @GlobalBp.route('/API/Ctc-Detalhes/<string:filial>/<string:serie>/<string:ctc>')
 @login_required
+@require_ajax
+@RequerPermissao('ACOMPANHAMENTO.PAINEL.VISUALIZAR')
 def ApiCtcDetalhes(filial, serie, ctc):
     """
     API Global para buscar detalhes de um CTC.
@@ -25,6 +29,9 @@ def ApiCtcDetalhes(filial, serie, ctc):
     return jsonify(Dados)
 
 @GlobalBp.route('/Api/DetalhesAwbModal', methods=['GET'])
+@login_required # Adicionado para garantir a segurança da API
+@require_ajax
+@RequerPermissao('ACOMPANHAMENTO.PAINEL.VISUALIZAR')
 def ApiDetalhesAwbModal():
     cod_awb = request.args.get('codAwb')
     LogService.Debug("Global", f"API /DetalhesAwbModal chamada. ID: {cod_awb}")
@@ -42,6 +49,8 @@ def ApiDetalhesAwbModal():
     
 @GlobalBp.route('/API/Voos-Hoje') 
 @login_required
+@require_ajax
+@RequerPermissao('PLANEJAMENTO.ROTAS.VISUALIZAR')
 def ApiVoosHoje():
     Hoje = datetime.now()
     # Chama a função do Service que aceita a data

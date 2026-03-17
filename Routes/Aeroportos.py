@@ -4,12 +4,15 @@ from datetime import datetime
 # Importa a CLASSE do Serviço agora, não as funções soltas
 from Services.AeroportosService import AeroportoService
 from Services.LogService import LogService
-from Services.PermissaoService import RequerPermissao # <--- Import Log
+from Services.PermissaoService import RequerPermissao 
+from luftcore.extensions.flask_extension import require_ajax
 
 AeroportoBp = Blueprint('Aeroporto', __name__)
 
 @AeroportoBp.route('/Aeroportos/API/Listar-Simples')
 @login_required
+@require_ajax
+@RequerPermissao('CADASTROS.AEROPORTOS.VISUALIZAR')
 def ApiListarSimples():
     try:
         # Chamada corrigida: AeroportoService.ListarTodosParaSelect()
@@ -21,7 +24,7 @@ def ApiListarSimples():
 
 @AeroportoBp.route('/Aeroportos/Gerenciar', methods=['GET', 'POST'])
 @login_required
-@RequerPermissao('cadastros.aeroportos.editar') 
+@RequerPermissao('CADASTROS.AEROPORTOS.EDITAR')
 def Gerenciar():
     ModalConfirmacao = False
     DadosConfirmacao = {}
@@ -84,14 +87,14 @@ def Gerenciar():
 
     # Chamada corrigida
     Historico = AeroportoService.ListarRemessasAeroportos()
-    return render_template('Pages/Aeroportos/Manager.html', 
+    return render_template('Cadastros/Aeroportos/Manager.html', 
                            ListaRemessas=Historico, 
                            ExibirModal=ModalConfirmacao, 
                            DadosModal=DadosConfirmacao)
 
 @AeroportoBp.route('/Aeroportos/Excluir/<int:id_remessa>')
 @login_required
-@RequerPermissao('cadastros.aeroportos.editar')
+@RequerPermissao('CADASTROS.AEROPORTOS.DELETAR')
 def Excluir(id_remessa):
     LogService.Info("Route.Aeroportos", f"Usuário {current_user.Login} solicitou exclusão da remessa {id_remessa}")
     # Chamada corrigida
@@ -102,14 +105,15 @@ def Excluir(id_remessa):
 
 @AeroportoBp.route('/Ranking')
 @login_required
-@RequerPermissao('cadastros.aeroportos.visualizar') # Ajuste a permissão conforme necessário
+@RequerPermissao('CADASTROS.AEROPORTOS.VISUALIZAR') # Ajuste a permissão conforme necessário
 def RankingIndex():
     Dados = AeroportoService.ListarAeroportosPorEstado()
-    return render_template('Pages/Aeroportos/Ranking.html', Dados=Dados)
+    return render_template('Cadastros/Aeroportos/Ranking.html', Dados=Dados)
 
 @AeroportoBp.route('/API/SalvarRanking', methods=['POST'])
 @login_required
-@RequerPermissao('cadastros.aeroportos.editar')
+@require_ajax
+@RequerPermissao('CADASTROS.AEROPORTOS.EDITAR')
 def SalvarRanking():
     try:
         data = request.json

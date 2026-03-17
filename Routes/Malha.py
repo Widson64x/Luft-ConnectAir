@@ -1,14 +1,17 @@
 from flask import Blueprint, jsonify, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
+from luftcore.extensions.flask_extension import require_ajax
 from datetime import datetime
 from Services.MalhaService import MalhaService
 from Services.LogService import LogService
-from Services.PermissaoService import RequerPermissao # <--- Import Adicionado
+from Services.PermissaoService import RequerPermissao
+
 MalhaBp = Blueprint('Malha', __name__)
 
 @MalhaBp.route('/Malha/API/Rotas')
 @login_required
-@RequerPermissao('cadastros.malha.editar')
+@require_ajax
+@RequerPermissao('CADASTROS.MALHA.VISUALIZAR')
 def ApiRotas():
     Inicio = request.args.get('inicio')
     Fim = request.args.get('fim')
@@ -36,7 +39,7 @@ def ApiRotas():
 
 @MalhaBp.route('/Malha/Gerenciar', methods=['GET', 'POST'])
 @login_required
-@RequerPermissao('cadastros.malha.editar')
+@RequerPermissao('CADASTROS.MALHA.EDITAR')
 def Gerenciar():
     # Variáveis para controlar o Modal de Confirmação
     ModalConfirmacao = False
@@ -109,14 +112,14 @@ def Gerenciar():
 
     Historico = MalhaService.ListarRemessas()
     
-    return render_template('Pages/Malha/Manager.html', 
+    return render_template('Cadastros/Malha/Manager.html', 
                            ListaRemessas=Historico, 
                            ExibirModal=ModalConfirmacao, 
                            DadosModal=DadosConfirmacao)
 
 @MalhaBp.route('/Malha/Excluir/<int:id_remessa>')
 @login_required
-@RequerPermissao('cadastros.malha.editar')
+@RequerPermissao('CADASTROS.MALHA.DELETAR')
 def Excluir(id_remessa):
     LogService.Warning("Routes.Malha", f"Solicitação de exclusão de remessa {id_remessa} por {current_user.Login}")
     Sucesso, Mensagem = MalhaService.ExcluirRemessa(id_remessa)

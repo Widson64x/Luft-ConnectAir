@@ -75,7 +75,7 @@
     <div style="min-width: 300px;">
         <div class="relative">
             <i class="ph-bold ph-magnifying-glass absolute" style="left: 14px; top: 50%; transform: translateY(-50%); color: var(--luft-text-muted);"></i>
-            <input type="text" id="global-search" class="form-control pl-10" placeholder="Buscar por IATA, Nome ou Cidade..." onkeyup="FiltrarGlobal(this.value)" style="padding-left: 40px; border-radius: 50px;">
+            <input type="text" id="global-search" class="form-control pl-10" placeholder="Buscar por IATA, Nome ou Cidade..." onkeyup="filtrarGlobal(this.value)" style="padding-left: 40px; border-radius: 50px;">
         </div>
     </div>
 </div>
@@ -88,7 +88,7 @@
         </div>
         
         <div style="flex: 1; overflow-y: auto;">
-            <div class="luft-uf-item active" onclick="AtivarModoGlobal()" id="btn-global">
+            <div class="luft-uf-item active" onclick="ativarModoGlobal()" id="btn-global">
                 <div class="d-flex align-items-center gap-3">
                     <div class="d-flex align-items-center justify-content-center bg-primary-light text-primary rounded" style="width: 36px; height: 36px;">
                         <i class="ph-bold ph-globe-hemisphere-west text-lg"></i>
@@ -104,7 +104,7 @@
             <div style="height: 1px; background: var(--luft-border); margin: 8px 0;"></div>
 
             {% for uf, lista in Dados.items() %}
-            <div class="luft-uf-item item-uf" id="uf-{{ uf }}" onclick="SelecionarUf('{{ uf }}')">
+            <div class="luft-uf-item item-uf" id="uf-{{ uf }}" onclick="selecionarUf('{{ uf }}')">
                 <div class="d-flex align-items-center gap-3">
                     <div class="d-flex align-items-center justify-content-center bg-app border text-main font-black rounded" style="width: 36px; height: 36px; border-color: var(--luft-border);">
                         {{ uf }}
@@ -128,20 +128,23 @@
                 <span class="text-sm font-medium text-muted" id="subtitulo-view">--</span>
             </div>
             
-            <button class="btn btn-success d-flex align-items-center gap-2 btn-save" onclick="SalvarRankingAtual()">
+            <button class="btn btn-success d-flex align-items-center gap-2 btn-save" onclick="salvarRankingAtual()">
                 <i class="ph-bold ph-floppy-disk text-lg"></i>
                 <span class="btn-text">Salvar Alterações</span>
             </button>
         </div>
 
         <div class="luft-cards-grid" id="container-aeroportos">
-            </div>
+        </div>
     </div>
 
 </div>
 
 <script>
-    window.DadosRanking = {{ Dados | tojson | safe }};
+    const dadosRanking = {{ Dados | tojson | safe }};
+    const rotasRanking = {
+        salvarRanking: "/Luft-ConnectAir/Aeroportos/API/SalvarRanking" // Rota fixada para compatibilidade com a original
+    };
 </script>
 <script src="{{ url_for('static', filename='JS/Aeroportos/Ranking.js') }}"></script>
 {% endblock %}

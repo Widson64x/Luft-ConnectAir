@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, jsonify, request, send_file, flash, redirect, url_for
 from flask_login import login_required, current_user
 from datetime import timedelta, datetime, date
+from luftcore.extensions.flask_extension import require_ajax
 
 # Import dos Serviços
 from Services.PermissaoService import RequerPermissao
@@ -30,14 +31,15 @@ COORDENADAS_UFS = {
 
 @PlanejamentoBp.route('/Dashboard')
 @login_required
-@RequerPermissao('planejamento.visualizar')
+@RequerPermissao('PLANEJAMENTO.ROTAS.VISUALIZAR')
 def Dashboard():
     LogService.Info("Routes.Planejamento", f"Usuário {current_user.id} acessou Dashboard Planejamento.")
     return render_template('Pages/Planejamento/Index.html')
 
 @PlanejamentoBp.route('/API/Listar')
 @login_required
-@RequerPermissao('planejamento.visualizar')
+@require_ajax
+@RequerPermissao('PLANEJAMENTO.ROTAS.VISUALIZAR')
 def ApiCtcsHoje():
     LogService.Debug("Routes.Planejamento", "API Listar CTCs requisitada.")
     Dados = PlanejamentoService.BuscarCtcsPlanejamento()
@@ -45,7 +47,7 @@ def ApiCtcsHoje():
 
 @PlanejamentoBp.route('/Montar/<string:filial>/<string:serie>/<string:ctc>')
 @login_required
-@RequerPermissao('planejamento.editar')
+@RequerPermissao('PLANEJAMENTO.ROTAS.EDITAR')
 def MontarPlanejamento(filial, serie, ctc):
     LogService.Info("Routes.Planejamento", f"Iniciando Montagem Planejamento: {filial}-{serie}-{ctc}")
     
@@ -115,10 +117,10 @@ def MontarPlanejamento(filial, serie, ctc):
                            OpcoesRotas=OpcoesRotas,
                            PlanejamentoSalvo=PlanejamentoSalvo) 
 
-# --- ROTA CANCELAR ---
 @PlanejamentoBp.route('/API/Cancelar', methods=['POST'])
 @login_required
-@RequerPermissao('planejamento.editar')
+@require_ajax
+@RequerPermissao('PLANEJAMENTO.ROTAS.EDITAR')
 def CancelarPlanejamentoRota():
     dados = request.json
     id_plan = dados.get('id_planejamento')
@@ -135,7 +137,8 @@ def CancelarPlanejamentoRota():
 
 @PlanejamentoBp.route('/API/Salvar', methods=['POST'])
 @login_required
-@RequerPermissao('planejamento.editar')
+@require_ajax
+@RequerPermissao('PLANEJAMENTO.ROTAS.EDITAR')
 def SalvarPlanejamento():
     try:
         dados_front = request.json
@@ -211,7 +214,7 @@ def SalvarPlanejamento():
 
 @PlanejamentoBp.route('/API/Exportar')
 @login_required
-@RequerPermissao('planejamento.visualizar')
+@RequerPermissao('PLANEJAMENTO.ROTAS.EXPORTAR')
 def ExportarPlanejamentosExcel():
     LogService.Info("Routes.Planejamento", f"Usuário {current_user.id} solicitou exportação de planejamento.")
     
@@ -232,7 +235,7 @@ def ExportarPlanejamentosExcel():
 
 @PlanejamentoBp.route('/Mapa-Global')
 @login_required
-@RequerPermissao('planejamento.mapa')
+@RequerPermissao('PLANEJAMENTO.MAPA.VISUALIZAR')
 def MapaGlobal():
     try:
         LogService.Debug("Routes.Planejamento", "Gerando Mapa Global...")

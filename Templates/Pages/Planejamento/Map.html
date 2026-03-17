@@ -11,60 +11,25 @@
 
 <style>
     /* --- ESTRUTURA DO MAPA GLOBAL --- */
-    .luft-mapglobal-wrapper {
-        display: grid; 
-        grid-template-columns: 420px 1fr; 
-        gap: 20px;
-        height: calc(100vh - 120px); 
-        animation: slideUpFade 0.5s ease-out forwards;
-    }
-
+    .luft-mapglobal-wrapper { display: grid; grid-template-columns: 420px 1fr; gap: 20px; height: calc(100vh - 120px); animation: slideUpFade 0.5s ease-out forwards; }
     @keyframes slideUpFade { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 
-    .luft-mapglobal-sidebar {
-        display: flex; 
-        flex-direction: column; 
-        overflow: hidden;
-    }
+    .luft-mapglobal-sidebar { display: flex; flex-direction: column; overflow: hidden; }
 
     .luft-mapglobal-map {
-        border-radius: 16px; 
-        border: 1px solid var(--luft-border);
-        position: relative; 
-        height: 100%; 
-        width: 100%; 
-        overflow: hidden; 
-        z-index: 1;
+        border-radius: 16px; border: 1px solid var(--luft-border);
+        position: relative; height: 100%; width: 100%; overflow: hidden; z-index: 1;
         box-shadow: var(--luft-shadow-sm);
     }
 
     /* Abas de Filtro */
-    .luft-mapglobal-tabs {
-        display: flex; 
-        background: var(--luft-bg-app); 
-        border: 1px solid var(--luft-border);
-        padding: 6px; 
-        border-radius: 10px; 
-        gap: 4px;
-        margin-top: 16px;
-    }
+    .luft-mapglobal-tabs { display: flex; background: var(--luft-bg-app); border: 1px solid var(--luft-border); padding: 6px; border-radius: 10px; gap: 4px; margin-top: 16px; }
     
     .luft-mapglobal-tab {
-        flex: 1;
-        background: transparent; 
-        border: none; 
-        border-radius: 8px;
-        padding: 8px 4px; 
-        cursor: pointer; 
-        font-weight: 600; 
-        font-size: 0.75rem;
-        color: var(--luft-text-muted); 
-        display: flex; 
-        align-items: center; 
-        justify-content: center; 
-        gap: 6px;
-        transition: all 0.2s;
-        white-space: nowrap;
+        flex: 1; background: transparent; border: none; border-radius: 8px;
+        padding: 8px 4px; cursor: pointer; font-weight: 600; font-size: 0.75rem;
+        color: var(--luft-text-muted); display: flex; align-items: center; justify-content: center; gap: 6px;
+        transition: all 0.2s; white-space: nowrap;
     }
 
     .luft-mapglobal-tab:hover { background: var(--luft-border); color: var(--luft-text-main); }
@@ -94,14 +59,6 @@
     .map-marker.is-urgente::before { content: ''; position: absolute; top: -5px; left: -5px; right: -5px; bottom: -5px; border-radius: 50%; border: 2px solid var(--luft-danger); animation: pulse-radar 2s infinite; opacity: 0; z-index: -1; }
     
     @keyframes pulse-radar { 0% { transform: scale(0.8); opacity: 0.8; } 100% { transform: scale(1.4); opacity: 0; } }
-
-    /* Modais Genéricos */
-    .luft-modal-backdrop-custom {
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(0, 0, 0, 0.5); z-index: 10000;
-        display: none; align-items: center; justify-content: center;
-        backdrop-filter: blur(4px);
-    }
 </style>
 
 <div class="luft-mapglobal-wrapper">
@@ -113,16 +70,16 @@
             <p class="text-xs text-muted mt-1">Selecione um filtro e um cluster no mapa</p>
             
             <div class="luft-mapglobal-tabs">
-                <button class="luft-mapglobal-tab active" onclick="MudarFiltroMapa('TODOS')" id="btn-todos">
+                <button class="luft-mapglobal-tab active" onclick="mudarFiltroMapa('TODOS')" id="btn-todos">
                     <i class="ph-bold ph-squares-four"></i> Global
                 </button>
-                <button class="luft-mapglobal-tab" onclick="MudarFiltroMapa('DIARIO')" id="btn-diario">
+                <button class="luft-mapglobal-tab" onclick="mudarFiltroMapa('DIARIO')" id="btn-diario">
                     <i class="ph-bold ph-sun"></i> Do Dia
                 </button>
-                <button class="luft-mapglobal-tab" onclick="MudarFiltroMapa('BACKLOG')" id="btn-backlog">
+                <button class="luft-mapglobal-tab" onclick="mudarFiltroMapa('BACKLOG')" id="btn-backlog">
                     <i class="ph-bold ph-clock-counter-clockwise"></i> Backlog
                 </button>
-                <button class="luft-mapglobal-tab" onclick="MudarFiltroMapa('REVERSA')" id="btn-reversa">
+                <button class="luft-mapglobal-tab" onclick="mudarFiltroMapa('REVERSA')" id="btn-reversa">
                     <i class="ph-bold ph-arrow-u-up-left"></i> Reversa
                 </button>
             </div>
@@ -139,220 +96,12 @@
     <div class="luft-mapglobal-map" id="map"></div>
 </div>
 
-<div id="modal-detalhes" class="luft-modal-backdrop-custom" onclick="FecharModal(event)">
-    <div class="luft-card p-0" style="width: 90%; max-width: 800px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden;" onclick="event.stopPropagation()">
-        
-        <div class="p-4 d-flex justify-content-between align-items-center bg-app" style="border-bottom: 1px solid var(--luft-border);">
-            <h3 class="font-bold text-main m-0 d-flex align-items-center gap-2">
-                <i class="ph-duotone ph-file-text text-primary"></i> Detalhes do CTC: <span id="modal-ctc-id" class="text-primary"></span>
-            </h3>
-            <button class="btn-icon-only" onclick="FecharModal(null)"><i class="ph-bold ph-x"></i></button>
-        </div>
-        
-        <div style="overflow-y: auto; padding: 0;">
-            <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
-                <tbody id="tabela-detalhes"></tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
 <script>
-    // Dados originais vindo do Backend
-    const DADOS_COMPLETOS = {{ Dados | tojson | safe }};
-    const URL_BASE_MONTAR = "{{ url_for('Planejamento.MontarPlanejamento', filial='__FIL__', serie='__SER__', ctc='__NUM__') }}";
-    
-    let map;
-    let markersLayer;
-    let FILTRO_ATUAL = 'TODOS';
-
-    const fmtShortMoney = (val) => {
-        if (!val) return 'R$ 0';
-        if (val >= 1000000) return 'R$ ' + (val / 1000000).toFixed(1).replace('.', ',') + 'M';
-        if (val >= 1000) return 'R$ ' + (val / 1000).toFixed(0) + 'k';
-        return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+    // Injeção de Dados Backend
+    const dadosMapaGlobal = {{ Dados | tojson | safe }};
+    const rotasMapaGlobal = {
+        montarRota: "{{ url_for('Planejamento.MontarPlanejamento', filial='__F__', serie='__S__', ctc='__C__') }}"
     };
-
-    document.addEventListener("DOMContentLoaded", function() {
-        map = L.map('map', {zoomControl: false}).setView([-15.7, -52], 4);
-        L.control.zoom({position: 'topright'}).addTo(map);
-
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-            attribution: 'Luft-ConnectAir', maxZoom: 18
-        }).addTo(map);
-
-        markersLayer = L.layerGroup().addTo(map);
-        RenderizarMapa('TODOS');
-    });
-
-    function MudarFiltroMapa(tipo) {
-        FILTRO_ATUAL = tipo;
-        document.querySelectorAll('.luft-mapglobal-tab').forEach(btn => btn.classList.remove('active'));
-        document.getElementById(`btn-${tipo.toLowerCase()}`).classList.add('active');
-
-        RenderizarMapa(tipo);
-
-        document.getElementById('lista-ctcs').innerHTML = `
-            <div style="text-align: center; padding: 40px; color: var(--luft-text-muted);">
-                <i class="ph-duotone ph-funnel" style="font-size: 3rem; display:block; margin-bottom:10px;"></i>
-                Filtro aplicado: <b class="text-main">${tipo}</b>.<br>Selecione um cluster no mapa.
-            </div>`;
-    }
-
-    function RenderizarMapa(filtro) {
-        markersLayer.clearLayers();
-
-        DADOS_COMPLETOS.forEach(est => {
-            const listaFiltrada = est.lista_ctcs.filter(ctc => {
-                if (filtro === 'TODOS') return true;
-                return ctc.origem_dados === filtro;
-            });
-
-            if (listaFiltrada.length === 0) return;
-
-            const qtdDocs = listaFiltrada.length;
-            const valorTotal = listaFiltrada.reduce((acc, cur) => acc + (cur.raw_val_mercadoria || 0), 0);
-            const qtdVols = listaFiltrada.reduce((acc, cur) => acc + (cur.volumes || 0), 0);
-            const temUrgencia = listaFiltrada.some(c => c.eh_urgente);
-
-            const cssClass = temUrgencia ? 'map-marker is-urgente' : 'map-marker';
-            const headerClass = temUrgencia ? 'bg-red' : 'bg-blue';
-            const size = 90; 
-
-            const iconHtml = `
-                <div class="marker-bubble">
-                    <div class="marker-header ${headerClass}">${est.uf}</div>
-                    <div class="marker-body">
-                        <div class="marker-docs">${qtdDocs}</div>
-                        <div class="marker-vols">${qtdVols} vol</div>
-                        <div class="marker-value">${fmtShortMoney(valorTotal)}</div>
-                    </div>
-                </div>
-            `;
-
-            const customIcon = L.divIcon({
-                html: iconHtml, className: cssClass, iconSize: [size, size], iconAnchor: [size/2, size/2]
-            });
-
-            const marker = L.marker([est.coords.lat, est.coords.lon], {icon: customIcon});
-            
-            marker.on('click', () => {
-                CarregarSidebar(listaFiltrada);
-                map.flyTo([est.coords.lat, est.coords.lon], 6, {duration: 1.2});
-            });
-
-            markersLayer.addLayer(marker);
-        });
-    }
-
-    function CarregarSidebar(listaCtcs) {
-        const container = document.getElementById('lista-ctcs');
-        container.innerHTML = '';
-
-        if(listaCtcs.length === 0) {
-            container.innerHTML = '<div style="text-align:center; padding: 40px; color: var(--luft-text-muted);">Nenhum registro encontrado.</div>';
-            return;
-        }
-
-        const listaOrdenada = listaCtcs.sort((a, b) => {
-            if (a.eh_urgente && !b.eh_urgente) return -1;
-            if (!a.eh_urgente && b.eh_urgente) return 1;
-            return parseFloat(b.raw_frete_total || 0) - parseFloat(a.raw_frete_total || 0);
-        });
-
-        listaOrdenada.forEach(c => {
-            const isUrg = c.eh_urgente;
-            const borda = isUrg ? 'border-left: 4px solid var(--luft-danger);' : 'border-left: 4px solid var(--luft-primary-500);';
-            const badgeHtml = isUrg ? `<span class="luft-badge luft-badge-danger"><i class="ph-bold ph-warning"></i> URGENTE</span>` : ``;
-            
-            let urlFinal = URL_BASE_MONTAR
-                .replace('__FIL__', c.filial)
-                .replace('__SER__', c.serie)
-                .replace('__NUM__', c.ctc);
-            
-            const jsonFullData = encodeURIComponent(JSON.stringify(c.full_data));
-
-            const html = `
-                <div class="luft-card p-3 mb-3 hover-lift" style="${borda}">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="luft-badge luft-badge-secondary font-black" style="font-family: monospace;">${c.filial}-${c.serie}-${c.ctc}</span>
-                        ${badgeHtml}
-                    </div>
-                    
-                    <div class="font-bold text-main mb-1 d-flex align-items-center gap-2">
-                        ${c.origem.split('/')[0]} 
-                        <i class="ph-bold ph-arrow-right text-muted" style="font-size: 0.8rem;"></i> 
-                        ${c.destino.split('/')[0]}
-                    </div>
-                    
-                    <div class="text-xs text-muted mb-3" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${c.remetente}">
-                        <i class="ph-bold ph-user"></i> ${c.remetente}
-                    </div>
-
-                    <div class="d-flex justify-content-between align-items-center mb-3 text-xs text-muted">
-                        <span><i class="ph-bold ph-calendar-blank"></i> ${c.data_emissao}</span>
-                        <span class="font-bold text-main">${c.origem_dados}</span>
-                    </div>
-
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px;">
-                        <div class="p-2 bg-app rounded text-center">
-                            <span class="text-xs text-muted d-block">Peso (Fís/Tax)</span>
-                            <span class="text-sm font-bold text-main">${c.peso_fisico} / <strong>${c.peso_taxado}</strong></span>
-                        </div>
-                        <div class="p-2 bg-app rounded text-center">
-                            <span class="text-xs text-muted d-block">Volumes / NFs</span>
-                            <span class="text-sm font-bold text-main">${c.volumes} / ${c.qtd_notas}</span>
-                        </div>
-                        <div class="p-2 bg-app rounded text-center">
-                            <span class="text-xs text-muted d-block">Mercadoria</span>
-                            <span class="text-sm font-bold text-success">${fmtShortMoney(c.raw_val_mercadoria)}</span>
-                        </div>
-                    </div>
-
-                    <div style="display: grid; grid-template-columns: 1fr 40px; gap: 8px;">
-                        <a href="${urlFinal}" class="btn btn-primary d-flex align-items-center justify-content-center gap-2">
-                            <i class="ph-bold ph-airplane-tilt"></i> Planejar Voo
-                        </a>
-                        <button class="btn btn-secondary d-flex align-items-center justify-content-center" onclick="AbrirModalGlobal('${c.filial}', '${c.serie}', '${c.ctc}')" title="Ver Documento Completo">
-                            <i class="ph-bold ph-file-text"></i>
-                        </button>
-                    </div>
-                </div>
-            `;
-            container.innerHTML += html;
-        });
-    }
-
-    function AbrirModal(ctcNum, jsonDataEncoded) {
-        const modal = document.getElementById('modal-detalhes');
-        const titulo = document.getElementById('modal-ctc-id');
-        const tabela = document.getElementById('tabela-detalhes');
-        const data = JSON.parse(decodeURIComponent(jsonDataEncoded));
-        
-        titulo.innerText = ctcNum;
-        tabela.innerHTML = ''; 
-
-        let isEven = false;
-        for (const [key, value] of Object.entries(data)) {
-            if(value !== null && value !== "") {
-                const bg = isEven ? 'background: var(--luft-bg-app);' : '';
-                const row = `
-                    <tr style="border-bottom: 1px solid var(--luft-border); ${bg}">
-                        <th style="padding: 12px 20px; color: var(--luft-text-muted); font-weight: 600; width: 35%; text-transform: uppercase; font-size: 0.75rem;">${key}</th>
-                        <td style="padding: 12px 20px; color: var(--luft-text-main); font-family: monospace;">${value}</td>
-                    </tr>
-                `;
-                tabela.innerHTML += row;
-                isEven = !isEven;
-            }
-        }
-        modal.style.display = 'flex';
-    }
-
-    function FecharModal(event) {
-        if(!event || event.target.className === 'luft-modal-backdrop-custom' || event.target.closest('.btn-icon-only')) {
-            document.getElementById('modal-detalhes').style.display = 'none';
-        }
-    }
 </script>
+<script src="{{ url_for('static', filename='JS/Planejamento/Map.js') }}"></script>
 {% endblock %}

@@ -45,6 +45,7 @@
         background: var(--luft-bg-app); color: var(--luft-text-muted);
         font-weight: 700; text-transform: uppercase; font-size: 0.75rem;
         padding: 16px 20px; text-align: left; border-bottom: 1px solid var(--luft-border);
+        position: sticky; top: 0; z-index: 10;
     }
     .luft-reversa-tabela td {
         padding: 16px 20px; border-bottom: 1px solid var(--luft-border);
@@ -133,13 +134,13 @@
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-4" style="padding: 20px 24px; border-bottom: 1px solid var(--luft-border); background: transparent;">
             
             <div class="luft-tabs-wrapper" style="border-bottom: none; padding-bottom: 0; margin-bottom: 0;">
-                <button class="luft-tab-btn active" onclick="setFilter('todos', this)" id="btn-todos">
+                <button class="luft-tab-btn active" onclick="definirFiltro('todos', this)" id="btn-todos">
                     <i class="ph-bold ph-list"></i> Todos
                 </button>
-                <button class="luft-tab-btn" onclick="setFilter('pendente', this)" id="btn-pendente">
+                <button class="luft-tab-btn" onclick="definirFiltro('pendente', this)" id="btn-pendente">
                     <i class="ph-bold ph-hourglass"></i> Pendentes
                 </button>
-                <button class="luft-tab-btn" onclick="setFilter('liberado', this)" id="btn-liberado">
+                <button class="luft-tab-btn" onclick="definirFiltro('liberado', this)" id="btn-liberado">
                     <i class="ph-bold ph-check"></i> Liberados
                 </button>
             </div>
@@ -159,7 +160,7 @@
                         <th style="width: 80px; text-align: center;">
                             <div class="d-flex flex-column align-items-center gap-1">
                                 <div class="luft-checkbox-wrapper">
-                                    <input type="checkbox" class="luft-custom-check" id="chk-todos" onclick="toggleTodos(this)" title="Selecionar e salvar todos visíveis">
+                                    <input type="checkbox" class="luft-custom-check" id="chk-todos" onclick="alternarTodos(this)" title="Selecionar e salvar todos visíveis">
                                 </div>
                                 <span class="text-xs text-muted font-bold" style="font-size: 0.65rem;">TODOS</span>
                             </div>
@@ -267,202 +268,10 @@
 </div>
 
 <script>
-    let currentFilter = 'todos';
-
-    document.addEventListener('DOMContentLoaded', () => {
-        document.getElementById('last-update').innerText = new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
-        filtrarTabela();
-
-        const checkboxes = document.querySelectorAll('.chk-action');
-        checkboxes.forEach(chk => {
-            chk.addEventListener('change', handleCheck);
-        });
-    });
-
-    function setFilter(filterType, btnElement) {
-        currentFilter = filterType;
-        document.querySelectorAll('.luft-tab-btn').forEach(b => b.classList.remove('active'));
-        btnElement.classList.add('active');
-
-        const chkTodos = document.getElementById('chk-todos');
-        if(chkTodos) chkTodos.checked = false;
-
-        filtrarTabela();
-    }
-
-    // --- LÓGICA PRINCIPAL ---
-    function filtrarTabela() {
-        const searchText = document.getElementById('searchInput').value.toLowerCase();
-        const rows = document.querySelectorAll('.data-row');
-
-        let countTotal = 0;
-        let countPendente = 0;
-        let countLiberado = 0;
-        let visibleCount = 0;
-        let hasData = false;
-
-        rows.forEach(row => {
-            const status = row.dataset.status;
-            const textContent = row.dataset.search.toLowerCase();
-            const matchesSearch = textContent.includes(searchText);
-
-            if (matchesSearch) {
-                countTotal++;
-                if (status === 'pendente') countPendente++;
-                if (status === 'liberado') countLiberado++;
-            }
-
-            const matchesFilter = (currentFilter === 'todos') || (currentFilter === status);
-
-            if (matchesSearch && matchesFilter) {
-                row.style.display = '';
-                visibleCount++;
-                hasData = true;
-            } else {
-                row.style.display = 'none';
-            }
-        });
-
-        animateValue("count-total", countTotal);
-        animateValue("count-pendente", countPendente);
-        animateValue("count-liberado", countLiberado);
-
-        const noSearchRow = document.getElementById('no-search-results');
-        if (noSearchRow) {
-            noSearchRow.style.display = (!hasData && rows.length > 0) ? '' : 'none';
-        }
-
-        document.getElementById('visible-count').innerText = visibleCount;
-    }
-
-    function animateValue(id, value) {
-        const obj = document.getElementById(id);
-        if(obj) obj.innerText = value;
-    }
-
-    // --- SALVAR LOTE ---
-    async function toggleTodos(source) {
-        const isChecked = source.checked;
-        const rows = document.querySelectorAll('.data-row');
-        const checkboxesToUpdate = [];
-
-        rows.forEach(row => {
-            if (row.style.display !== 'none') {
-                const chk = row.querySelector('.chk-action');
-                if (chk && chk.checked !== isChecked) {
-                    chk.checked = isChecked;
-                    checkboxesToUpdate.push(chk);
-                }
-            }
-        });
-
-        if (checkboxesToUpdate.length === 0) return;
-        source.disabled = true;
-
-        const promises = checkboxesToUpdate.map(async (chk) => {
-            const payload = {
-                filial: chk.dataset.filial,
-                serie: chk.dataset.serie,
-                ctc: chk.dataset.ctc,
-                liberado: isChecked
-            };
-
-            const statusDisplay = document.getElementById(`status-display-${payload.filial}-${payload.ctc}`);
-            const originalHtml = statusDisplay.innerHTML;
-
-            statusDisplay.innerHTML = `<div class="text-xs font-bold text-primary"><i class="ph-bold ph-spinner ph-spin"></i> Salvando...</div>`;
-            chk.disabled = true;
-
-            try {
-                const response = await fetch('/Luft-ConnectAir/Reversa/AtualizarStatus', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                const json = await response.json();
-
-                if (json.sucesso) {
-                    const row = chk.closest('tr');
-                    row.dataset.status = isChecked ? 'liberado' : 'pendente';
-
-                    if (isChecked) {
-                        statusDisplay.innerHTML = `
-                            <div class="luft-badge luft-badge-success"><i class="ph-fill ph-check-circle"></i> Liberado</div>
-                            <div class="text-xs text-muted mt-1 font-medium">Lote</div>
-                        `;
-                    } else {
-                        statusDisplay.innerHTML = `<div class="luft-badge luft-badge-warning"><i class="ph-fill ph-clock"></i> Pendente</div>`;
-                    }
-                } else {
-                    throw new Error(json.msg);
-                }
-            } catch (error) {
-                console.error(error);
-                chk.checked = !isChecked; 
-                statusDisplay.innerHTML = originalHtml;
-            } finally {
-                chk.disabled = false;
-            }
-        });
-
-        await Promise.all(promises);
-        source.disabled = false;
-        filtrarTabela();
-    }
-
-    // --- SALVAR INDIVIDUAL ---
-    async function handleCheck(e) {
-        const el = e.target;
-        const isChecked = el.checked;
-        const row = el.closest('tr');
-
-        const payload = {
-            filial: el.dataset.filial,
-            serie: el.dataset.serie,
-            ctc: el.dataset.ctc,
-            liberado: isChecked
-        };
-
-        const statusDisplay = document.getElementById(`status-display-${payload.filial}-${payload.ctc}`);
-        const originalHtml = statusDisplay.innerHTML;
-
-        statusDisplay.innerHTML = `<div class="text-xs font-bold text-primary"><i class="ph-bold ph-spinner ph-spin"></i> Salvando...</div>`;
-        el.disabled = true;
-
-        try {
-            const response = await fetch('/Luft-ConnectAir/Reversa/AtualizarStatus', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            const json = await response.json();
-
-            if (json.sucesso) {
-                const novoStatus = isChecked ? 'liberado' : 'pendente';
-                row.dataset.status = novoStatus;
-
-                if (isChecked) {
-                    statusDisplay.innerHTML = `
-                        <div class="luft-badge luft-badge-success"><i class="ph-fill ph-check-circle"></i> Liberado</div>
-                        <div class="text-xs text-muted mt-1 font-medium">Agora</div>
-                    `;
-                } else {
-                    statusDisplay.innerHTML = `<div class="luft-badge luft-badge-warning"><i class="ph-fill ph-clock"></i> Pendente</div>`;
-                }
-                filtrarTabela();
-            } else {
-                throw new Error(json.msg);
-            }
-        } catch (error) {
-            console.error(error);
-            alert('Erro ao comunicar com o servidor: ' + error.message);
-            el.checked = !isChecked;
-            statusDisplay.innerHTML = originalHtml;
-        } finally {
-            el.disabled = false;
-        }
-    }
+    const rotasReversa = {
+        atualizarStatus: "/Luft-ConnectAir/Reversa/AtualizarStatus"
+    };
 </script>
+<script src="{{ url_for('static', filename='JS/Reversa/Index.js') }}"></script>
+
 {% endblock %}

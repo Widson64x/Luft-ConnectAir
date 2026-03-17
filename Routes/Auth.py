@@ -45,7 +45,7 @@ def Login():
             LogService.Warning("Routes.Auth", f"Login recusado para '{Identificador}' (IP: {IpCliente}).")
             flash('Login falhou. Verifique suas credenciais.', 'danger')
 
-    return render_template('Pages/Auth/Login.html')
+    return render_template('Auth/Login.html')
 
 @AuthBp.route('/Deslogar')
 @login_required

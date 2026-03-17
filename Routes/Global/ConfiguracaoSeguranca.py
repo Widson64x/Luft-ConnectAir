@@ -12,6 +12,7 @@ from Models.SQL_SERVER.Usuario import Usuario, UsuarioGrupo  # Ajuste os nomes d
 
 # Service que acabamos de atualizar
 from Services.PermissaoService import PermissaoService, RequerPermissao
+from luftcore.extensions.flask_extension import require_ajax
 
 SISTEMA_ID = int(os.getenv("SISTEMA_ID", 1))
 
@@ -20,7 +21,7 @@ Seguranca_BP = Blueprint('Seguranca', __name__, url_prefix='/Seguranca')
 
 @Seguranca_BP.route('/Permissoes')
 @login_required
-@RequerPermissao('SISTEMA.CONFIGURACOES.VISUALIZAR') # Ajuste a chave conforme sua necessidade
+@RequerPermissao('SISTEMA.SEGURANCA.VISUALIZAR')
 def Index():
     Sessao = ObterSessaoSqlServer()
     try:
@@ -65,7 +66,7 @@ def Index():
 
 @Seguranca_BP.route('/Permissoes/Criar', methods=['POST'])
 @login_required
-@RequerPermissao('SISTEMA.CONFIGURACOES.CRIAR')
+@RequerPermissao('SISTEMA.SEGURANCA.CRIAR')
 def CriarNovaPermissao():
     modulo = request.form.get('modulo', '').upper().strip().replace(' ', '_')
     acao = request.form.get('acao', '').upper().strip()
@@ -107,6 +108,8 @@ def CriarNovaPermissao():
 
 @Seguranca_BP.route('/Api/AcessosGrupo', methods=['GET'])
 @login_required
+@require_ajax
+@RequerPermissao('SISTEMA.SEGURANCA.VISUALIZAR')
 def BuscarAcessosGrupo():
     id_grupo = request.args.get('idGrupo')
     if not id_grupo: return jsonify({"erro": "ID do grupo não informado"}), 400
@@ -121,6 +124,8 @@ def BuscarAcessosGrupo():
 
 @Seguranca_BP.route('/Api/AcessosUsuario', methods=['GET'])
 @login_required
+@require_ajax
+@RequerPermissao('SISTEMA.SEGURANCA.VISUALIZAR')
 def BuscarAcessosUsuario():
     id_usuario = request.args.get('idUsuario')
     if not id_usuario: return jsonify({"erro": "ID do usuário não informado"}), 400
@@ -154,7 +159,8 @@ def BuscarAcessosUsuario():
 
 @Seguranca_BP.route('/Api/SalvarVinculo', methods=['POST'])
 @login_required
-@RequerPermissao('SISTEMA.CONFIGURACOES.EDITAR')
+@require_ajax
+@RequerPermissao('SISTEMA.SEGURANCA.EDITAR')
 def SalvarVinculo():
     dados = request.get_json()
     tipo = dados.get('Tipo') # 'Grupo' ou 'Usuario'

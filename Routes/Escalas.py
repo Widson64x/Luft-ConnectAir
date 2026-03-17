@@ -8,14 +8,14 @@ EscalasBp = Blueprint('Escalas', __name__)
 
 @EscalasBp.route('/Mapa')
 @login_required
-@RequerPermissao('cadastros.malha.visualizar')
+@RequerPermissao('CADASTROS.MALHA.VISUALIZAR')
 def Mapa():
     """Renderiza a tela principal do mapa de escalas."""
-    return render_template('Pages/Escalas/Index.html')
+    return render_template('Cadastros/Escalas/Index.html')
 
 @EscalasBp.route('/Api/OtimizarRotas', methods=['GET'])
 @login_required
-@RequerPermissao('cadastros.malha.visualizar')
+@RequerPermissao('CADASTROS.MALHA.VISUALIZAR')
 def ApiOtimizarRotas():
     """
     Rota API que processa a inteligência de rotas.

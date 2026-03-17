@@ -11,42 +11,24 @@
 <style>
     /* --- ESTILOS EXCLUSIVOS DO ACOMPANHAMENTO --- */
     .luft-acompanhamento-wrapper {
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-        height: calc(100vh - 120px); /* Ajuste para não gerar barra de rolagem infinita na página */
-        overflow: hidden;
+        display: flex; flex-direction: column; gap: 20px;
+        height: calc(100vh - 120px); overflow: hidden;
         animation: slideUpFade 0.6s ease-out forwards;
     }
 
-    @keyframes slideUpFade { 
-        from { opacity: 0; transform: translateY(20px); } 
-        to { opacity: 1; transform: translateY(0); } 
-    }
+    @keyframes slideUpFade { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
     /* Seção do Mapa */
     .luft-acompanhamento-mapa {
-        flex: 1;
-        min-height: 350px;
-        border-radius: 16px;
-        border: 1px solid var(--luft-border);
-        overflow: hidden;
-        position: relative;
-        background: #fff;
-        box-shadow: var(--luft-shadow-sm);
+        flex: 1; min-height: 350px; border-radius: 16px; border: 1px solid var(--luft-border);
+        overflow: hidden; position: relative; background: #fff; box-shadow: var(--luft-shadow-sm);
     }
 
     /* Seção da Tabela */
     .luft-acompanhamento-tabela {
-        flex: 1;
-        min-height: 250px;
-        border-radius: 16px;
-        border: 1px solid var(--luft-border);
-        background: var(--luft-bg-panel);
-        box-shadow: var(--luft-shadow-sm);
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
+        flex: 1; min-height: 250px; border-radius: 16px; border: 1px solid var(--luft-border);
+        background: var(--luft-bg-panel); box-shadow: var(--luft-shadow-sm);
+        display: flex; flex-direction: column; overflow: hidden;
     }
 
     .luft-acompanhamento-tabela-wrap { flex: 1; overflow-y: auto; }
@@ -103,14 +85,13 @@
     /* Modal de Voo */
     .luft-modal-voo-overlay {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(0,0,0,0.5); z-index: 2000;
-        display: none; align-items: center; justify-content: center;
-        backdrop-filter: blur(4px);
+        background: rgba(0,0,0,0.5); z-index: 2000; display: none; align-items: center;
+        justify-content: center; backdrop-filter: blur(4px);
     }
     .luft-modal-voo-card {
-        background: var(--luft-bg-panel); width: 400px;
-        border-radius: 16px; box-shadow: 0 20px 50px rgba(0,0,0,0.3);
-        overflow: hidden; animation: slideUpFade 0.3s ease; border: 1px solid var(--luft-border);
+        background: var(--luft-bg-panel); width: 400px; border-radius: 16px;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.3); overflow: hidden;
+        animation: slideUpFade 0.3s ease; border: 1px solid var(--luft-border);
     }
 
     .m-header { padding: 20px 24px; color: white; display: flex; justify-content: space-between; align-items: center; }
@@ -140,7 +121,6 @@
 <div class="luft-acompanhamento-wrapper">
     
     <div class="luft-card p-4 d-flex align-items-end gap-4 flex-wrap" style="flex: 0 0 auto;">
-        
         <div style="flex: 1; min-width: 200px;">
             <label class="form-label text-xs font-bold text-muted mb-1" style="text-transform: uppercase;">Buscar AWB</label>
             <div class="relative">
@@ -168,7 +148,7 @@
         </div>
 
         <div style="flex: 0 0 auto;">
-            <button class="btn btn-primary d-flex align-items-center gap-2" onclick="CarregarDados()" style="height: 40px;">
+            <button class="btn btn-primary d-flex align-items-center gap-2" onclick="carregarDados()" style="height: 40px;">
                 Filtrar <i class="ph-bold ph-caret-right"></i>
             </button>
         </div>
@@ -183,10 +163,7 @@
         <div id="mapa-voos" style="width: 100%; height: 100%; z-index: 1;"></div>
         
         <div class="luft-map-controls">
-            <div class="luft-btn-map-info">
-                <i class="ph-bold ph-info"></i>
-            </div>
-
+            <div class="luft-btn-map-info"><i class="ph-bold ph-info"></i></div>
             <div class="luft-map-legend">
                 <div class="luft-lg-section">
                     <div class="luft-lg-title">Status da Localização</div>
@@ -279,7 +256,7 @@
                     <span id="mv-numero" style="font-size: 1.4rem; font-weight: 800; line-height: 1;">VOO 0000</span>
                 </div>
             </div>
-            <button class="m-close-btn" onclick="FecharModalVoo()"><i class="ph-bold ph-x"></i></button>
+            <button class="m-close-btn" onclick="fecharModalVoo()"><i class="ph-bold ph-x"></i></button>
         </div>
         <div class="m-body">
             <div class="m-route">
@@ -311,14 +288,10 @@
 </div>
 
 <script>
-    // Objeto de Configuração para injetar as URLs do Jinja2 no JS externo
-    const APP_CONFIG = {
-        urls: {
-            listarAwbs: "{{ url_for('Acompanhamento.ApiListarAwbs') }}",
-            // Passa a URL base sem o número, o JS concatena o ID depois
-            historico: "{{ url_for('Acompanhamento.ApiHistorico', numero_awb='') }}", 
-            detalhesVoo: "{{ url_for('Acompanhamento.ApiDetalhesVooModal') }}"
-        }
+    const rotasAcompanhamento = {
+        listarAwbs: "{{ url_for('Acompanhamento.ApiListarAwbs') }}",
+        historico: "{{ url_for('Acompanhamento.ApiHistorico', numero_awb='') }}", 
+        detalhesVoo: "{{ url_for('Acompanhamento.ApiDetalhesVooModal') }}"
     };
 </script>
 

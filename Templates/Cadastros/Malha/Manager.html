@@ -1,7 +1,7 @@
 {% extends "Layout/BaseLayout.html" %}
 {% import 'luftcore/components.html' as ui %}
 
-{% block titulo %}Base de Aeroportos | Luft-ConnectAir{% endblock %}
+{% block titulo %}Gestão de Malha | Luft-ConnectAir{% endblock %}
 
 {% block conteudo %}
 
@@ -36,7 +36,7 @@
         cursor: pointer;
         transition: all 0.3s ease;
     }
-    .luft-upload-container:hover {
+    .luft-upload-container:hover, .luft-upload-container.drag-ativo {
         border-color: var(--luft-primary-500);
         background: rgba(59, 130, 246, 0.05);
         transform: translateY(-4px);
@@ -74,20 +74,22 @@
 <div class="luft-modal-backdrop-custom">
     <div class="luft-modal-card-custom">
         <i class="ph-duotone ph-warning-circle text-warning" style="font-size: 3.5rem; margin-bottom: 15px;"></i>
-        <h3 class="font-black text-main" style="font-size: 1.3rem; margin-bottom: 10px;">Versão Existente</h3>
+        <h3 class="font-black text-main" style="font-size: 1.3rem; margin-bottom: 10px;">Conflito de Versão</h3>
         <p class="text-muted font-medium mb-4" style="line-height: 1.5;">
-            Já existe uma base de aeroportos para <strong>{{ DadosModal.mes_ref.strftime('%m/%Y') }}</strong>.<br>
-            Deseja substituir os dados atuais?
+            Já existe uma malha ativa para <strong>{{ DadosModal.mes_ref.strftime('%m/%Y') }}</strong>.<br>
+            Deseja arquivar a anterior e ativar esta?
         </p>
         
-        <form method="POST" class="d-flex justify-content-center gap-3">
+        <form method="POST" id="form-substituicao" class="d-flex justify-content-center gap-3">
             <input type="hidden" name="confirmar_substituicao" value="true">
             <input type="hidden" name="caminho_temp" value="{{ DadosModal.caminho_temp }}">
             <input type="hidden" name="nome_arquivo" value="{{ DadosModal.nome_arquivo }}">
             <input type="hidden" name="mes_ref" value="{{ DadosModal.mes_ref }}">
             
-            <a href="{{ url_for('Aeroporto.Gerenciar') }}" class="btn btn-secondary">Cancelar</a>
-            <button type="submit" class="btn btn-warning"><i class="ph-bold ph-arrows-clockwise"></i> Substituir</button>
+            <a href="{{ url_for('Malha.Gerenciar') }}" class="btn btn-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-warning" id="btn-confirmar-substituicao">
+                <i class="ph-bold ph-arrows-clockwise"></i> Confirmar Substituição
+            </button>
         </form>
     </div>
 </div>
@@ -97,15 +99,10 @@
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-4">
         <div>
             <h2 class="font-black text-main m-0 d-flex align-items-center gap-2" style="font-size: 1.8rem; letter-spacing: -0.5px;">
-                <i class="ph-duotone ph-map-pin text-primary"></i> Base de Aeroportos
+                <i class="ph-duotone ph-airplane-tilt text-primary"></i> Gestão de Malha Aérea
             </h2>
-            <p class="text-muted mt-1 font-medium">Cadastro mundial de códigos IATA/ICAO e coordenadas geográficas.</p>
+            <p class="text-muted mt-1 font-medium">Importação de planilhas de voos e controle de vigência.</p>
         </div>
-        
-        <a href="{{ url_for('Aeroporto.RankingIndex') }}" class="btn btn-primary d-flex align-items-center gap-2 hover-lift" style="padding: 10px 20px; font-size: 1rem;">
-            <i class="ph-bold ph-chart-bar text-xl"></i>
-            <span>Definir Prioridades (Ranking)</span>
-        </a>
     </div>
 
     <div class="luft-manager-grid">
@@ -113,26 +110,26 @@
         <div class="luft-card" style="padding: 0; height: fit-content; overflow: hidden;">
             <div class="d-flex justify-content-between align-items-center" style="padding: 20px 24px; border-bottom: 1px solid var(--luft-border); background: transparent;">
                 <h3 class="font-bold text-main m-0 text-lg d-flex align-items-center gap-2">
-                    <i class="ph-bold ph-globe text-primary"></i> Atualizar Base
+                    <i class="ph-bold ph-upload-simple text-primary"></i> Nova Importação
                 </h3>
             </div>
             
             <div style="padding: 24px;">
-                <form method="POST" enctype="multipart/form-data">
-                    <label class="form-label text-xs font-bold text-muted mb-2 text-uppercase d-block">Arquivo CSV (Padrão ICAO)</label>
+                <form method="POST" enctype="multipart/form-data" id="form-upload-malha">
+                    <label class="form-label text-xs font-bold text-muted mb-2 text-uppercase d-block">ARQUIVO EXCEL (.XLSX)</label>
                     
-                    <div class="luft-upload-container" onclick="document.getElementById('fileInput').click()">
-                        <i class="ph-duotone ph-file-csv luft-upload-icon"></i>
+                    <div class="luft-upload-container" id="area-upload">
+                        <i class="ph-duotone ph-file-xls luft-upload-icon"></i>
                         <div class="font-bold text-main">Clique ou arraste aqui</div>
-                        <div class="text-xs text-muted mt-1">Suporta apenas arquivos .csv</div>
-                        <input type="file" id="fileInput" name="arquivo_csv" accept=".csv" style="display: none;" onchange="this.form.submit()">
+                        <div class="text-xs text-muted mt-1">Suporta apenas arquivos .xlsx</div>
+                        <input type="file" id="inputArquivoExcel" name="arquivo_xlsx" accept=".xlsx" style="display: none;">
                     </div>
 
                     <div class="luft-alert luft-alert-info mt-4" style="margin-bottom: 0;">
                         <i class="ph-fill ph-info luft-alert-icon"></i>
                         <div class="luft-alert-content">
-                            <h4 class="luft-alert-title">Nota</h4>
-                            <p class="luft-alert-text">A data de referência será definida automaticamente como o mês atual.</p>
+                            <h4 class="luft-alert-title">Instruções</h4>
+                            <p class="luft-alert-text">O sistema detecta automaticamente o mês de referência baseada nas datas do arquivo.</p>
                         </div>
                     </div>
                 </form>
@@ -153,7 +150,7 @@
                         <tr>
                             <th>Referência</th>
                             <th>Tipo</th>
-                            <th>Arquivo</th>
+                            <th>Arquivo Original</th>
                             <th>Responsável</th>
                             <th>Status</th>
                             <th style="text-align: center;">Ações</th>
@@ -172,8 +169,8 @@
                             </td>
                             <td>
                                 <div class="d-flex align-items-center gap-2 font-medium">
-                                    <i class="ph-fill ph-file-csv text-success text-lg"></i>
-                                    {{ remessa.NomeArquivoOriginal[:30] }}
+                                    <i class="ph-fill ph-file-xls text-success text-lg"></i>
+                                    {{ remessa.NomeArquivoOriginal[:30] }}{{ '...' if remessa.NomeArquivoOriginal|length > 30 }}
                                 </div>
                             </td>
                             <td>
@@ -189,9 +186,8 @@
                             </td>
                             <td style="text-align: center;">
                                 <div class="d-flex justify-content-center">
-                                    <a href="{{ url_for('Aeroporto.Excluir', id_remessa=remessa.Id) }}" 
-                                       onclick="return confirm('ATENÇÃO: Isso apagará toda a base.\nContinuar?')"
-                                       class="btn btn-secondary d-flex align-items-center justify-content-center text-danger" title="Excluir" style="width: 36px; height: 36px; padding: 0;">
+                                    <a href="{{ url_for('Malha.Excluir', id_remessa=remessa.Id) }}" 
+                                       class="btn btn-secondary d-flex align-items-center justify-content-center text-danger btn-excluir-malha" title="Excluir Remessa" style="width: 36px; height: 36px; padding: 0;">
                                        <i class="ph-bold ph-trash text-lg"></i>
                                     </a>
                                 </div>
@@ -200,8 +196,8 @@
                         {% else %}
                         <tr>
                             <td colspan="6" style="text-align: center; padding: 60px; color: var(--luft-text-muted);">
-                                <i class="ph-duotone ph-globe-hemisphere-west text-muted" style="font-size: 3.5rem; margin-bottom: 10px;"></i><br>
-                                <span class="font-bold text-main">Nenhuma base carregada.</span>
+                                <i class="ph-duotone ph-folder-open text-muted" style="font-size: 3.5rem; margin-bottom: 10px;"></i><br>
+                                <span class="font-bold text-main">Nenhuma malha importada até o momento.</span>
                             </td>
                         </tr>
                         {% endfor %}
@@ -211,4 +207,12 @@
         </div>
     </div>
 </div>
+
+<script>
+    const rotasMalha = {
+        painelGerenciamento: "{{ url_for('Malha.Gerenciar') }}"
+    };
+</script>
+<script src="{{ url_for('static', filename='JS/Malha/Manager.js') }}"></script>
+
 {% endblock %}

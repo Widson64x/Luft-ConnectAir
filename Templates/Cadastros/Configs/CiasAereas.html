@@ -81,7 +81,7 @@
 </div>
 
 <style>
-    /* Estilos Glass */
+    /* Estilos Glass Originais */
     .glass-header {
         display: flex; justify-content: space-between; align-items: center;
         margin-bottom: 20px;
@@ -163,65 +163,7 @@
 </style>
 
 <script>
-    // URL CORRETA GERADA PELO FLASK
     const API_SALVAR = "{{ url_for('Configuracoes.SalvarScoreCia') }}";
-
-    function AtualizarLabel(cia, valor) {
-        const lbl = document.getElementById(`lbl-${cia}`);
-        lbl.innerText = valor + '%';
-        lbl.className = 'score-badge';
-        const nivel = Math.floor(valor / 20);
-        lbl.classList.add(`score-${nivel}`);
-    }
-
-    function SalvarPreferencia(cia, valor) {
-        fetch(API_SALVAR, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cia: cia, score: valor })
-        })
-        .then(r => r.json())
-        .then(d => {
-            if(!d.sucesso) alert('Erro ao salvar preferência.');
-        })
-        .catch(err => console.error(err));
-    }
-
-    // --- Lógica do Modal ---
-    function AbrirModalNovaCia() {
-        document.getElementById('input-nova-cia').value = '';
-        const el = document.getElementById('modal-nova-cia');
-        el.classList.remove('hidden');
-        setTimeout(() => el.classList.add('visible'), 10);
-    }
-
-    function FecharModalNovaCia(e) {
-        if (e && !e.target.classList.contains('modal-backdrop')) return;
-        const el = document.getElementById('modal-nova-cia');
-        el.classList.remove('visible');
-        setTimeout(() => el.classList.add('hidden'), 300);
-    }
-
-    function SalvarNovaCia() {
-        const nome = document.getElementById('input-nova-cia').value.trim().toUpperCase();
-        const score = document.getElementById('input-novo-score').value;
-
-        if(!nome) { alert('Digite o nome da Cia.'); return; }
-
-        // Usa a mesma API para criar
-        fetch(API_SALVAR, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cia: nome, score: score })
-        })
-        .then(r => r.json())
-        .then(d => {
-            if(d.sucesso) {
-                location.reload(); // Recarrega para mostrar na lista
-            } else {
-                alert('Erro ao criar companhia.');
-            }
-        });
-    }
 </script>
+<script src="{{ url_for('static', filename='JS/Configs/CiasAereas.js') }}"></script>
 {% endblock %}

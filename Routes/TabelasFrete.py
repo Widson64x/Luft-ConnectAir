@@ -8,7 +8,7 @@ FreteBp = Blueprint('Frete', __name__)
 
 @FreteBp.route('/Fretes/Gerenciar', methods=['GET', 'POST'])
 @login_required
-@RequerPermissao('cadastros.tabelas.visualizar')
+@RequerPermissao('CADASTROS.TABELAS_FRETE.VISUALIZAR')
 def Gerenciar():
     if request.method == 'POST':
         if 'arquivo_xlsx' in request.files:
@@ -25,11 +25,11 @@ def Gerenciar():
                 return redirect(url_for('Frete.Gerenciar'))
 
     Historico = TabelaFreteService.ListarRemessas()
-    return render_template('Pages/TabelasFrete/Manager.html', ListaRemessas=Historico)
+    return render_template('Cadastros/TabelasFrete/Manager.html', ListaRemessas=Historico)
 
 @FreteBp.route('/Fretes/Excluir/<int:id_remessa>')
 @login_required
-@RequerPermissao('cadastros.tabelas.editar')
+@RequerPermissao('CADASTROS.TABELAS_FRETE.DELETAR')
 def Excluir(id_remessa):
     Sucesso, Msg = TabelaFreteService.ExcluirRemessa(id_remessa)
     if Sucesso: flash(Msg, 'info')

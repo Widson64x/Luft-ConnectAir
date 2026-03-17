@@ -9,7 +9,7 @@ CidadeBp = Blueprint('Cidade', __name__)
 
 @CidadeBp.route('/Cidades/Gerenciar', methods=['GET', 'POST'])
 @login_required
-@RequerPermissao('cadastros.cidades.editar')
+@RequerPermissao('CADASTROS.CIDADES.EDITAR')
 def Gerenciar():
     ModalConfirmacao = False
     DadosConfirmacao = {}
@@ -51,11 +51,11 @@ def Gerenciar():
             return redirect(url_for('Cidade.Gerenciar'))
 
     Historico = CidadesService.ListarRemessas()
-    return render_template('Pages/Cidades/Manager.html', ListaRemessas=Historico, ExibirModal=ModalConfirmacao, DadosModal=DadosConfirmacao)
+    return render_template('Cadastros/Cidades/Manager.html', ListaRemessas=Historico, ExibirModal=ModalConfirmacao, DadosModal=DadosConfirmacao)
 
 @CidadeBp.route('/Cidades/Excluir/<int:id_remessa>')
 @login_required
-@RequerPermissao('cadastros.cidades.editar')
+@RequerPermissao('CADASTROS.CIDADES.DELETAR')
 def Excluir(id_remessa):
     LogService.Info("Route.Cidades", f"Usuário {current_user.Login} solicitou exclusão da remessa {id_remessa}")
     Ok, Msg = CidadesService.ExcluirRemessa(id_remessa)

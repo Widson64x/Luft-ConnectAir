@@ -6,56 +6,32 @@
 {% block conteudo %}
 
 <style>
-    .luft-config-wrapper {
-        animation: slideUpFade 0.5s ease-out forwards;
-    }
-
-    @keyframes slideUpFade { 
-        from { opacity: 0; transform: translateY(15px); } 
-        to { opacity: 1; transform: translateY(0); } 
-    }
+    .luft-config-wrapper { animation: slideUpFade 0.5s ease-out forwards; }
+    @keyframes slideUpFade { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 
     .luft-config-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-        gap: 24px;
-        margin-top: 24px;
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 24px; margin-top: 24px;
     }
 
     .luft-config-card {
-        background: var(--luft-bg-panel);
-        border: 1px solid var(--luft-border);
-        border-radius: 16px;
-        padding: 24px;
-        display: flex;
-        gap: 20px;
-        text-decoration: none;
-        color: var(--luft-text-main);
+        background: var(--luft-bg-panel); border: 1px solid var(--luft-border);
+        border-radius: 16px; padding: 24px; display: flex; gap: 20px;
+        text-decoration: none; color: var(--luft-text-main);
         transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         box-shadow: var(--luft-shadow-sm);
     }
 
     .luft-config-card:hover:not(.disabled) {
-        border-color: var(--luft-primary-500);
-        transform: translateY(-6px);
+        border-color: var(--luft-primary-500); transform: translateY(-6px);
         box-shadow: var(--luft-shadow-lg);
     }
 
-    .luft-config-card.disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-        background: var(--luft-bg-app);
-    }
+    .luft-config-card.disabled { opacity: 0.5; cursor: not-allowed; background: var(--luft-bg-app); }
 
     .luft-config-icon {
-        width: 56px;
-        height: 56px;
-        border-radius: 14px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.8rem;
-        flex-shrink: 0;
+        width: 56px; height: 56px; border-radius: 14px; display: flex;
+        align-items: center; justify-content: center; font-size: 1.8rem; flex-shrink: 0;
     }
 </style>
 
@@ -71,9 +47,7 @@
 
     <div class="luft-config-grid">
         <a href="{{ url_for('Seguranca.Index') }}" class="luft-config-card">
-            <div class="luft-config-icon bg-primary-light text-primary">
-                <i class="ph-bold ph-shield-check"></i>
-            </div>
+            <div class="luft-config-icon bg-primary-light text-primary"><i class="ph-bold ph-shield-check"></i></div>
             <div>
                 <h3 class="font-bold text-main m-0 mb-1" style="font-size: 1.1rem;">Permissões de Acesso</h3>
                 <p class="text-xs text-muted" style="line-height: 1.5;">Gerencie grupos de usuários, níveis de acesso e vincule permissões a funcionalidades.</p>
@@ -81,9 +55,7 @@
         </a>
 
         <a href="{{ url_for('Configuracoes.GerenciarCias') }}" class="luft-config-card">
-            <div class="luft-config-icon bg-success-light text-success">
-                <i class="ph-bold ph-airplane-tilt"></i>
-            </div>
+            <div class="luft-config-icon bg-success-light text-success"><i class="ph-bold ph-airplane-tilt"></i></div>
             <div>
                 <h3 class="font-bold text-main m-0 mb-1" style="font-size: 1.1rem;">Índice de Prioridade</h3>
                 <p class="text-xs text-muted" style="line-height: 1.5;">Defina o nível de preferência para cada companhia aérea parceira nas roteirizações.</p>
@@ -91,9 +63,7 @@
         </a>
 
         <a href="#" class="luft-config-card" onclick="LuftCore.alternarTema(); return false;">
-            <div class="luft-config-icon bg-warning-light text-warning">
-                <i class="ph-bold ph-paint-brush-broad"></i>
-            </div>
+            <div class="luft-config-icon bg-warning-light text-warning"><i class="ph-bold ph-paint-brush-broad"></i></div>
             <div>
                 <h3 class="font-bold text-main m-0 mb-1" style="font-size: 1.1rem;">Aparência e Tema</h3>
                 <p class="text-xs text-muted" style="line-height: 1.5;">Alterne manualmente entre o modo claro e escuro para melhor conforto visual.</p>
@@ -101,9 +71,7 @@
         </a>
 
         <div class="luft-config-card disabled">
-            <div class="luft-config-icon bg-info-light text-info">
-                <i class="ph-bold ph-scroll"></i>
-            </div>
+            <div class="luft-config-icon bg-info-light text-info"><i class="ph-bold ph-scroll"></i></div>
             <div>
                 <h3 class="font-bold text-main m-0 mb-1" style="font-size: 1.1rem;">Logs de Auditoria</h3>
                 <p class="text-xs text-muted" style="line-height: 1.5;">Em breve: Visualize quem acessou o que e quando. Histórico de segurança.</p>
@@ -111,9 +79,7 @@
         </div>
 
         <div class="luft-config-card disabled">
-            <div class="luft-config-icon bg-danger-light text-danger">
-                <i class="ph-bold ph-plugs"></i>
-            </div>
+            <div class="luft-config-icon bg-danger-light text-danger"><i class="ph-bold ph-plugs"></i></div>
             <div>
                 <h3 class="font-bold text-main m-0 mb-1" style="font-size: 1.1rem;">Integrações API</h3>
                 <p class="text-xs text-muted" style="line-height: 1.5;">Em breve: Gerencie chaves de API e conexões externas (Omie, Totvs).</p>

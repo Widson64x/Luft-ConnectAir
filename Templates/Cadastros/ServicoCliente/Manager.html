@@ -157,7 +157,7 @@
                                         {# CASO 2: Múltiplos CNPJs #}
                                         <li>
                                             <div class="luft-tree-item">
-                                                <i class="ph-bold ph-caret-right toggle-icon" onclick="ToggleTree(this)"></i>
+                                                <i class="ph-bold ph-caret-right toggle-icon" onclick="toggleTree(this)"></i>
                                                 <input type="checkbox" class="chk-grupo" id="grupo_{{ loop.index }}" value="{{ grupo }}">
                                                 <label for="grupo_{{ loop.index }}"><strong class="text-primary"><i class="ph-bold ph-folders"></i> {{ grupo or 'Geral / Sem Grupo' }}</strong></label>
                                             </div>
@@ -240,7 +240,7 @@
                     <button type="submit" id="BtnSubmit" class="btn btn-primary d-flex align-items-center justify-content-center gap-2" style="width: 100%;">
                         <i class="ph-bold ph-floppy-disk"></i> Salvar Lote
                     </button>
-                    <button type="button" id="BtnCancel" class="btn btn-secondary d-flex align-items-center justify-content-center gap-2 mt-2" style="width: 100%; display: none;" onclick="CancelarEdicao()">
+                    <button type="button" id="BtnCancel" class="btn btn-secondary d-flex align-items-center justify-content-center gap-2 mt-2" style="width: 100%; display: none;" onclick="cancelarEdicao()">
                         <i class="ph-bold ph-x"></i> Cancelar Edição
                     </button>
                 </form>
@@ -252,7 +252,7 @@
                 <h3 class="font-bold text-main m-0 text-lg d-flex align-items-center gap-2">
                     <i class="ph-bold ph-list-dashes text-primary"></i> Clientes Configurados
                 </h3>
-                <button onclick="CarregarListaServicos()" class="btn btn-secondary d-flex align-items-center gap-2" style="padding: 8px 16px; font-size: 0.85rem;">
+                <button onclick="carregarListaServicos()" class="btn btn-secondary d-flex align-items-center gap-2" style="padding: 8px 16px; font-size: 0.85rem;">
                     <i class="ph-bold ph-arrows-clockwise"></i> Atualizar
                 </button>
             </div>
@@ -289,260 +289,12 @@
 </div>
 
 <script>
-    const URL_SALVAR = "{{ url_for('ServicosClientes.SalvarServico') }}";
-    const URL_EDITAR_BASE = "{{ url_for('ServicosClientes.EditarServico', IdServico=0) }}";
-
-    document.addEventListener("DOMContentLoaded", function() {
-        CarregarListaServicos();
-        ConfigurarTreeview();
-    });
-
-    // --- LÓGICA DO TREEVIEW ---
-    function ToggleTree(icon) {
-        icon.classList.toggle('open');
-        const childrenContainer = icon.closest('li').querySelector('.luft-tree-children');
-        if(childrenContainer) {
-            childrenContainer.style.display = childrenContainer.style.display === 'block' ? 'none' : 'block';
-        }
-    }
-
-    function AtualizarContagem() {
-        const marcados = document.querySelectorAll('.chk-cliente:checked').length;
-        document.getElementById('InfoContagem').innerHTML = `${marcados} Cliente(s) Selecionado(s)`;
-    }
-
-    function ConfigurarTreeview() {
-        const treeRoot = document.querySelector('.luft-tree-root');
-        
-        treeRoot.addEventListener('change', function(e) {
-            const target = e.target;
-            
-            if (target.classList.contains('chk-grupo')) {
-                const parentLi = target.closest('li');
-                const childCheckboxes = parentLi.querySelectorAll('.chk-cliente');
-                childCheckboxes.forEach(chk => chk.checked = target.checked);
-            }
-            
-            if (target.classList.contains('chk-cliente')) {
-                UpdateParentStatus(target);
-            }
-            
-            AtualizarContagem();
-        });
-    }
-
-    function UpdateParentStatus(childCheckbox) {
-        let parentUl = childCheckbox.closest('.luft-tree-children');
-        if (!parentUl) return;
-        
-        let parentLi = parentUl.closest('li');
-        let parentCheckbox = parentLi.querySelector('.chk-grupo');
-        
-        let siblingCheckboxes = parentUl.querySelectorAll('.chk-cliente');
-        let allChecked = true;
-        let someChecked = false;
-
-        siblingCheckboxes.forEach(cb => {
-            if (cb.checked) someChecked = true;
-            else allChecked = false;
-        });
-
-        parentCheckbox.checked = allChecked;
-        parentCheckbox.indeterminate = someChecked && !allChecked;
-    }
-    // --- FIM LÓGICA TREEVIEW ---
-
-    function CarregarListaServicos() {
-        const loader = document.getElementById('loader-tabela');
-        const tabela = document.getElementById('tabela-servicos');
-        const tbody = document.getElementById('tbody-servicos');
-        const emptyState = document.getElementById('empty-state');
-
-        loader.style.display = 'block';
-        tabela.style.display = 'none';
-        emptyState.style.display = 'none';
-
-        fetch("{{ url_for('ServicosClientes.ListaServicosContratados') }}")
-            .then(response => response.json())
-            .then(data => {
-                tbody.innerHTML = '';
-                
-                if (data.length === 0) {
-                    loader.style.display = 'none';
-                    emptyState.style.display = 'block';
-                    return;
-                }
-
-                const grupos = data.reduce((acumulador, item) => {
-                    if (!acumulador[item.Grupo]) acumulador[item.Grupo] = [];
-                    acumulador[item.Grupo].push(item);
-                    return acumulador;
-                }, {});
-
-                const nomesGrupos = Object.keys(grupos).sort();
-
-                nomesGrupos.forEach((nomeGrupo, indexGrupo) => {
-                    const clientesDoGrupo = grupos[nomeGrupo];
-                    const nomeExibicaoGrupo = nomeGrupo === 'Z_Sem Grupo' ? 'Geral / Sem Grupo' : nomeGrupo;
-
-                    // CABEÇALHO DO GRUPO (A "Pastinha")
-                    const trGrupo = document.createElement('tr');
-                    trGrupo.className = 'linha-grupo-header';
-                    trGrupo.style.backgroundColor = 'var(--luft-bg-app)';
-                    trGrupo.style.cursor = 'pointer';
-                    trGrupo.innerHTML = `
-                        <td colspan="5" style="padding: 12px 24px; font-weight: 700; color: var(--luft-text-main);" onclick="ToggleTabelaGrupo('grupo_tabela_${indexGrupo}')">
-                            <i class="ph-bold ph-caret-down toggle-icon-tabela" id="icon_tabela_${indexGrupo}" style="transition: transform 0.2s; display: inline-block;"></i>
-                            <i class="ph-bold ph-folders" style="margin-left: 8px; margin-right: 8px; color: var(--luft-primary-600);"></i>
-                            ${nomeExibicaoGrupo} 
-                            <span style="font-size: 0.8rem; color: var(--luft-text-muted); font-weight: 600; margin-left: 6px;">(${clientesDoGrupo.length} serviço(s))</span>
-                        </td>
-                    `;
-                    tbody.appendChild(trGrupo);
-
-                    // CLIENTES DO GRUPO
-                    clientesDoGrupo.forEach(item => {
-                        const getBadgeAutorizacao = (valor) => {
-                            if(valor === 'SIM') return `<span class="luft-badge luft-badge-success">SIM</span>`;
-                            if(valor === 'NÃO') return `<span class="luft-badge luft-badge-danger">NÃO</span>`;
-                            return `<span class="luft-badge luft-badge-warning">SOB AUTORIZAÇÃO</span>`;
-                        };
-
-                        const getBadgeServico = (valor) => {
-                            if(valor === 'EXPRESSO') return `<span class="luft-badge luft-badge-warning"><i class="ph-fill ph-lightning"></i> EXPRESSO</span>`;
-                            if(valor === 'DEPENDE_DO_DESTINO') return `<span class="luft-badge luft-badge-info"><i class="ph-fill ph-star"></i> DEPENDE DO DESTINO</span>`;
-                            return `<span class="luft-badge luft-badge-success"><i class="ph-fill ph-truck"></i> ECONÔMICO</span>`;
-                        };
-
-                        const tr = document.createElement('tr');
-                        tr.className = `linha-grupo-tabela grupo_tabela_${indexGrupo}`; 
-                        
-                        const urlExcluir = `{{ url_for('ServicosClientes.ExcluirServico', IdServico=0) }}`.replace('0', item.Id);
-                        const nomeExibicao = item.Fantasia || item.RazaoSocial || 'Nome não cadastrado';
-
-                        tr.innerHTML = `
-                            <td style="padding-left: 40px;"> 
-                                <div style="font-size: 0.75rem; font-weight: 800; color: var(--luft-primary-600); margin-bottom: 2px;">
-                                    CÓD: ${item.CodigoCliente}
-                                </div>
-                                <div style="font-weight: 700; color: var(--luft-text-main);">
-                                    ${nomeExibicao}
-                                </div>
-                                <div style="font-size: 0.75rem; color: var(--luft-text-muted); margin-top: 2px; font-family: monospace;">
-                                    CNPJ: ${item.Cnpj || 'N/A'}
-                                </div>
-                            </td>
-                            <td>
-                                <div style="margin-bottom: 4px; font-size: 0.85rem;"><strong class="text-muted">Validade:</strong> <span class="font-bold text-main">${item.DurabilidadeGelo}</span></div>
-                                <div style="font-size: 0.85rem;"><strong class="text-muted">Troca:</strong> ${getBadgeAutorizacao(item.AutorizacaoTrocaGelo)}</div>
-                            </td>
-                            <td>${getBadgeAutorizacao(item.AutorizacaoArmazenagem)}</td>
-                            <td>${getBadgeServico(item.ServicoContratado)}</td>
-                            <td style="text-align: center;">
-                                <div class="d-flex justify-content-center gap-2">
-                                    <button class="btn btn-secondary text-primary d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; padding: 0;" title="Editar" 
-                                        onclick="PrepararEdicao(${item.Id}, '${item.CodigoCliente}', '${item.DurabilidadeGelo}', '${item.AutorizacaoTrocaGelo}', '${item.AutorizacaoArmazenagem}', '${item.ServicoContratado}')">
-                                        <i class="ph-bold ph-pencil-simple text-lg"></i>
-                                    </button>
-                                    
-                                    <form action="${urlExcluir}" method="POST" style="display:inline;" onsubmit="return confirm('Tem certeza que deseja excluir as parametrizações deste cliente?');">
-                                        <button type="submit" class="btn btn-secondary text-danger d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; padding: 0;" title="Excluir">
-                                            <i class="ph-bold ph-trash text-lg"></i>
-                                        </button>
-                                    </form>
-                                </div>
-                            </td>
-                        `;
-                        tbody.appendChild(tr);
-                    });
-                });
-
-                loader.style.display = 'none';
-                tabela.style.display = 'table';
-            })
-            .catch(error => {
-                console.error("Erro ao carregar lista:", error);
-                loader.innerHTML = `<p class="text-danger font-bold"><i class="ph-bold ph-warning"></i> Erro ao carregar dados.</p>`;
-            });
-    }
-
-    function ToggleTabelaGrupo(classeGrupo) {
-        const linhas = document.querySelectorAll('.' + classeGrupo);
-        const icone = document.getElementById(classeGrupo.replace('grupo_tabela_', 'icon_tabela_'));
-        
-        let isHidden = false;
-        if(linhas.length > 0) {
-            isHidden = linhas[0].style.display === 'none';
-        }
-
-        linhas.forEach(linha => {
-            linha.style.display = isHidden ? 'table-row' : 'none';
-        });
-
-        if (icone) {
-            icone.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(-90deg)';
-        }
-    }
-
-    function PrepararEdicao(id, codigoCliente, durabilidade, troca, armazenagem, servico) {
-        document.getElementById('DurabilidadeGelo').value = durabilidade;
-        document.getElementById('AutorizacaoTrocaGelo').value = troca;
-        document.getElementById('AutorizacaoArmazenagem').value = armazenagem;
-        document.getElementById('ServicoContratado').value = servico;
-
-        document.querySelectorAll('.chk-cliente, .chk-grupo').forEach(chk => chk.checked = false);
-        
-        let chkEdit = document.getElementById('cliente_' + codigoCliente);
-        if(chkEdit) {
-            chkEdit.checked = true;
-            UpdateParentStatus(chkEdit);
-            
-            let parentUl = chkEdit.closest('.luft-tree-children');
-            if(parentUl) {
-                parentUl.style.display = 'block';
-                let icon = parentUl.closest('li').querySelector('.toggle-icon');
-                if(icon) icon.classList.add('open');
-            }
-        }
-        AtualizarContagem();
-
-        const form = document.getElementById('FormServico');
-        form.action = URL_EDITAR_BASE.replace('0', id);
-        
-        document.getElementById('FormTitle').innerHTML = '<i class="ph-bold ph-pencil-simple text-warning"></i> Editando Parametrização';
-        
-        const btnSubmit = document.getElementById('BtnSubmit');
-        btnSubmit.innerHTML = '<i class="ph-bold ph-check-circle"></i> Atualizar Configuração';
-        btnSubmit.classList.remove('btn-primary');
-        btnSubmit.classList.add('btn-success');
-        
-        document.getElementById('BtnCancel').style.display = 'flex';
-        
-        // Em telas pequenas rola pro topo do form
-        if(window.innerWidth < 1100) {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-    }
-
-    function CancelarEdicao() {
-        const form = document.getElementById('FormServico');
-        form.reset();
-        
-        document.querySelectorAll('.chk-cliente, .chk-grupo').forEach(chk => {
-            chk.checked = false;
-            chk.indeterminate = false;
-        });
-        AtualizarContagem();
-        
-        form.action = URL_SALVAR;
-        document.getElementById('FormTitle').innerHTML = '<i class="ph-bold ph-plus-circle text-primary"></i> Nova Parametrização Lote';
-        
-        const btnSubmit = document.getElementById('BtnSubmit');
-        btnSubmit.innerHTML = '<i class="ph-bold ph-floppy-disk"></i> Salvar Lote';
-        btnSubmit.classList.remove('btn-success');
-        btnSubmit.classList.add('btn-primary');
-        
-        document.getElementById('BtnCancel').style.display = 'none';
-    }
+    const rotasServicos = {
+        salvar: "{{ url_for('ServicosClientes.SalvarServico') }}",
+        listar: "{{ url_for('ServicosClientes.ListaServicosContratados') }}",
+        editarBase: "{{ url_for('ServicosClientes.EditarServico', IdServico=0) }}",
+        excluirBase: "{{ url_for('ServicosClientes.ExcluirServico', IdServico=0) }}"
+    };
 </script>
+<script src="{{ url_for('static', filename='JS/ServicoCliente/Manager.js') }}"></script>
 {% endblock %}

@@ -110,6 +110,7 @@ def RequerPermissao(Chave):
 
             Permitido = PermissaoService.VerificarPermissao(current_user, Chave)
 
+            # Se não conseguir determinar o IP real, cai para o IP da requisição (um pouco menos ideal, mas evita falhas críticas)
             x_forwarded_for = request.headers.get('X-Forwarded-For')
             if x_forwarded_for:
                 ip_real = x_forwarded_for.split(',')[0].strip()
@@ -117,6 +118,7 @@ def RequerPermissao(Chave):
                 ip_real = request.headers.get('X-Real-IP', request.remote_addr)
 
             params_dict = {}
+            # Se fornecer parâmetros, converte para string (limite de 1000 chars para evitar logs gigantes)
             if request.args: params_dict['query'] = dict(request.args)
             if request.form: params_dict['form'] = dict(request.form)
             if request.is_json: params_dict['json'] = request.get_json(silent=True)

@@ -7,18 +7,18 @@ ConfiguracoesBp = Blueprint('Configuracoes', __name__)
 
 @ConfiguracoesBp.route('/')
 @login_required
-@RequerPermissao('sistema.configuracoes.visualizar')
+@RequerPermissao('SISTEMA.CONFIGURACOES.VISUALIZAR')
 def Index():
     return render_template('Pages/Configs/Index.html')
 
 @ConfiguracoesBp.route('/CiasAereas')
-@RequerPermissao('sistema.configuracoes.editar')
+@RequerPermissao('SISTEMA.CONFIGURACOES.VISUALIZAR')
 def GerenciarCias():
     Lista = CiaAereaService.ObterTodasCias()
     return render_template('Pages/Configs/CiasAereas.html', Cias=Lista)
 
 @ConfiguracoesBp.route('/API/CiasAereas/Salvar', methods=['POST'])
-@RequerPermissao('sistema.configuracoes.editar')
+@RequerPermissao('SISTEMA.CONFIGURACOES.EDITAR')
 def SalvarScoreCia():
     try:
         data = request.json

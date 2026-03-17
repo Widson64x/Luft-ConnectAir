@@ -5,77 +5,35 @@
 
 {% block conteudo %}
 <style>
-    .luft-perm-container {
-        display: flex; flex-direction: column; gap: var(--luft-space-6); 
-        height: 100%; overflow: hidden;
-    }
-    .luft-tabs-header {
-        display: flex; gap: var(--luft-space-4); margin-bottom: var(--luft-space-4);
-        border-bottom: 1px solid var(--luft-border); padding-bottom: 0; flex-shrink: 0;
-    }
-    .luft-tab-btn {
-        padding: var(--luft-space-3) var(--luft-space-2); background: transparent; border: none; 
-        border-bottom: 3px solid transparent; font-weight: 600; font-size: var(--luft-text-sm); 
-        color: var(--luft-text-muted); cursor: pointer; transition: 0.2s; 
-        display: flex; align-items: center; gap: var(--luft-space-2);
-    }
+    /* Estilos Originais */
+    .luft-perm-container { display: flex; flex-direction: column; gap: var(--luft-space-6); height: 100%; overflow: hidden; }
+    .luft-tabs-header { display: flex; gap: var(--luft-space-4); margin-bottom: var(--luft-space-4); border-bottom: 1px solid var(--luft-border); padding-bottom: 0; flex-shrink: 0; }
+    .luft-tab-btn { padding: var(--luft-space-3) var(--luft-space-2); background: transparent; border: none; border-bottom: 3px solid transparent; font-weight: 600; font-size: var(--luft-text-sm); color: var(--luft-text-muted); cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: var(--luft-space-2); }
     .luft-tab-btn:hover:not(.ativo) { color: var(--luft-text-main); }
     .luft-tab-btn.ativo { color: var(--luft-primary-600); border-bottom-color: var(--luft-primary-600); }
 
-    .luft-split-view {
-        display: flex; gap: var(--luft-space-6); width: 100%;
-        height: calc(100vh - 260px); min-height: 400px;
-    }
+    .luft-split-view { display: flex; gap: var(--luft-space-6); width: 100%; height: calc(100vh - 260px); min-height: 400px; }
     
-    .luft-sidebar-list {
-        width: 320px; background: var(--luft-bg-panel); border-radius: var(--luft-radius-xl);
-        border: 1px solid var(--luft-border); display: flex; flex-direction: column; flex-shrink: 0;
-        height: 100%; overflow: hidden; 
-    }
+    .luft-sidebar-list { width: 320px; background: var(--luft-bg-panel); border-radius: var(--luft-radius-xl); border: 1px solid var(--luft-border); display: flex; flex-direction: column; flex-shrink: 0; height: 100%; overflow: hidden; }
     .luft-sidebar-search { padding: var(--luft-space-4); border-bottom: 1px solid var(--luft-border-light); }
     
     .luft-list-content { flex: 1; overflow-y: auto; padding: var(--luft-space-2); } 
     
-    .luft-list-item {
-        padding: var(--luft-space-3) var(--luft-space-4); margin-bottom: var(--luft-space-1); 
-        border-radius: var(--luft-radius-lg); cursor: pointer; transition: all 0.2s; 
-        border-left: 3px solid transparent; display: flex; justify-content: space-between; align-items: center;
-    }
+    .luft-list-item { padding: var(--luft-space-3) var(--luft-space-4); margin-bottom: var(--luft-space-1); border-radius: var(--luft-radius-lg); cursor: pointer; transition: all 0.2s; border-left: 3px solid transparent; display: flex; justify-content: space-between; align-items: center; }
     .luft-list-item:hover { background: var(--luft-bg-panel-hover); }
     .luft-list-item.ativo { background: var(--luft-primary-100); border-left-color: var(--luft-primary-600); }
 
-    .luft-main-panel {
-        flex: 1; background: var(--luft-bg-panel); border-radius: var(--luft-radius-xl);
-        border: 1px solid var(--luft-border); display: flex; flex-direction: column; position: relative;
-        height: 100%; overflow: hidden;
-    }
-    .luft-panel-header {
-        padding: var(--luft-space-5) var(--luft-space-6); border-bottom: 1px solid var(--luft-border); 
-        display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
-    }
+    .luft-main-panel { flex: 1; background: var(--luft-bg-panel); border-radius: var(--luft-radius-xl); border: 1px solid var(--luft-border); display: flex; flex-direction: column; position: relative; height: 100%; overflow: hidden; }
+    .luft-panel-header { padding: var(--luft-space-5) var(--luft-space-6); border-bottom: 1px solid var(--luft-border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
     .luft-panel-scroll { flex: 1; overflow-y: auto; padding: var(--luft-space-6); background: var(--luft-bg-app); }
 
-    .empty-state {
-        display: flex; flex-direction: column; align-items: center; justify-content: center; 
-        height: 100%; width: 100%; color: var(--luft-text-muted); text-align: center;
-    }
+    .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; width: 100%; color: var(--luft-text-muted); text-align: center; }
     .empty-state i { font-size: 4rem; opacity: 0.2; margin-bottom: 12px; }
     .empty-state h3 { font-size: 1.25rem; font-weight: 500; margin: 0; }
 
-    .luft-category-block {
-        background: var(--luft-bg-panel); border-radius: var(--luft-radius-xl);
-        border: 1px solid var(--luft-border); margin-bottom: var(--luft-space-6); 
-        overflow: hidden; box-shadow: var(--luft-shadow-sm);
-    }
-    .luft-category-header {
-        padding: var(--luft-space-3) var(--luft-space-5); background: var(--luft-primary-50);
-        border-bottom: 1px solid var(--luft-border-light); display: flex; align-items: center;
-    }
-    .luft-perm-item {
-        display: flex; justify-content: space-between; align-items: center; 
-        padding: var(--luft-space-4) var(--luft-space-5); border-bottom: 1px solid var(--luft-border-light); 
-        transition: background 0.2s;
-    }
+    .luft-category-block { background: var(--luft-bg-panel); border-radius: var(--luft-radius-xl); border: 1px solid var(--luft-border); margin-bottom: var(--luft-space-6); overflow: hidden; box-shadow: var(--luft-shadow-sm); }
+    .luft-category-header { padding: var(--luft-space-3) var(--luft-space-5); background: var(--luft-primary-50); border-bottom: 1px solid var(--luft-border-light); display: flex; align-items: center; }
+    .luft-perm-item { display: flex; justify-content: space-between; align-items: center; padding: var(--luft-space-4) var(--luft-space-5); border-bottom: 1px solid var(--luft-border-light); transition: background 0.2s; }
     .luft-perm-item:last-child { border-bottom: none; }
     .luft-perm-item:hover { background: var(--luft-bg-panel-hover); }
     .luft-perm-key { font-family: monospace; font-size: var(--luft-text-xs); background: var(--luft-slate-100); padding: 2px 6px; border-radius: 4px; color: var(--luft-text-muted); }
@@ -261,205 +219,17 @@
             <button type="button" class="btn btn-outline w-full" onclick="LuftCore.fecharModal('modalPermissao')">Cancelar</button>
         </div>
     </form>
-
-    <script>
-        function PreverChave() {
-            const mod = document.querySelector('input[name="modulo"]').value.toUpperCase().trim().replace(/ /g, '_') || 'MODULO';
-            const acao = document.querySelector('select[name="acao"]').value.toUpperCase().trim() || 'ACAO';
-            const exc = document.getElementById('inputExcecao').value.toUpperCase().trim().replace(/ /g, '_');
-            
-            let preview = `${mod}`;
-            if(exc) preview += `.${exc}`;
-            preview += `.${acao}`;
-            
-            document.getElementById('chavePreview').innerText = preview;
-        }
-    </script>
 {% endcall %}
 
 <script>
-    const PODE_EDITAR = {{ 'true' if PodeEditar else 'false' }};
-
-    let MODO = 'Grupo'; 
-    let ID_ATUAL = null;
-    let DADOS_ATUAIS = null;
-    
-    function MudarAba(novaAba) {
-        document.querySelectorAll('.luft-tab-btn').forEach(b => b.classList.remove('ativo'));
-        event.currentTarget.classList.add('ativo');
-
-        document.getElementById('listaGrupos').classList.toggle('d-none', novaAba !== 'grupo');
-        document.getElementById('listaGrupos').classList.toggle('d-block', novaAba === 'grupo');
-        document.getElementById('listaUsuarios').classList.toggle('d-none', novaAba !== 'usuario');
-        document.getElementById('listaUsuarios').classList.toggle('d-block', novaAba === 'usuario');
-        
-        document.getElementById('painelPermissoes').classList.remove('d-flex');
-        document.getElementById('painelPermissoes').classList.add('d-none');
-        document.getElementById('estadoVazio').classList.remove('d-none');
-        
-        document.getElementById('msgVazio').innerText = (novaAba === 'grupo') ? 'Selecione um grupo ao lado' : 'Selecione um usuário ao lado';
-        
-        MODO = (novaAba === 'grupo') ? 'Grupo' : 'Usuario';
-        ID_ATUAL = null;
-        document.querySelectorAll('.luft-list-item').forEach(i => i.classList.remove('ativo'));
-    }
-
-    async function CarregarGrupo(el, id, nome) {
-        if(MODO !== 'Grupo') return;
-        ID_ATUAL = id;
-        AtivarItemLista(el);
-        PrepararPainel(nome, 'Editando permissões gerais do grupo');
-
-        try {
-            // Mudou de Configuracoes.BuscarAcessosGrupo para Seguranca.BuscarAcessosGrupo
-            const resp = await fetch("{{ url_for('Seguranca.BuscarAcessosGrupo') }}?idGrupo=" + id);
-            const dados = await resp.json();
-            const ativos = new Set(dados.ids_ativos);
-            
-            document.querySelectorAll('.check-perm').forEach(chk => {
-                const idPerm = parseInt(chk.dataset.id);
-                chk.checked = ativos.has(idPerm);
-                chk.disabled = !PODE_EDITAR;
-                ConfigurarVisualUsuario(idPerm, null, null, null); 
-            });
-        } catch (e) { alert('Erro ao carregar grupo.'); console.error(e); }
-    }
-
-    async function CarregarUsuario(el, id, nome) {
-        if(MODO !== 'Usuario') return;
-        ID_ATUAL = id;
-        AtivarItemLista(el);
-        PrepararPainel(nome, 'Editando exceções e heranças');
-
-        try {
-            // Mudou de Configuracoes.BuscarAcessosUsuario para Seguranca.BuscarAcessosUsuario
-            const resp = await fetch("{{ url_for('Seguranca.BuscarAcessosUsuario') }}?idUsuario=" + id);
-            DADOS_ATUAIS = await resp.json();
-            
-            const heranca = new Set(DADOS_ATUAIS.heranca_grupo);
-            const permitidos = new Set(DADOS_ATUAIS.usuario_permitidos);
-            const bloqueados = new Set(DADOS_ATUAIS.usuario_bloqueados);
-
-            document.querySelectorAll('.check-perm').forEach(chk => {
-                const idPerm = parseInt(chk.dataset.id);
-                let isChecked = false;
-                let tipoStatus = 'herdado';
-
-                if (permitidos.has(idPerm)) {
-                    isChecked = true;
-                    tipoStatus = 'forcado';
-                } else if (bloqueados.has(idPerm)) {
-                    isChecked = false;
-                    tipoStatus = 'bloqueado';
-                } else {
-                    isChecked = heranca.has(idPerm);
-                    tipoStatus = 'herdado';
-                }
-
-                chk.checked = isChecked;
-                chk.disabled = !PODE_EDITAR;
-                ConfigurarVisualUsuario(idPerm, tipoStatus, isChecked, heranca.has(idPerm));
-            });
-        } catch (e) { alert('Erro ao carregar usuário.'); console.error(e); }
-    }
-
-    async function ProcessarClick(chk) {
-        if (!PODE_EDITAR) {
-            chk.checked = !chk.checked;
-            alert('Você não tem permissão para editar.');
-            return;
+    const configPermissoes = {
+        podeEditar: {{ 'true' if PodeEditar else 'false' }},
+        urls: {
+            buscarAcessosGrupo: "{{ url_for('Seguranca.BuscarAcessosGrupo') }}",
+            buscarAcessosUsuario: "{{ url_for('Seguranca.BuscarAcessosUsuario') }}",
+            salvarVinculo: "{{ url_for('Seguranca.SalvarVinculo') }}"
         }
-
-        if (!ID_ATUAL) return;
-        const idPerm = chk.dataset.id;
-        const novoEstado = chk.checked; 
-
-        if (MODO === 'Grupo') {
-            await EnviarAPI('Grupo', ID_ATUAL, idPerm, novoEstado ? 'Adicionar' : 'Remover');
-            return;
-        }
-
-        if (MODO === 'Usuario') {
-            const acao = novoEstado ? 'Permitir' : 'Bloquear';
-            await EnviarAPI('Usuario', ID_ATUAL, idPerm, acao);
-            ConfigurarVisualUsuario(idPerm, novoEstado ? 'forcado' : 'bloqueado', novoEstado, null);
-        }
-    }
-
-    async function ResetarPermissao(idPerm) {
-        if (!confirm('Voltar a herdar do grupo?')) return;
-        await EnviarAPI('Usuario', ID_ATUAL, idPerm, 'Resetar');
-        const heranca = new Set(DADOS_ATUAIS.heranca_grupo);
-        const herdaAtivo = heranca.has(parseInt(idPerm));
-        
-        const chk = document.getElementById('chk-' + idPerm);
-        chk.checked = herdaAtivo;
-        ConfigurarVisualUsuario(idPerm, 'herdado', herdaAtivo, null);
-    }
-
-    function ConfigurarVisualUsuario(idPerm, tipoStatus, isChecked, herancaValor) {
-        const badgeInherit = document.getElementById(`badge-inherit-${idPerm}`);
-        const badgeAllow = document.getElementById(`badge-allow-${idPerm}`);
-        const badgeDeny = document.getElementById(`badge-deny-${idPerm}`);
-        const btnReset = document.getElementById(`btn-reset-${idPerm}`);
-
-        if(badgeInherit) badgeInherit.style.display = 'none';
-        if(badgeAllow) badgeAllow.style.display = 'none';
-        if(badgeDeny) badgeDeny.style.display = 'none';
-        if(btnReset) btnReset.style.display = 'none';
-
-        if (MODO === 'Grupo') return;
-
-        if (tipoStatus === 'herdado') badgeInherit.style.display = 'inline-block';
-        else if (tipoStatus === 'forcado') { badgeAllow.style.display = 'inline-block'; btnReset.style.display = 'inline-block'; }
-        else if (tipoStatus === 'bloqueado') { badgeDeny.style.display = 'inline-block'; btnReset.style.display = 'inline-block'; }
-    }
-
-    async function EnviarAPI(tipo, alvo, perm, acao) {
-        try {
-            // Mudou de Configuracoes.SalvarVinculo para Seguranca.SalvarVinculo
-            const resp = await fetch("{{ url_for('Seguranca.SalvarVinculo') }}", {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ Tipo: tipo, IdAlvo: alvo, IdPermissao: perm, Acao: acao })
-            });
-            const d = await resp.json();
-            if(!d.sucesso) alert('Erro: ' + d.erro);
-        } catch(e) { console.error(e); alert('Erro de conexão'); }
-    }
-
-    function AtivarItemLista(el) {
-        document.querySelectorAll('.luft-list-item').forEach(i => i.classList.remove('ativo'));
-        el.classList.add('ativo');
-    }
-    
-    function PrepararPainel(titulo, subtitulo) {
-        document.getElementById('estadoVazio').classList.add('d-none');
-        document.getElementById('painelPermissoes').classList.remove('d-none');
-        document.getElementById('painelPermissoes').classList.add('d-flex');
-        
-        document.getElementById('tituloSelecionado').innerText = titulo;
-        document.getElementById('subtituloSelecionado').innerText = subtitulo;
-        document.querySelector('.luft-panel-scroll').scrollTop = 0;
-    }
-
-    function FiltrarLateral(val) {
-        val = val.toLowerCase();
-        const listaId = MODO === 'Grupo' ? 'listaGrupos' : 'listaUsuarios';
-        document.querySelectorAll(`#${listaId} .luft-list-item`).forEach(el => {
-            el.style.display = el.innerText.toLowerCase().includes(val) ? 'flex' : 'none';
-        });
-    }
-
-    function FiltrarPermissoes(val) {
-        val = val.toLowerCase();
-        document.querySelectorAll('.luft-perm-item').forEach(el => {
-            el.style.display = el.innerText.toLowerCase().includes(val) ? 'flex' : 'none';
-        });
-        document.querySelectorAll('.luft-category-block').forEach(cat => {
-            const visible = cat.querySelectorAll('.luft-perm-item[style="display: flex;"], .luft-perm-item:not([style*="display: none"])').length > 0;
-            cat.style.display = visible ? 'block' : 'none';
-        });
-    }
+    };
 </script>
+<script src="{{ url_for('static', filename='JS/Configs/Permissoes.js') }}"></script>
 {% endblock %}
