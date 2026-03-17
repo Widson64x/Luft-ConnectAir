@@ -45,7 +45,7 @@ LogService.Info("App", f"Iniciando aplicação no ambiente: {os.getenv('AMBIENTE
 # Configuração do Flask-Login
 GerenciadorLogin = LoginManager() # Instancia o gerenciador de login
 GerenciadorLogin.init_app(app)
-GerenciadorLogin.login_view = 'Auth.Login' # Nome da rota para redirecionar quem não tá logado
+GerenciadorLogin.login_view = 'Auth.login' # Nome da rota para redirecionar quem não tá logado
 
 @app.context_processor
 def InjetarDadosGlobais():
