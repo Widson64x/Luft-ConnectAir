@@ -86,7 +86,7 @@
             <input type="hidden" name="nome_arquivo" value="{{ DadosModal.nome_arquivo }}">
             <input type="hidden" name="mes_ref" value="{{ DadosModal.mes_ref }}">
             
-            <a href="{{ url_for('Frete.Gerenciar') }}" class="btn btn-secondary">Cancelar</a>
+            <a href="{{ url_for('Frete.gerenciar') }}" class="btn btn-secondary">Cancelar</a>
             <button type="submit" class="btn btn-warning" id="btn-confirmar-substituicao">
                 <i class="ph-bold ph-arrows-clockwise"></i> Substituir
             </button>
@@ -186,7 +186,7 @@
                             </td>
                             <td style="text-align: center;">
                                 <div class="d-flex justify-content-center">
-                                    <a href="{{ url_for('Frete.Excluir', id_remessa=remessa.Id) }}" 
+                                    <a href="{{ url_for('Frete.excluir', id_remessa=remessa.Id) }}" 
                                        class="btn btn-secondary d-flex align-items-center justify-content-center text-danger btn-excluir-tabela" title="Excluir" style="width: 36px; height: 36px; padding: 0;">
                                        <i class="ph-bold ph-trash text-lg"></i>
                                     </a>
@@ -210,7 +210,7 @@
 
 <script>
     const rotasTabelasFrete = {
-        gerenciar: "{{ url_for('Frete.Gerenciar') }}"
+        gerenciar: "{{ url_for('Frete.gerenciar') }}"
     };
 </script>
 <script src="{{ url_for('static', filename='JS/TabelasFrete/Manager.js') }}"></script>

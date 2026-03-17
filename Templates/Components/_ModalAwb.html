@@ -448,7 +448,7 @@
         MudarAba('geral'); 
 
         try {
-            const resp = await fetch(`{{ url_for('Global.ApiDetalhesAwbModal') }}?codAwb=${codAwb}`);
+            const resp = await fetch(`{{ url_for('Global.apiDetalhesAwbModal') }}?codAwb=${codAwb}`);
             const json = await resp.json();
             
             if(json.sucesso) {

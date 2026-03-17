@@ -140,7 +140,7 @@ class GerenciadorPlanejamento {
             tr.innerHTML = `
                 <td style="text-align: center; min-width: 110px;">
                     <div class="d-flex align-items-center justify-content-center gap-2">
-                        <button class="btn btn-secondary d-flex align-items-center justify-content-center" style="padding: 6px; width: 36px; height: 36px;" onclick="abrirModalDetalhes('${linha.filial}', '${linha.serie}', '${linha.ctc}')" title="Ver Detalhes">
+                        <button class="btn btn-secondary d-flex align-items-center justify-content-center" style="padding: 6px; width: 36px; height: 36px;" onclick="AbrirModalGlobal('26', '1', '2601233063')" title="Ver Detalhes">
                             <i class="ph-bold ph-file-text" style="font-size: 1.1rem;"></i>
                         </button>
                         <a href="${linkMontagem}" class="btn btn-primary d-flex align-items-center justify-content-center" style="padding: 6px; width: 36px; height: 36px;" title="Planejar Rota">
@@ -355,6 +355,6 @@ document.addEventListener('DOMContentLoaded', () => {
     gerenciador.inicializar();
 
     // Expõe os métodos no escopo global para que os on-clicks do HTML continuem funcionando
-    window.ordenarTabela = (coluna) => gerenciador.ordenarTabela(coluna);
-    window.mudarAbaVisivel = (aba) => gerenciador.mudarAbaVisivel(aba);
+    window.Ordenar = (coluna) => gerenciador.ordenarTabela(coluna);
+    window.MudarAba = (aba) => gerenciador.mudarAbaVisivel(aba);
 });

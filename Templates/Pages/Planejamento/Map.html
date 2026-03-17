@@ -100,7 +100,7 @@
     // Injeção de Dados Backend
     const dadosMapaGlobal = {{ Dados | tojson | safe }};
     const rotasMapaGlobal = {
-        montarRota: "{{ url_for('Planejamento.MontarPlanejamento', filial='__F__', serie='__S__', ctc='__C__') }}"
+        montarRota: "{{ url_for('Planejamento.montarPlanejamento', filial='__F__', serie='__S__', ctc='__C__') }}"
     };
 </script>
 <script src="{{ url_for('static', filename='JS/Planejamento/Map.js') }}"></script>

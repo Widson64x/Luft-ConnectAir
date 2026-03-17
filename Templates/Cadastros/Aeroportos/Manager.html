@@ -86,7 +86,7 @@
             <input type="hidden" name="nome_arquivo" value="{{ DadosModal.nome_arquivo }}">
             <input type="hidden" name="mes_ref" value="{{ DadosModal.mes_ref }}">
             
-            <a href="{{ url_for('Aeroporto.Gerenciar') }}" class="btn btn-secondary">Cancelar</a>
+            <a href="{{ url_for('Aeroporto.gerenciar') }}" class="btn btn-secondary">Cancelar</a>
             <button type="submit" class="btn btn-warning" id="btn-confirmar-substituicao">
                 <i class="ph-bold ph-arrows-clockwise"></i> Substituir
             </button>
@@ -104,7 +104,7 @@
             <p class="text-muted mt-1 font-medium">Cadastro mundial de códigos IATA/ICAO e coordenadas geográficas.</p>
         </div>
         
-        <a href="{{ url_for('Aeroporto.RankingIndex') }}" class="btn btn-primary d-flex align-items-center gap-2 hover-lift" style="padding: 10px 20px; font-size: 1rem;">
+        <a href="{{ url_for('Aeroporto.rankingIndex') }}" class="btn btn-primary d-flex align-items-center gap-2 hover-lift" style="padding: 10px 20px; font-size: 1rem;">
             <i class="ph-bold ph-chart-bar text-xl"></i>
             <span>Definir Prioridades (Ranking)</span>
         </a>
@@ -191,7 +191,7 @@
                             </td>
                             <td style="text-align: center;">
                                 <div class="d-flex justify-content-center">
-                                    <a href="{{ url_for('Aeroporto.Excluir', id_remessa=remessa.Id) }}" 
+                                    <a href="{{ url_for('Aeroporto.excluir', id_remessa=remessa.Id) }}"
                                        class="btn btn-secondary d-flex align-items-center justify-content-center text-danger btn-excluir-base" title="Excluir" style="width: 36px; height: 36px; padding: 0;">
                                        <i class="ph-bold ph-trash text-lg"></i>
                                     </a>
@@ -215,7 +215,7 @@
 
 <script>
     const rotasAeroportos = {
-        gerenciar: "{{ url_for('Aeroporto.Gerenciar') }}"
+        gerenciar: "{{ url_for('Aeroporto.gerenciar') }}"
     };
 </script>
 <script src="{{ url_for('static', filename='JS/Aeroportos/Manager.js') }}"></script>

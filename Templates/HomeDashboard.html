@@ -204,7 +204,7 @@
 
     <div class="luft-dashboard-grid">
         {% if current_user.TemPermissao('planejamento.visualizar') %}
-        <a href="{{ url_for('Planejamento.Dashboard') }}" class="luft-dashboard-module">
+        <a href="{{ url_for('Planejamento.dashboard') }}" class="luft-dashboard-module">
             <div class="luft-dashboard-module-icon"><i class="ph-duotone ph-globe-hemisphere-west"></i></div>
             <div class="luft-dashboard-module-content">
                 <div class="font-black text-main mb-2" style="font-size: 1.4rem;">Planejamento</div>
@@ -215,7 +215,7 @@
         {% endif %}
 
         {% if current_user.TemPermissao('acompanhamento.visualizar') %}
-        <a href="{{ url_for('Acompanhamento.Painel') }}" class="luft-dashboard-module">
+        <a href="{{ url_for('Acompanhamento.painel') }}" class="luft-dashboard-module">
             <div class="luft-dashboard-module-icon"><i class="ph-bold ph-airplane-in-flight"></i></div>
             <div class="luft-dashboard-module-content">
                 <div class="font-black text-main mb-2" style="font-size: 1.4rem;">Acompanhamento</div>
@@ -226,7 +226,7 @@
         {% endif %}
 
         {% if current_user.TemPermissao('cadastros.malha.visualizar') %}
-        <a href="{{ url_for('Escalas.Mapa') }}" class="luft-dashboard-module">
+        <a href="{{ url_for('Escalas.mapa') }}" class="luft-dashboard-module">
             <div class="luft-dashboard-module-icon"><i class="ph-duotone ph-broadcast"></i></div>
             <div class="luft-dashboard-module-content">
                 <div class="font-black text-main mb-2" style="font-size: 1.4rem;">Escalas e Rotas</div>
@@ -239,15 +239,15 @@
         {# Lógica para definir o destino do módulo de Cadastro com base na prioridade #}
         {% set link_destino = '' %}
         {% if current_user.TemPermissao('cadastros.malha.editar') %}
-            {% set link_destino = url_for('Malha.Gerenciar') %}
+            {% set link_destino = url_for('Malha.gerenciar') %}
         {% elif current_user.TemPermissao('cadastros.aeroportos.editar') %}
-            {% set link_destino = url_for('Aeroporto.Gerenciar') %}
+            {% set link_destino = url_for('Aeroporto.gerenciar') %}
         {% elif current_user.TemPermissao('cadastros.cidades.editar') %}
-            {% set link_destino = url_for('Cidade.Gerenciar') %}
+            {% set link_destino = url_for('Cidade.gerenciar') %}
         {% elif current_user.TemPermissao('cadastros.tabelas.editar') %}
-            {% set link_destino = url_for('Frete.Gerenciar') %}
+            {% set link_destino = url_for('Frete.gerenciar') %}
         {% elif current_user.TemPermissao('cadastros.cortes.editar') %}
-            {% set link_destino = url_for('Cortes.Gerenciar') %}
+            {% set link_destino = url_for('Cortes.gerenciar') %}
         {% endif %}
 
         {% if link_destino %}
@@ -262,7 +262,7 @@
         {% endif %}
 
         {% if current_user.TemPermissao('reversa.visualizar') %}
-        <a href="{{ url_for('Reversa.Index') }}" class="luft-dashboard-module">
+        <a href="{{ url_for('Reversa.index') }}" class="luft-dashboard-module">
             <div class="luft-dashboard-module-icon"><i class="ph-bold ph-arrow-u-down-left"></i></div>
             <div class="luft-dashboard-module-content">
                 <div class="font-black text-main mb-2" style="font-size: 1.4rem;">Devoluções e Reversas</div>
@@ -276,7 +276,7 @@
 
 <script>
     const rotasDashboard = {
-        apiVoosHoje: "{{ url_for('Global.ApiVoosHoje') }}"
+        apiVoosHoje: "{{ url_for('Global.apiVoosHoje') }}"
     };
 </script>
 <script src="{{ url_for('static', filename='JS/HomeDashboard.js') }}"></script>

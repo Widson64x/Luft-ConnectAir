@@ -145,7 +145,7 @@
         </div>
 
         <div class="d-flex gap-2">
-            <a href="{{ url_for('Planejamento.Dashboard') }}" class="btn btn-secondary flex-1" style="text-align: center;">Voltar</a>
+            <a href="{{ url_for('Planejamento.dashboard') }}" class="btn btn-secondary flex-1" style="text-align: center;">Voltar</a>
             
             <button class="btn btn-danger hidden flex-1" id="btn-cancelar-plan" onclick="cancelarPlanejamentoExistente()">
                 <i class="ph-bold ph-trash"></i> Cancelar
@@ -232,9 +232,9 @@
     };
 
     const rotasEditor = {
-        salvarPlanejamento: "{{ url_for('Planejamento.SalvarPlanejamento') }}",
-        cancelarPlanejamento: "{{ url_for('Planejamento.CancelarPlanejamentoRota') }}",
-        dashboard: "{{ url_for('Planejamento.Dashboard') }}"
+        salvarPlanejamento: "{{ url_for('Planejamento.salvarPlanejamento') }}",
+        cancelarPlanejamento: "{{ url_for('Planejamento.cancelarPlanejamentoRota') }}",
+        dashboard: "{{ url_for('Planejamento.dashboard') }}"
     };
 </script>
 <script src="{{ url_for('static', filename='JS/Planejamento/Editor.js') }}"></script>

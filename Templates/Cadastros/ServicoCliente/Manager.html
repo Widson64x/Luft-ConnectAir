@@ -130,7 +130,7 @@
             </div>
             
             <div style="padding: 24px; overflow-y: auto; flex: 1;">
-                <form id="FormServico" action="{{ url_for('ServicosClientes.SalvarServico') }}" method="POST">
+                <form id="FormServico" action="{{ url_for('ServicosClientes.salvarServico') }}" method="POST">
                     
                     <div style="margin-bottom: 20px;">
                         <label class="form-label text-xs font-bold text-muted mb-2 text-uppercase d-block">
@@ -290,10 +290,10 @@
 
 <script>
     const rotasServicos = {
-        salvar: "{{ url_for('ServicosClientes.SalvarServico') }}",
-        listar: "{{ url_for('ServicosClientes.ListaServicosContratados') }}",
-        editarBase: "{{ url_for('ServicosClientes.EditarServico', IdServico=0) }}",
-        excluirBase: "{{ url_for('ServicosClientes.ExcluirServico', IdServico=0) }}"
+        salvar: "{{ url_for('ServicosClientes.salvarServico') }}",
+        listar: "{{ url_for('ServicosClientes.listaServicosContratados') }}",
+        editarBase: "{{ url_for('ServicosClientes.editarServico', IdServico=0) }}",
+        excluirBase: "{{ url_for('ServicosClientes.excluirServico', IdServico=0) }}"
     };
 </script>
 <script src="{{ url_for('static', filename='JS/ServicoCliente/Manager.js') }}"></script>

@@ -220,11 +220,11 @@
 
 <script>
     const rotasCortes = {
-        listarPlanejamento: "{{ url_for('Cortes.ApiListarPlanejamento') }}",
-        listarEmissao: "{{ url_for('Cortes.ApiListarEmissao') }}",
-        salvarPlanejamento: "{{ url_for('Cortes.ApiSalvarPlanejamento') }}",
-        salvarEmissao: "{{ url_for('Cortes.ApiSalvarEmissao') }}",
-        excluirEmMassa: "{{ url_for('Cortes.ApiExcluirEmMassa', tipo='__TIPO__') }}" // Placeholder a ser substituído
+        listarPlanejamento: "{{ url_for('Cortes.apiListarPlanejamento') }}",
+        listarEmissao: "{{ url_for('Cortes.apiListarEmissao') }}",
+        salvarPlanejamento: "{{ url_for('Cortes.apiSalvarPlanejamento') }}",
+        salvarEmissao: "{{ url_for('Cortes.apiSalvarEmissao') }}",
+        excluirEmMassa: "{{ url_for('Cortes.apiExcluirEmMassa', tipo='__TIPO__') }}"
     };
 </script>
 <script src="{{ url_for('static', filename='JS/Cortes/Manager.js') }}"></script>

@@ -106,11 +106,11 @@
             <p class="text-muted mt-1 font-medium" id="data-extenso">Carregando data...</p>
         </div>
         <div class="d-flex gap-2">
-            <a href="{{ url_for('Planejamento.ExportarPlanejamentosExcel') }}" class="btn d-flex align-items-center gap-2" style="background-color: #217346; color: white; border: none;" title="Exportar para Excel">
+            <a href="{{ url_for('Planejamento.exportarPlanejamentosExcel') }}" class="btn d-flex align-items-center gap-2" style="background-color: #217346; color: white; border: none;" title="Exportar para Excel">
                 <i class="ph-bold ph-microsoft-excel-logo" style="font-size: 1.2rem;"></i> Exportar
             </a>
             
-            <a href="{{ url_for('Planejamento.MapaGlobal') }}" class="btn btn-primary d-flex align-items-center gap-2" title="Ver Mapa Global">
+            <a href="{{ url_for('Planejamento.mapaGlobal') }}" class="btn btn-primary d-flex align-items-center gap-2" title="Ver Mapa Global">
                 <i class="ph-bold ph-globe-hemisphere-west" style="font-size: 1.2rem;"></i> Mapa Global
             </a>
         </div>
@@ -257,11 +257,9 @@
 </div>
 
 <script>
-    // Dicionário de rotas injetado pelo Jinja2 para ser consumido pelo JS
     const rotasPlanejamento = {
-        listarCtcs: "{{ url_for('Planejamento.ApiCtcsHoje') }}",
-        // Usamos placeholders (__F__, __S__, __C__) para substituir no JS dinamicamente
-        montarRota: "{{ url_for('Planejamento.MontarPlanejamento', filial='__F__', serie='__S__', ctc='__C__') }}"
+        listarCtcs: "{{ url_for('Planejamento.apiCtcsHoje') }}",
+        montarRota: "{{ url_for('Planejamento.montarPlanejamento', filial='__F__', serie='__S__', ctc='__C__') }}"
     };
 </script>
 <script src="{{ url_for('static', filename='JS/Planejamento/Index.js') }}"></script>

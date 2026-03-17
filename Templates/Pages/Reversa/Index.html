@@ -269,7 +269,7 @@
 
 <script>
     const rotasReversa = {
-        atualizarStatus: "/Luft-ConnectAir/Reversa/AtualizarStatus"
+        atualizarStatus: "{{ url_for('Reversa.atualizarStatus') }}"
     };
 </script>
 <script src="{{ url_for('static', filename='JS/Reversa/Index.js') }}"></script>

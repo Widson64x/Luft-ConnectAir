@@ -174,7 +174,7 @@
 {% call ui.modal('modalPermissao', 'Nova Permissão', 'md', 'ph-key') %}
     <p class="text-sm text-muted mb-4">A chave será gerada automaticamente no padrão <b>SISTEMA.MÓDULO.[EXCEÇÃO].AÇÃO</b></p>
     
-    <form action="{{ url_for('Seguranca.CriarNovaPermissao') }}" method="POST">
+    <form action="{{ url_for('Seguranca.criarNovaPermissao') }}" method="POST">
         <div class="form-group mb-4">
             <label class="form-label font-bold">Módulo do Sistema</label>
             <input type="text" name="modulo" class="form-control" list="listaCats" placeholder="Ex: RELATORIOS" required oninput="PreverChave()">
@@ -225,9 +225,9 @@
     const configPermissoes = {
         podeEditar: {{ 'true' if PodeEditar else 'false' }},
         urls: {
-            buscarAcessosGrupo: "{{ url_for('Seguranca.BuscarAcessosGrupo') }}",
-            buscarAcessosUsuario: "{{ url_for('Seguranca.BuscarAcessosUsuario') }}",
-            salvarVinculo: "{{ url_for('Seguranca.SalvarVinculo') }}"
+            buscarAcessosGrupo: "{{ url_for('Seguranca.buscarAcessosGrupo') }}",
+            buscarAcessosUsuario: "{{ url_for('Seguranca.buscarAcessosUsuario') }}",
+            salvarVinculo: "{{ url_for('Seguranca.salvarVinculo') }}"
         }
     };
 </script>

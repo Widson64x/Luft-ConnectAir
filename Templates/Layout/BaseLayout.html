@@ -29,26 +29,26 @@
         {% call ui.nav_item('Cadastros', icone='ph-bold ph-folder-notch', ativo=ativo_cadastros) %}
             
             {% if current_user.TemPermissao('cadastros.malha.editar') %}
-                {{ ui.nav_item('Malha Aérea', href=url_for('Malha.Gerenciar'), ativo=('Malha' in request.endpoint)) }}
+                {{ ui.nav_item('Malha Aérea', href=url_for('Malha.gerenciar'), ativo=('Malha' in request.endpoint)) }}
             {% endif %}
 
             {% if current_user.TemPermissao('cadastros.aeroportos.editar') %}
-                {{ ui.nav_item('Aeroportos', href=url_for('Aeroporto.Gerenciar'), ativo=('Aeroporto' in request.endpoint)) }}
+                {{ ui.nav_item('Aeroportos', href=url_for('Aeroporto.gerenciar'), ativo=('Aeroporto' in request.endpoint)) }}
             {% endif %}
 
             {% if current_user.TemPermissao('cadastros.cidades.editar') %}
-                {{ ui.nav_item('Cidades', href=url_for('Cidade.Gerenciar'), ativo=('Cidade' in request.endpoint)) }}
+                {{ ui.nav_item('Cidades', href=url_for('Cidade.gerenciar'), ativo=('Cidade' in request.endpoint)) }}
             {% endif %}
 
             {% if current_user.TemPermissao('cadastros.tabelas.editar') %}
-                {{ ui.nav_item('Tabelas de Frete', href=url_for('Frete.Gerenciar'), ativo=('Frete' in request.endpoint)) }}
+                {{ ui.nav_item('Tabelas de Frete', href=url_for('Frete.gerenciar'), ativo=('Frete' in request.endpoint)) }}
             {% endif %}
 
             {% if current_user.TemPermissao('cadastros.cortes.visualizar') %}
-                {{ ui.nav_item('Horários de Corte', href=url_for('Cortes.Gerenciar'), ativo=('Cortes' in request.endpoint)) }}
+                {{ ui.nav_item('Horários de Corte', href=url_for('Cortes.gerenciar'), ativo=('Cortes' in request.endpoint)) }}
             {% endif %}
 
-            {{ ui.nav_item('Serviços dos Clientes', href=url_for('ServicosClientes.Gerenciar'), ativo=('ServicosClientes' in request.endpoint)) }}
+            {{ ui.nav_item('Serviços dos Clientes', href=url_for('ServicosClientes.gerenciar'), ativo=('ServicosClientes' in request.endpoint)) }}
             
         {% endcall %}
     {% endif %}
@@ -57,7 +57,7 @@
     {% if current_user.TemPermissao('planejamento.visualizar') %}
         {{ ui.nav_item('Planejamento', 
             icone='ph-bold ph-globe-hemisphere-west', 
-            href=url_for('Planejamento.Dashboard'), 
+            href=url_for('Planejamento.dashboard'), 
             ativo=('Planejamento' in request.endpoint)) 
         }}
     {% endif %}
@@ -66,7 +66,7 @@
     {% if current_user.TemPermissao('cadastros.malha.visualizar') %}
         {{ ui.nav_item('Escalas', 
             icone='ph-bold ph-calendar-blank', 
-            href=url_for('Escalas.Mapa'), 
+            href=url_for('Escalas.mapa'), 
             ativo=('Escalas' in request.endpoint)) 
         }}
     {% endif %}
@@ -75,7 +75,7 @@
     {% if current_user.TemPermissao('acompanhamento.visualizar') %}
         {{ ui.nav_item('Acompanhamento', 
             icone='ph-bold ph-airplane-in-flight', 
-            href=url_for('Acompanhamento.Painel'), 
+            href=url_for('Acompanhamento.painel'), 
             ativo=('Acompanhamento' in request.endpoint)) 
         }}
     {% endif %}
@@ -84,19 +84,12 @@
     {% if current_user.TemPermissao('reversa.visualizar') %}
         {{ ui.nav_item('Devoluções (Reversa)', 
             icone='ph-bold ph-arrow-u-down-left', 
-            href=url_for('Reversa.Index'), 
+            href=url_for('Reversa.index'), 
             ativo=('Reversa' in request.endpoint)) 
         }}
     {% endif %}
 
-    {# --- CONFIGURAÇÕES --- #}
-    {% if current_user.TemPermissao('sistema.configuracoes.visualizar') %}
-        {{ ui.nav_item('Configurações', 
-            icone='ph-bold ph-gear', 
-            href=url_for('Configuracoes.Index'), 
-            ativo=('Configuracoes' in request.endpoint)) 
-        }}
-    {% endif %}
+
 {% endblock %}
 
 {% block sidebar_actions %}
@@ -104,7 +97,14 @@
         <i class="ph-bold ph-moon"></i>
     </button>
     
-    <a href="{{ url_for('Auth.Logout') }}" class="luft-btn-action hover-lift text-danger" title="Sair">
+    {# --- BOTÃO DE CONFIGURAÇÕES MOVIDO PARA AS AÇÕES --- #}
+    {% if current_user.TemPermissao('sistema.configuracoes.visualizar') %}
+    <a href="{{ url_for('Configuracoes.index') }}" class="luft-btn-action hover-lift" title="Configurações">
+        <i class="ph-bold ph-sliders-horizontal"></i>
+    </a>
+    {% endif %}
+    
+    <a href="{{ url_for('Auth.logout') }}" class="luft-btn-action hover-lift text-danger" title="Sair">
         <i class="ph-bold ph-power"></i>
     </a>
 {% endblock %}
