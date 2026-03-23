@@ -2,8 +2,8 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, T
 from datetime import datetime
 from Models.SQL_SERVER.Base import Base
 
-class Tb_PLN_Sistema(Base):
-    __tablename__ = "Tb_PLN_Sistema"
+class Tb_Sistema(Base):
+    __tablename__ = "Tb_Sistema"
     __table_args__ = {"schema": "intec.dbo"}
 
     Id_Sistema = Column(Integer, primary_key=True, autoincrement=True)
@@ -11,39 +11,39 @@ class Tb_PLN_Sistema(Base):
     Descricao_Sistema = Column(String(255))
     Ativo = Column(Boolean, default=True)
 
-class Tb_PLN_Permissao(Base):
-    __tablename__ = "Tb_PLN_Permissao"
+class Tb_Permissao(Base):
+    __tablename__ = "Tb_Permissao"
     __table_args__ = {"schema": "intec.dbo"}
 
     Id_Permissao = Column(Integer, primary_key=True, autoincrement=True)
-    Id_Sistema = Column(Integer, ForeignKey("intec.dbo.Tb_PLN_Sistema.Id_Sistema"), nullable=False)
+    Id_Sistema = Column(Integer, ForeignKey("intec.dbo.Tb_Sistema.Id_Sistema"), nullable=False)
     Chave_Permissao = Column(String(100), nullable=False)
     Descricao_Permissao = Column(String(255))
     Categoria_Permissao = Column(String(50))
 
-class Tb_PLN_PermissaoGrupo(Base):
-    __tablename__ = "Tb_PLN_PermissaoGrupo"
+class Tb_PermissaoGrupo(Base):
+    __tablename__ = "Tb_PermissaoGrupo"
     __table_args__ = {"schema": "intec.dbo"}
 
     Id_Vinculo = Column(Integer, primary_key=True, autoincrement=True)
     Codigo_UsuarioGrupo = Column(Integer, nullable=False) # Sem FK para evitar erro cross-database
-    Id_Permissao = Column(Integer, ForeignKey("intec.dbo.Tb_PLN_Permissao.Id_Permissao"))
+    Id_Permissao = Column(Integer, ForeignKey("intec.dbo.Tb_Permissao.Id_Permissao"))
 
-class Tb_PLN_PermissaoUsuario(Base):
-    __tablename__ = "Tb_PLN_PermissaoUsuario"
+class Tb_PermissaoUsuario(Base):
+    __tablename__ = "Tb_PermissaoUsuario"
     __table_args__ = {"schema": "intec.dbo"}
 
     Id_Vinculo = Column(Integer, primary_key=True, autoincrement=True)
     Codigo_Usuario = Column(Integer, nullable=False) # Sem FK para evitar erro cross-database
-    Id_Permissao = Column(Integer, ForeignKey("intec.dbo.Tb_PLN_Permissao.Id_Permissao"))
+    Id_Permissao = Column(Integer, ForeignKey("intec.dbo.Tb_Permissao.Id_Permissao"))
     Conceder = Column(Boolean, default=True)
 
-class Tb_PLN_LogAcesso(Base):
-    __tablename__ = "Tb_PLN_LogAcesso"
+class Tb_LogAcesso(Base):
+    __tablename__ = "Tb_LogAcesso"
     __table_args__ = {"schema": "intec.dbo"}
 
     Id_Log = Column(Integer, primary_key=True, autoincrement=True)
-    Id_Sistema = Column(Integer, ForeignKey("intec.dbo.Tb_PLN_Sistema.Id_Sistema"), nullable=True)
+    Id_Sistema = Column(Integer, ForeignKey("intec.dbo.Tb_Sistema.Id_Sistema"), nullable=True)
     Id_Usuario = Column(Integer, nullable=True)
     Nome_Usuario = Column(String(150))
     Rota_Acessada = Column(String(200))

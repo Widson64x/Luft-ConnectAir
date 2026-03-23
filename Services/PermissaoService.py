@@ -7,7 +7,7 @@ from flask_login import current_user
 
 # Importações específicas do Luft-ConnectAir
 from Conexoes import ObterSessaoSqlServer
-from Models.SQL_SERVER.Permissoes import Tb_PLN_Permissao, Tb_PLN_PermissaoGrupo, Tb_PLN_PermissaoUsuario, Tb_PLN_LogAcesso
+from Models.SQL_SERVER.Permissoes import Tb_Permissao, Tb_PermissaoGrupo, Tb_PermissaoUsuario, Tb_LogAcesso
 from Models.SQL_SERVER.Usuario import Usuario as ModeloUsuario
 from Services.LogService import LogService
 
@@ -47,19 +47,19 @@ class PermissaoService:
             id_grupo = user_db.codigo_usuariogrupo
             chave_procurada = PermissaoService._Normalizar(ChavePermissao)
 
-            todas_perms = Sessao.query(Tb_PLN_Permissao).filter_by(Id_Sistema=SISTEMA_ID).all()
+            todas_perms = Sessao.query(Tb_Permissao).filter_by(Id_Sistema=SISTEMA_ID).all()
             permissao_encontrada = next((p for p in todas_perms if PermissaoService._Normalizar(p.Chave_Permissao) == chave_procurada), None)
             
             if not permissao_encontrada: return False
 
             tem_acesso = False
             if id_grupo:
-                tem_acesso = Sessao.query(Tb_PLN_PermissaoGrupo).filter_by(
+                tem_acesso = Sessao.query(Tb_PermissaoGrupo).filter_by(
                     Id_Permissao=permissao_encontrada.Id_Permissao,
                     Codigo_UsuarioGrupo=id_grupo
                 ).count() > 0
 
-            override = Sessao.query(Tb_PLN_PermissaoUsuario).filter_by(
+            override = Sessao.query(Tb_PermissaoUsuario).filter_by(
                 Id_Permissao=permissao_encontrada.Id_Permissao,
                 Codigo_Usuario=id_usuario_logado
             ).first()
@@ -79,7 +79,7 @@ class PermissaoService:
             IdUsuario = getattr(Usuario, 'Codigo_Usuario', getattr(Usuario, 'IdBanco', Usuario.get_id())) if Usuario.is_authenticated else None
             nome = getattr(Usuario, 'Nome_Usuario', getattr(Usuario, 'Nome', 'Anonimo')) if Usuario.is_authenticated else 'Anonimo'
             
-            NovoLog = Tb_PLN_LogAcesso(
+            NovoLog = Tb_LogAcesso(
                 Id_Sistema=SISTEMA_ID,
                 Id_Usuario=IdUsuario,
                 Nome_Usuario=nome,

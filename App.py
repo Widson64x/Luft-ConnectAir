@@ -121,7 +121,8 @@ luftcore_app = LuftCorePackages(
     show_topbar=True,         # Se meteres False, a barra de cima desaparece toda
     show_search=False,        # Oculta a barra de pesquisa
     show_notifications=False, # Oculta o botão do sininho
-    show_breadcrumb=True      # Mantém os breadcrumbs automáticos ativados
+    show_breadcrumb=True,      # Mantém os breadcrumbs automáticos ativados
+    #favicon=f"{Prefix}/Static/Img/Logos/LUFT-HANSA.ico" # Usa o favicon com o prefixo correto (certifique-se de que o caminho está certo!)
 )
 
 # O Auth geralmente fica separado, ex: /Luft-ConnectAir/auth

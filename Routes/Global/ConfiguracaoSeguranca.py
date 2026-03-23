@@ -4,7 +4,7 @@ from flask_login import login_required, current_user
 from collections import defaultdict
 
 from Conexoes import ObterSessaoSqlServer
-from Models.SQL_SERVER.Permissoes import Tb_PLN_Permissao, Tb_PLN_PermissaoGrupo, Tb_PLN_PermissaoUsuario, Tb_PLN_Sistema
+from Models.SQL_SERVER.Permissoes import Tb_Permissao, Tb_PermissaoGrupo, Tb_PermissaoUsuario, Tb_Sistema
 from Models.SQL_SERVER.Usuario import Usuario, UsuarioGrupo  
 
 from Services.PermissaoService import PermissaoService, RequerPermissao
@@ -32,9 +32,9 @@ def index():
             Usuario.codigo_usuariogrupo == UsuarioGrupo.codigo_usuariogrupo
         ).order_by(Usuario.Nome_Usuario).all()
         
-        listaPermissoes = sessaoDb.query(Tb_PLN_Permissao).filter_by(Id_Sistema=sistemaId).order_by(
-            Tb_PLN_Permissao.Categoria_Permissao, 
-            Tb_PLN_Permissao.Descricao_Permissao
+        listaPermissoes = sessaoDb.query(Tb_Permissao).filter_by(Id_Sistema=sistemaId).order_by(
+            Tb_Permissao.Categoria_Permissao, 
+            Tb_Permissao.Descricao_Permissao
         ).all()
         
         permissoesPorCategoria = defaultdict(list)
@@ -71,12 +71,12 @@ def criarNovaPermissao():
 
     sessaoDb = ObterSessaoSqlServer()
     try:
-        permissaoExistente = sessaoDb.query(Tb_PLN_Permissao).filter_by(Id_Sistema=sistemaId, Chave_Permissao=chavePermissao).first()
+        permissaoExistente = sessaoDb.query(Tb_Permissao).filter_by(Id_Sistema=sistemaId, Chave_Permissao=chavePermissao).first()
         if permissaoExistente:
             flash(f"A permissão com a chave '{chavePermissao}' já existe!", "warning")
             return redirect(url_for('Seguranca.index'))
 
-        novaPermissaoObj = Tb_PLN_Permissao(
+        novaPermissaoObj = Tb_Permissao(
             Id_Sistema=sistemaId,
             Chave_Permissao=chavePermissao,
             Descricao_Permissao=descricaoReq,
@@ -104,7 +104,7 @@ def buscarAcessosGrupo():
 
     sessaoDb = ObterSessaoSqlServer()
     try:
-        vinculosGrupo = sessaoDb.query(Tb_PLN_PermissaoGrupo).filter_by(Codigo_UsuarioGrupo=idGrupoReq).all()
+        vinculosGrupo = sessaoDb.query(Tb_PermissaoGrupo).filter_by(Codigo_UsuarioGrupo=idGrupoReq).all()
         idsAtivos = [vinculo.Id_Permissao for vinculo in vinculosGrupo]
         return jsonify({"ids_ativos": idsAtivos})
     finally:
@@ -127,10 +127,10 @@ def buscarAcessosUsuario():
         
         permissoesHeranca = []
         if idGrupoUser:
-            vinculosDoGrupo = sessaoDb.query(Tb_PLN_PermissaoGrupo).filter_by(Codigo_UsuarioGrupo=idGrupoUser).all()
+            vinculosDoGrupo = sessaoDb.query(Tb_PermissaoGrupo).filter_by(Codigo_UsuarioGrupo=idGrupoUser).all()
             permissoesHeranca = [v.Id_Permissao for v in vinculosDoGrupo]
 
-        vinculosDoUsuario = sessaoDb.query(Tb_PLN_PermissaoUsuario).filter_by(Codigo_Usuario=idUsuarioReq).all()
+        vinculosDoUsuario = sessaoDb.query(Tb_PermissaoUsuario).filter_by(Codigo_Usuario=idUsuarioReq).all()
         
         permissoesAtivas = [v.Id_Permissao for v in vinculosDoUsuario if v.Conceder]
         permissoesBloqueadas = [v.Id_Permissao for v in vinculosDoUsuario if not v.Conceder]
@@ -157,15 +157,15 @@ def salvarVinculo():
     sessaoDb = ObterSessaoSqlServer()
     try:
         if tipoAlvo == 'Grupo':
-            vinculoExistente = sessaoDb.query(Tb_PLN_PermissaoGrupo).filter_by(Codigo_UsuarioGrupo=idAlvoReq, Id_Permissao=idPermissaoReq).first()
+            vinculoExistente = sessaoDb.query(Tb_PermissaoGrupo).filter_by(Codigo_UsuarioGrupo=idAlvoReq, Id_Permissao=idPermissaoReq).first()
             
             if acaoRequerida == 'Adicionar' and not vinculoExistente:
-                sessaoDb.add(Tb_PLN_PermissaoGrupo(Codigo_UsuarioGrupo=idAlvoReq, Id_Permissao=idPermissaoReq))
+                sessaoDb.add(Tb_PermissaoGrupo(Codigo_UsuarioGrupo=idAlvoReq, Id_Permissao=idPermissaoReq))
             elif acaoRequerida == 'Remover' and vinculoExistente:
                 sessaoDb.delete(vinculoExistente)
                 
         elif tipoAlvo == 'Usuario':
-            vinculoExistente = sessaoDb.query(Tb_PLN_PermissaoUsuario).filter_by(Codigo_Usuario=idAlvoReq, Id_Permissao=idPermissaoReq).first()
+            vinculoExistente = sessaoDb.query(Tb_PermissaoUsuario).filter_by(Codigo_Usuario=idAlvoReq, Id_Permissao=idPermissaoReq).first()
 
             if acaoRequerida == 'Resetar':
                 if vinculoExistente: sessaoDb.delete(vinculoExistente)
@@ -174,7 +174,7 @@ def salvarVinculo():
                 if vinculoExistente:
                     vinculoExistente.Conceder = concederAcesso
                 else:
-                    sessaoDb.add(Tb_PLN_PermissaoUsuario(Codigo_Usuario=idAlvoReq, Id_Permissao=idPermissaoReq, Conceder=concederAcesso))
+                    sessaoDb.add(Tb_PermissaoUsuario(Codigo_Usuario=idAlvoReq, Id_Permissao=idPermissaoReq, Conceder=concederAcesso))
 
         sessaoDb.commit()
         return jsonify({"sucesso": True})
