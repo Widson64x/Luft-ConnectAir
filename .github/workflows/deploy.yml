@@ -25,7 +25,7 @@ jobs:
         # --- CONFIGURAÇÕES ---
         $ServiceName = "Luft-ConnectAir"
         $AppPath = "C:\ProjetosPython\Luft-ConnectAir"
-        $LogFile = "C:\actions-runner\deploy-log.txt"
+        $LogFile = "C:\GitHubRunners\Luft-ConnectAir\deploy-log.txt"
         
         # Inicia Log
         Start-Transcript -Path $LogFile -Append
