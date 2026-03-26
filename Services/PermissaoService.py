@@ -77,8 +77,15 @@ class PermissaoService:
         Sessao = ObterSessaoSqlServer()
         try:
             IdUsuario = getattr(Usuario, 'Codigo_Usuario', getattr(Usuario, 'IdBanco', Usuario.get_id())) if Usuario.is_authenticated else None
-            nome = getattr(Usuario, 'Nome_Usuario', getattr(Usuario, 'Nome', 'Anonimo')) if Usuario.is_authenticated else 'Anonimo'
-            
+            nome = (
+                getattr(Usuario, 'nome', None)
+                or getattr(Usuario, 'Login', None)
+                or getattr(Usuario, 'Login_Usuario', None)
+                or getattr(Usuario, 'Nome_Usuario', None)
+                or getattr(Usuario, 'nome_completo', None)
+                or 'Anonimo'
+            )
+
             NovoLog = Tb_LogAcesso(
                 Id_Sistema=SISTEMA_ID,
                 Id_Usuario=IdUsuario,
