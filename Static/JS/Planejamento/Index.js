@@ -49,7 +49,6 @@ class GerenciadorPlanejamento {
         }
 
         try {
-            // Utilizando a rota injetada do HTML!
             const resposta = await fetch(rotasPlanejamento.listarCtcs);
             if (!resposta.ok) throw new Error("Falha na comunicação com o servidor");
             
@@ -78,9 +77,14 @@ class GerenciadorPlanejamento {
             item.volumes = Number(item.volumes || 0);
             item.quantidadeNotas = Number(item.qtd_notas || 0);
             
-            // NOVOS CAMPOS LINDOS VINDOS DO BACKEND
-            item.custoPlanejado = Number(item.custo_planejado || 0);
+            item.freteTotal = Number(item.raw_frete_total || 0);
             item.tarifaEstimada = Number(item.tarifa_estimada || 5.50);
+
+            // --- CÁLCULOS INDIVIDUAIS POR CTC (Necessário para a ordenação funcionar) ---
+            item.custoEstimadoInd = item.pesoTaxado * item.tarifaEstimada;
+            item.lucroEstimadoInd = item.freteTotal - item.custoEstimadoInd;
+            // Evita divisão por zero
+            item.margemEstimadaInd = item.freteTotal > 0 ? (item.lucroEstimadoInd / item.freteTotal) * 100 : 0;
         });
 
         if (this.dadosOriginais.length === 0) {
@@ -100,9 +104,10 @@ class GerenciadorPlanejamento {
         corpoTabela.innerHTML = '';
 
         if (this.dadosVisiveis.length === 0) {
+            // Aumentei o colspan para 16 por causa das novas colunas
             corpoTabela.innerHTML = `
                 <tr>
-                    <td colspan="13" style="text-align: center; padding: 60px; color: var(--luft-text-muted);">
+                    <td colspan="16" style="text-align: center; padding: 60px; color: var(--luft-text-muted);">
                         <i class="ph-duotone ph-magnifying-glass" style="font-size: 3rem; margin-bottom: 15px; color: var(--luft-border);"></i><br>
                         <span class="font-bold text-main">Nenhum registro encontrado</span><br>
                         <span class="text-xs">Altere os filtros ou pesquise novamente.</span>
@@ -139,6 +144,11 @@ class GerenciadorPlanejamento {
                 .replace('__F__', linha.filial)
                 .replace('__S__', linha.serie)
                 .replace('__C__', linha.ctc);
+
+            // Regra Visual: Se a margem for negativa, fica vermelho para alertar o usuário!
+            const isPrejuizo = linha.margemEstimadaInd < 0;
+            const corLucro = isPrejuizo ? '#ef4444' : '#3b82f6'; // Vermelho ou Azul
+            const bgMargem = isPrejuizo ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.1)';
 
             tr.innerHTML = `
                 <td style="text-align: center; min-width: 110px;">
@@ -190,7 +200,18 @@ class GerenciadorPlanejamento {
                     <div class="text-xs text-muted">${this.formatadorNumero.format(linha.pesoFisico)} Fís</div>
                     <div class="font-black text-main">${this.formatadorNumero.format(linha.pesoTaxado)} Tax</div>
                 </td>
-                <td style="text-align: right; font-weight: 800; color: var(--luft-success);">${this.formatadorMoeda.format(linha.valorMercadoria)}</td>
+                <td style="text-align: right; font-weight: 800; color: var(--luft-text-muted);">${this.formatadorMoeda.format(linha.valorMercadoria)}</td>
+                
+                <td style="text-align: right; font-weight: 700; color: #10b981;">${this.formatadorMoeda.format(linha.freteTotal)}</td>
+                <td style="text-align: right; font-weight: 600; color: #ef4444;">${this.formatadorMoeda.format(linha.custoEstimadoInd)}</td>
+                <td style="text-align: right;">
+                    <div class="font-black" style="color: ${corLucro}; font-size: 1rem;">
+                        ${this.formatadorMoeda.format(linha.lucroEstimadoInd)}
+                    </div>
+                    <div style="color: ${corLucro}; font-weight: 700; font-size: 0.75rem; background: ${bgMargem}; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 2px;">
+                        ${this.formatadorNumero.format(linha.margemEstimadaInd)}%
+                    </div>
+                </td>
             `;
             fragmentoDom.appendChild(tr);
         });
@@ -272,11 +293,11 @@ class GerenciadorPlanejamento {
         const elementoValor = document.getElementById('kpi-valor');
         const elementoNotas = document.getElementById('kpi-notas');
         
-        // Novos elementos
-        const elementoFretePlanejado = document.getElementById('kpi-frete-planejado');
+        // Elementos de Rentabilidade
+        const elementoFreteTotal = document.getElementById('kpi-frete-total');
         const elementoCustoEstimado = document.getElementById('kpi-custo-estimado');
-        const elementoDiferenca = document.getElementById('kpi-diferenca');
-        const elementoPercentual = document.getElementById('kpi-percentual-economia');
+        const elementoLucro = document.getElementById('kpi-lucro');
+        const elementoMargem = document.getElementById('kpi-margem');
 
         if (!elementoTotal) return; 
 
@@ -284,21 +305,19 @@ class GerenciadorPlanejamento {
         let valorAcumulado = 0;
         let notasAcumuladas = 0;
         
-        // Novas variáveis de acúmulo
-        let fretePlanejadoAcumulado = 0;
-        let custoEstimadoAcumulado = 0;
+        // Variáveis de Gestão de Lucro
+        let freteTotalAcumulado = 0; // Receita
+        let custoEstimadoAcumulado = 0; // Despesa Aérea Teórica
 
         this.dadosVisiveis.forEach(dado => {
             pesoAcumulado += dado.pesoTaxado;
             valorAcumulado += dado.valorMercadoria;
             notasAcumuladas += dado.quantidadeNotas;
 
-            // 1. Analisa os CTCs já planejados usando o Custo Real das Tarifas Aéreas!
-            if (dado.tem_planejamento) {
-                fretePlanejadoAcumulado += dado.custoPlanejado;
-            }
+            // 1. Receita: Soma do raw_frete_total
+            freteTotalAcumulado += dado.freteTotal;
 
-            // 2. Faz o cálculo teórico do Custo para TODOS os CTCs na tela
+            // 2. Custo Estimado: Usa expressamente o Peso Taxado (Peso Cubado do Aéreo) * Tarifa
             custoEstimadoAcumulado += (dado.pesoTaxado * dado.tarifaEstimada);
         });
 
@@ -307,21 +326,33 @@ class GerenciadorPlanejamento {
         elementoValor.innerText = valorAcumulado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         elementoNotas.innerText = notasAcumuladas;
         
-        // Atualiza os novos cards
-        if (elementoFretePlanejado) elementoFretePlanejado.innerText = this.formatadorNumero.format(fretePlanejadoAcumulado);
+        // Atualiza os Cards de Receita e Custo
+        if (elementoFreteTotal) elementoFreteTotal.innerText = this.formatadorNumero.format(freteTotalAcumulado);
         if (elementoCustoEstimado) elementoCustoEstimado.innerText = this.formatadorNumero.format(custoEstimadoAcumulado);
 
-        // --- LÓGICA DE ECONOMIA / DIFERENÇA ---
-        const diferenca = custoEstimadoAcumulado - fretePlanejadoAcumulado;
-        const percentual = custoEstimadoAcumulado > 0 ? (diferenca / custoEstimadoAcumulado) * 100 : 0;
+        // --- MATEMÁTICA DA RENTABILIDADE ---
+        // Lucro Bruto = Receita (Frete do CTC) - Despesa (Custo Estimado do Aéreo)
+        const lucroEstimado = freteTotalAcumulado - custoEstimadoAcumulado;
+        
+        // Margem % = (Lucro / Receita) * 100
+        const margemPercentual = freteTotalAcumulado > 0 ? (lucroEstimado / freteTotalAcumulado) * 100 : 0;
 
-        if (elementoDiferenca) {
-            elementoDiferenca.innerText = this.formatadorNumero.format(diferenca);
+        // Atualiza a tela formatando como números decimais no padrão brasileiro
+        if (elementoLucro) {
+            elementoLucro.innerText = this.formatadorNumero.format(lucroEstimado);
         }
         
-        if (elementoPercentual) {
-            // Arredonda para 2 casas decimais e garante formato pt-BR
-            elementoPercentual.innerText = this.formatadorNumero.format(percentual);
+        if (elementoMargem) {
+            elementoMargem.innerText = this.formatadorNumero.format(margemPercentual);
+            
+            // Dica visual de UX: Deixa o lucro/margem vermelho se for prejuízo
+            if (margemPercentual < 0) {
+                elementoMargem.style.color = '#ef4444'; // Vermelho
+                if(elementoLucro) elementoLucro.style.color = '#ef4444';
+            } else {
+                elementoMargem.style.color = '#8b5cf6'; // Roxo padrão
+                if(elementoLucro) elementoLucro.style.color = '#3b82f6'; // Azul padrão
+            }
         }
     }
 
@@ -368,7 +399,6 @@ class GerenciadorPlanejamento {
 
         dadosParaProcessar.forEach(item => {
             if (item.filial) {
-                // Guarda a filial. Se por acaso a API não trouxer 'nomefilial', faz um fallback mostrando o próprio código
                 mapaFiliais.set(item.filial, item.nomefilial || item.filial);
             }
             if (item.motivodoc) conjuntoMotivos.add(item.motivodoc);
@@ -378,11 +408,9 @@ class GerenciadorPlanejamento {
         const selecaoMotivo = document.getElementById('filtro-motivo');
 
         if (selecaoFilial) {
-            // Converte o Map para array, ordena alfabeticamente pelo NOME da filial e popula o select
             Array.from(mapaFiliais.entries())
                 .sort((a, b) => String(a[1]).localeCompare(String(b[1])))
                 .forEach(([codigo, nome]) => {
-                    // O "value" continua sendo o código para não quebrar a filtragem, mas o usuário vê o nome
                     selecaoFilial.innerHTML += `<option value="${codigo}">${nome}</option>`;
                 });
         }
@@ -400,7 +428,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const gerenciador = new GerenciadorPlanejamento();
     gerenciador.inicializar();
 
-    // Expõe os métodos no escopo global para que os on-clicks do HTML continuem funcionando
     window.Ordenar = (coluna) => gerenciador.ordenarTabela(coluna);
     window.MudarAba = (aba) => gerenciador.mudarAbaVisivel(aba);
 });
