@@ -11,7 +11,7 @@
 <style>
     /* --- ESTILOS EXCLUSIVOS DO ACOMPANHAMENTO --- */
     .luft-acompanhamento-wrapper {
-        display: flex; flex-direction: column; gap: 20px;
+        display: flex; flex-direction: column; gap: 12px;
         height: calc(100vh - 120px); overflow: hidden;
         animation: slideUpFade 0.6s ease-out forwards;
     }
@@ -20,26 +20,28 @@
 
     /* Seção do Mapa */
     .luft-acompanhamento-mapa {
-        flex: 1; min-height: 350px; border-radius: 16px; border: 1px solid var(--luft-border);
+        flex: 1; min-height: 200px; border-radius: 16px; border: 1px solid var(--luft-border);
         overflow: hidden; position: relative; background: #fff; box-shadow: var(--luft-shadow-sm);
     }
 
     /* Seção da Tabela */
     .luft-acompanhamento-tabela {
-        flex: 1; min-height: 250px; border-radius: 16px; border: 1px solid var(--luft-border);
+        flex: 1.5; min-height: 250px; border-radius: 16px; border: 1px solid var(--luft-border);
         background: var(--luft-bg-panel); box-shadow: var(--luft-shadow-sm);
         display: flex; flex-direction: column; overflow: hidden;
     }
 
     .luft-acompanhamento-tabela-wrap { flex: 1; overflow-y: auto; }
     .luft-acompanhamento-tabela table { width: 100%; border-collapse: collapse; }
+    
+    /* ALTERADO: Padding reduzido (de 12px 24px para 8px 16px) para caberem mais linhas */
     .luft-acompanhamento-tabela th {
-        text-align: left; padding: 12px 24px; font-size: 0.75rem; font-weight: 700;
+        text-align: left; padding: 8px 16px; font-size: 0.75rem; font-weight: 700;
         text-transform: uppercase; color: var(--luft-text-muted); background: var(--luft-bg-app);
         position: sticky; top: 0; z-index: 10; border-bottom: 1px solid var(--luft-border);
     }
     .luft-acompanhamento-tabela td { 
-        padding: 12px 24px; border-bottom: 1px solid var(--luft-border); 
+        padding: 8px 16px; border-bottom: 1px solid var(--luft-border); 
         font-size: 0.85rem; color: var(--luft-text-main); vertical-align: middle; 
     }
     
@@ -120,42 +122,42 @@
 
 <div class="luft-acompanhamento-wrapper">
     
-    <div class="luft-card p-4 d-flex align-items-end gap-4 flex-wrap" style="flex: 0 0 auto;">
-        <div style="flex: 1; min-width: 200px;">
-            <label class="form-label text-xs font-bold text-muted mb-1" style="text-transform: uppercase;">Buscar AWB</label>
-            <div class="relative">
-                <i class="ph-bold ph-magnifying-glass absolute" style="left: 12px; top: 50%; transform: translateY(-50%); color: var(--luft-text-muted);"></i>
-                <input type="text" id="buscaAwb" class="form-control pl-10" placeholder="Ex: 957-..." style="padding-left: 36px;">
+    <div class="luft-card p-2 d-flex align-items-end gap-3 flex-wrap" style="flex: 0 0 auto;">
+        <div style="flex: 1; min-width: 180px;">
+            <label class="form-label text-muted mb-0" style="text-transform: uppercase; font-size: 0.65rem; font-weight: 700;">Buscar AWB</label>
+            <div class="relative mt-1">
+                <i class="ph-bold ph-magnifying-glass absolute" style="left: 10px; top: 50%; transform: translateY(-50%); color: var(--luft-text-muted);"></i>
+                <input type="text" id="buscaAwb" class="form-control" placeholder="Ex: 957-..." style="padding-left: 32px; height: 34px; font-size: 0.85rem;">
             </div>
         </div>
 
-        <div style="flex: 1; min-width: 200px;">
-            <label class="form-label text-xs font-bold text-muted mb-1" style="text-transform: uppercase;">Filial CTC</label>
-            <div class="relative">
-                <i class="ph-bold ph-file-text absolute" style="left: 12px; top: 50%; transform: translateY(-50%); color: var(--luft-text-muted);"></i>
-                <input type="text" id="buscaFilialCtc" class="form-control pl-10" placeholder="N° Filial CTC..." style="padding-left: 36px;">
+        <div style="flex: 1; min-width: 180px;">
+            <label class="form-label text-muted mb-0" style="text-transform: uppercase; font-size: 0.65rem; font-weight: 700;">Filial CTC</label>
+            <div class="relative mt-1">
+                <i class="ph-bold ph-file-text absolute" style="left: 10px; top: 50%; transform: translateY(-50%); color: var(--luft-text-muted);"></i>
+                <input type="text" id="buscaFilialCtc" class="form-control" placeholder="N° Filial CTC..." style="padding-left: 32px; height: 34px; font-size: 0.85rem;">
             </div>
         </div>
 
-        <div style="flex: 0 0 150px;">
-            <label class="form-label text-xs font-bold text-muted mb-1" style="text-transform: uppercase;">De</label>
-            <input type="date" id="dataInicio" class="form-control" value="{{ data_inicio }}">
+        <div style="flex: 0 0 130px;">
+            <label class="form-label text-muted mb-0" style="text-transform: uppercase; font-size: 0.65rem; font-weight: 700;">De</label>
+            <input type="date" id="dataInicio" class="form-control mt-1" value="{{ data_inicio }}" style="height: 34px; font-size: 0.85rem;">
         </div>
 
-        <div style="flex: 0 0 150px;">
-            <label class="form-label text-xs font-bold text-muted mb-1" style="text-transform: uppercase;">Até</label>
-            <input type="date" id="dataFim" class="form-control" value="{{ data_fim }}">
+        <div style="flex: 0 0 130px;">
+            <label class="form-label text-muted mb-0" style="text-transform: uppercase; font-size: 0.65rem; font-weight: 700;">Até</label>
+            <input type="date" id="dataFim" class="form-control mt-1" value="{{ data_fim }}" style="height: 34px; font-size: 0.85rem;">
         </div>
 
         <div style="flex: 0 0 auto;">
-            <button class="btn btn-primary d-flex align-items-center gap-2" onclick="carregarDados()" style="height: 40px;">
+            <button class="btn btn-primary d-flex align-items-center gap-2 mt-1" onclick="carregarDados()" style="height: 34px; font-size: 0.85rem; padding: 0 16px;">
                 Filtrar <i class="ph-bold ph-caret-right"></i>
             </button>
         </div>
 
-        <div class="d-flex flex-column align-items-end pl-4" style="margin-left: auto; border-left: 1px solid var(--luft-border);">
-            <span class="text-xs font-bold text-muted" style="text-transform: uppercase;">Listadas</span>
-            <span id="lbl-total" class="font-black text-primary" style="font-size: 1.8rem; line-height: 1;">0</span>
+        <div class="d-flex flex-column align-items-end pl-3 ml-auto" style="border-left: 1px solid var(--luft-border);">
+            <span class="text-muted" style="text-transform: uppercase; font-size: 0.6rem; font-weight: 700;">Listadas</span>
+            <span id="lbl-total" class="font-black text-primary" style="font-size: 1.5rem; line-height: 1;">0</span>
         </div>
     </div>
 

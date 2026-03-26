@@ -25,22 +25,31 @@
         box-shadow: var(--luft-shadow-sm);
     }
 
-    .luft-editor-sidebar { width: 420px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+    /* ALTERAÇÃO AQUI: height 100%, overflow hidden e gap menor (de 16px para 10px) */
+    .luft-editor-sidebar { 
+        width: 420px; display: flex; flex-direction: column; gap: 10px; 
+        height: 100%; overflow: hidden; 
+    }
 
-    /* Tabs de Estratégias */
-    .luft-strategy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    /* ALTERAÇÃO AQUI: gap menor na grid (de 8px para 6px) */
+    .luft-strategy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; flex-shrink: 0; }
     
+    /* ALTERAÇÃO AQUI: padding reduzido (de 10px para 8px) e tamanho da fonte ligeiramente menor */
     .luft-strategy-btn {
         background: var(--luft-bg-panel); border: 1px solid var(--luft-border);
-        border-radius: 8px; padding: 10px; display: flex; align-items: center; gap: 8px;
+        border-radius: 8px; padding: 8px; display: flex; align-items: center; gap: 8px;
         cursor: pointer; transition: all 0.2s; font-weight: 600;
-        font-size: 0.85rem; color: var(--luft-text-muted);
+        font-size: 0.8rem; color: var(--luft-text-muted);
     }
     
     .luft-strategy-btn:hover { background: var(--luft-bg-app); color: var(--luft-text-main); }
     .luft-strategy-btn.active { background: rgba(59, 130, 246, 0.08); border-color: var(--luft-primary-500); color: var(--luft-primary-600); }
 
-    .luft-editor-timeline { background: var(--luft-bg-panel); border: 1px solid var(--luft-border); border-radius: 12px; flex: 1; overflow-y: auto; padding: 0; }
+    /* ALTERAÇÃO AQUI: A timeline agora tem overflow-y: auto para ser a única coisa que rola */
+    .luft-editor-timeline { 
+        background: var(--luft-bg-panel); border: 1px solid var(--luft-border); 
+        border-radius: 12px; flex: 1; overflow-y: auto; padding: 0; 
+    }
 
     /* Modal Lote Customizado */
     .luft-modal-lote-backdrop {
@@ -55,43 +64,44 @@
     <div class="luft-editor-map-container" id="map"></div>
 
     <div class="luft-editor-sidebar">
-        <div class="luft-card p-4">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <div class="luft-badge luft-badge-secondary" 
-                     onclick="{% if Ctc.is_consolidado %}abrirModalLote(){% endif %}"
-                     style="{{ 'cursor: pointer;' if Ctc.is_consolidado else '' }}"
-                     title="{{ 'Clique para ver os documentos' if Ctc.is_consolidado else '' }}">
-                    {% if Ctc.is_consolidado %}
-                        <i class="ph-bold ph-stack"></i> Lote: {{ Ctc.qtd_docs }} docs <i class="ph-bold ph-caret-down ml-1"></i>
-                    {% else %}
-                        <i class="ph-bold ph-file-text"></i> CTC Individual
-                    {% endif %}
-                </div>
-
-                <div class="luft-badge {{ 'luft-badge-danger' if 'URGENTE' in (Ctc.prioridade|upper) else 'luft-badge-primary' }}">
-                    {{ Ctc.prioridade or 'Normal' }}
+        <div class="luft-card p-2" style="flex-shrink: 0;">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="font-black text-main m-0 d-flex align-items-center gap-1" style="font-size: 0.95rem;">
+                    {{ Ctc.origem_cidade }} <i class="ph-bold ph-airplane-tilt text-primary" style="font-size: 0.85rem;"></i> {{ Ctc.destino_cidade }}
+                </h2>
+                <div class="d-flex gap-1">
+                    <div class="luft-badge luft-badge-secondary" 
+                         onclick="{% if Ctc.is_consolidado %}abrirModalLote(){% endif %}"
+                         style="padding: 2px 6px; font-size: 0.65rem; {{ 'cursor: pointer;' if Ctc.is_consolidado else '' }}"
+                         title="{{ 'Clique para ver os documentos' if Ctc.is_consolidado else '' }}">
+                        {% if Ctc.is_consolidado %}
+                            <i class="ph-bold ph-stack"></i> {{ Ctc.qtd_docs }} docs
+                        {% else %}
+                            <i class="ph-bold ph-file-text"></i> Ind.
+                        {% endif %}
+                    </div>
+                    <div class="luft-badge {{ 'luft-badge-danger' if 'URGENTE' in (Ctc.prioridade|upper) else 'luft-badge-primary' }}" style="padding: 2px 6px; font-size: 0.65rem;">
+                        {{ Ctc.prioridade or 'Normal' }}
+                    </div>
                 </div>
             </div>
 
-            <h2 class="font-black text-main m-0 d-flex align-items-center gap-2" style="font-size: 1.2rem;">
-                {{ Ctc.origem_cidade }} <i class="ph-bold ph-airplane-tilt text-primary"></i> {{ Ctc.destino_cidade }}
-            </h2>
-            <div class="text-xs text-muted mt-2 d-flex flex-column gap-1">
-                <span class="font-bold text-main" style="font-size: 0.9rem;">{{ Ctc.filial }}-{{ Ctc.serie }}-{{ Ctc.ctc }}</span>
-                <span>Fís: {{ Ctc.peso_fisico|float|round(2) }} | Tax: <strong class="text-main">{{ Ctc.peso_taxado|float|round(2) }} kg</strong></span>
-                <span class="text-success font-bold" style="font-size: 0.95rem;">R$ {{ "{:,.2f}".format(Ctc.valor) }}</span>
+            <div class="d-flex justify-content-between align-items-center text-xs mt-2" style="background: rgba(0,0,0,0.03); padding: 4px 8px; border-radius: 6px; border: 1px solid var(--luft-border);">
+                <span class="font-bold text-main" style="font-size: 0.8rem;">{{ Ctc.filial }}-{{ Ctc.serie }}-{{ Ctc.ctc }}</span>
+                <span class="text-muted">Tax: <strong class="text-main">{{ Ctc.peso_taxado|float|round(2) }} kg</strong></span>
+                <span class="text-success font-bold" style="font-size: 0.85rem;">R$ {{ "{:,.2f}".format(Ctc.valor) }}</span>
             </div>
 
-            <div class="d-flex flex-wrap gap-2 mt-3">
-                <span class="luft-badge luft-badge-info" title="Tipo de Carga"><i class="ph-bold ph-package"></i> {{ Ctc.tipo_carga or 'GERAL' }}</span>
-                <span class="luft-badge luft-badge-success" title="Serviço Contratado"><i class="ph-bold ph-handshake"></i> {{ Ctc.servico_contratado or 'PADRÃO' }}</span>
-                <span class="luft-badge luft-badge-secondary" title="{{ Ctc.remetente }} - {{ Ctc.cnpj_cliente or Ctc.remet_cgc }}" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            <div class="d-flex gap-1 mt-2" style="overflow: hidden;">
+                <span class="luft-badge luft-badge-info" title="Tipo de Carga" style="padding: 2px 6px; font-size: 0.6rem;"><i class="ph-bold ph-package"></i> {{ Ctc.tipo_carga or 'GERAL' }}</span>
+                <span class="luft-badge luft-badge-success" title="Serviço" style="padding: 2px 6px; font-size: 0.6rem;"><i class="ph-bold ph-handshake"></i> {{ Ctc.servico_contratado or 'PADRÃO' }}</span>
+                <span class="luft-badge luft-badge-secondary" title="{{ Ctc.remetente }}" style="padding: 2px 6px; font-size: 0.6rem; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                     <i class="ph-bold ph-user"></i> {{ Ctc.remetente[:15] }}... 
                 </span>
             </div>
         </div>
 
-        <div id="aviso-modo-visualizacao" class="luft-alert luft-alert-success hidden">
+        <div id="aviso-modo-visualizacao" class="luft-alert luft-alert-success hidden" style="flex-shrink: 0; margin: 0;">
             <i class="ph-fill ph-lock-key luft-alert-icon"></i>
             <div class="luft-alert-content">
                 <h4 class="luft-alert-title">Planejamento Confirmado</h4>
@@ -120,20 +130,20 @@
             </button>
         </div>
 
-        <div class="luft-card p-3 d-flex justify-content-between text-center" id="strategy-metrics">
+        <div class="luft-card p-2 d-flex justify-content-between text-center" id="strategy-metrics" style="flex-shrink: 0;">
             <div>
                 <span class="text-xs text-muted font-bold d-block text-uppercase">Custo Est.</span>
-                <span class="font-black text-success" style="font-size: 1.1rem;" id="metrica-custo">--</span>
+                <span class="font-black text-success" style="font-size: 1rem;" id="metrica-custo">--</span>
             </div>
             <div style="width: 1px; background: var(--luft-border);"></div>
             <div>
                 <span class="text-xs text-muted font-bold d-block text-uppercase">Tempo Total</span>
-                <span class="font-black text-main" style="font-size: 1.1rem;" id="metrica-tempo">--</span>
+                <span class="font-black text-main" style="font-size: 1rem;" id="metrica-tempo">--</span>
             </div>
             <div style="width: 1px; background: var(--luft-border);"></div>
             <div>
                 <span class="text-xs text-muted font-bold d-block text-uppercase">Conexões</span>
-                <span class="font-black text-main" style="font-size: 1.1rem;" id="metrica-conexoes">--</span>
+                <span class="font-black text-main" style="font-size: 1rem;" id="metrica-conexoes">--</span>
             </div>
         </div>
 
@@ -144,7 +154,7 @@
             </div>
         </div>
 
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2" style="flex-shrink: 0;">
             <a href="{{ url_for('Planejamento.dashboard') }}" class="btn btn-secondary flex-1" style="text-align: center;">Voltar</a>
             
             <button class="btn btn-danger hidden flex-1" id="btn-cancelar-plan" onclick="cancelarPlanejamentoExistente()">

@@ -7,7 +7,6 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy import desc, func, text
 from Conexoes import ObterSessaoSqlServer
 from Models.SQL_SERVER.Ctc import CtcEsp, CtcEspCpl
-from Models.SQL_SERVER.NfEsp import NfEsp
 from Models.SQL_SERVER.Planejamento import PlanejamentoCabecalho, PlanejamentoItem, PlanejamentoTrecho
 from Models.SQL_SERVER.TabelaFrete import TabelaFrete, RemessaFrete
 from Models.SQL_SERVER.Aeroporto import Aeroporto, RemessaAeroportos
@@ -28,6 +27,7 @@ class PlanejamentoService:
     _QueryBase = """
          SELECT DISTINCT
              c.filial as Filial
+             ,fil.nomefilial as Filial_Nome
              ,c.filialctc as CTC
              ,c.seriectc as Serie
              ,C.MODAL as Modal
@@ -75,6 +75,8 @@ class PlanejamentoService:
              -- JOIN PARA BUSCAR A SUBCONTRATAÇÃO NA FARMA
              LEFT JOIN farma.dbo.tb_ctc_esp f (nolock) ON f.filialctc = cl.ctc_corresp AND ISNULL(cl.ctc_corresp, '') <> ''
              
+             LEFT JOIN intec.dbo.tb_filial fil (nolock) ON fil.filial COLLATE DATABASE_DEFAULT = c.filial COLLATE DATABASE_DEFAULT
+
              LEFT JOIN intec.dbo.tb_manifesto m (nolock) on m.filialctc = c.filialctc
              LEFT JOIN intec.dbo.Tb_PLN_ControleReversa rev (nolock) ON
              rev.Filial COLLATE DATABASE_DEFAULT = c.filial COLLATE DATABASE_DEFAULT AND
@@ -107,26 +109,91 @@ class PlanejamentoService:
              ) 
          """
 
+    # --- NOVO: Mapeamento Rápido de UF para Aeroporto Principal ---
+    MAPA_UF_IATA = {
+        'SP': 'GRU', 'RJ': 'GIG', 'MG': 'CNF', 'RS': 'POA', 'PR': 'CWB',
+        'SC': 'FLN', 'BA': 'SSA', 'PE': 'REC', 'CE': 'FOR', 'AM': 'MAO',
+        'PA': 'BEL', 'GO': 'BSB', 'DF': 'BSB', 'MT': 'CGB', 'MS': 'CGR',
+        'ES': 'VIX', 'MA': 'SLZ', 'PB': 'JPA', 'RN': 'NAT', 'AL': 'MCZ',
+        'SE': 'AJU', 'PI': 'THE', 'RO': 'PVH', 'RR': 'BVB', 'AP': 'MCP',
+        'AC': 'RBR', 'TO': 'PMW'
+    }
+
+    @staticmethod
+    def _CarregarCacheTarifas():
+        """Consulta 1 única vez a menor tarifa de cada rota ativa para cálculo virtual rápido"""
+        Sessao = ObterSessaoSqlServer()
+        cache = {}
+        try:
+            res = Sessao.query(
+                TabelaFrete.Origem, 
+                TabelaFrete.Destino, 
+                func.min(TabelaFrete.Tarifa).label('menor_tarifa')
+            ).join(RemessaFrete, TabelaFrete.IdRemessa == RemessaFrete.Id).filter(
+                RemessaFrete.Ativo == True
+            ).group_by(TabelaFrete.Origem, TabelaFrete.Destino).all()
+            
+            for r in res:
+                chave = f"{str(r.Origem).strip()}-{str(r.Destino).strip()}"
+                cache[chave] = float(r.menor_tarifa or 0)
+        except Exception as e:
+            LogService.Error("PlanejamentoService", "Erro em _CarregarCacheTarifas", e)
+        finally:
+            Sessao.close()
+        return cache
+
     @staticmethod
     def _ObterMapaCache():
         SessaoPln = ObterSessaoSqlServer()
         mapa = {}
         if SessaoPln:
             try:
+                # 1. Buscar a soma das tarifas para cada IdPlanejamento (pois pode ter conexões)
+                tarifas_por_plan = {}
+                res_tarifas = SessaoPln.query(
+                    PlanejamentoTrecho.IdPlanejamento, 
+                    func.sum(TabelaFrete.Tarifa).label('tarifa_total')
+                ).outerjoin(
+                    TabelaFrete, PlanejamentoTrecho.IdFrete == TabelaFrete.Id
+                ).group_by(PlanejamentoTrecho.IdPlanejamento).all()
+                
+                for r in res_tarifas:
+                    tarifas_por_plan[r.IdPlanejamento] = float(r.tarifa_total or 0)
+                
+                # 2. Buscar os itens com o peso_taxado para calcular o custo proporcional
                 rows = SessaoPln.query(
                     PlanejamentoItem.Filial, PlanejamentoItem.Serie, PlanejamentoItem.Ctc,
+                    PlanejamentoItem.PesoTaxado,
                     PlanejamentoCabecalho.Status, PlanejamentoCabecalho.IdPlanejamento
-                ).join(PlanejamentoCabecalho, PlanejamentoItem.IdPlanejamento == PlanejamentoCabecalho.IdPlanejamento).all()
+                ).join(
+                    PlanejamentoCabecalho, PlanejamentoItem.IdPlanejamento == PlanejamentoCabecalho.IdPlanejamento
+                ).filter(
+                    PlanejamentoCabecalho.Status != 'Cancelado'
+                ).all()
                 
                 for r in rows:
                     k = f"{str(r.Filial).strip()}-{str(r.Serie).strip()}-{str(r.Ctc).strip()}"
-                    mapa[k] = {'status': r.Status, 'id_plan': r.IdPlanejamento}
-            except: pass
-            finally: SessaoPln.close()
+                    
+                    # CÁLCULO REAL: (Soma das tarifas das conexões) * (Peso Taxado)
+                    tarifa_t = tarifas_por_plan.get(r.IdPlanejamento, 0.0)
+                    peso_item = float(r.PesoTaxado or 0)
+                    custo_real_trechos = peso_item * tarifa_t
+                    
+                    mapa[k] = {
+                        'status': r.Status, 
+                        'id_plan': r.IdPlanejamento,
+                        'custo_planejado': custo_real_trechos,
+                        'tarifa_rota': tarifa_t
+                    }
+            except Exception as e:
+                LogService.Error("PlanejamentoService", "Erro em _ObterMapaCache", e)
+            finally: 
+                SessaoPln.close()
         return mapa
 
     @staticmethod
-    def _SerializarResultados(ResultadoSQL, NomeBloco, MapaCache):
+    def _SerializarResultados(ResultadoSQL, NomeBloco, MapaCache, CacheTarifas=None):
+        if CacheTarifas is None: CacheTarifas = {}
         Lista = []
         def to_float(val): return float(val) if val else 0.0
         def to_int(val): return int(val) if val else 0
@@ -155,10 +222,26 @@ class PlanejamentoService:
             remetente_final = to_str(row.Destinatario) if is_dev else to_str(row.Remetente)
             destinatario_final = to_str(row.Remetente) if is_dev else to_str(row.Destinatario)
             
+
+            # --- NOVA LÓGICA DE PLANEJAMENTO VIRTUAL RÁPIDO ---
+            uf_orig = to_str(row.UFOrigem)
+            uf_dest = to_str(row.UFDestino)
+            
+            # Pega o Aeroporto principal da UF (Se não achar, chuta GRU -> MAO como fallback)
+            iata_orig = PlanejamentoService.MAPA_UF_IATA.get(uf_orig, 'GRU')
+            iata_dest = PlanejamentoService.MAPA_UF_IATA.get(uf_dest, 'MAO')
+            
+            chave_tarifa = f"{iata_orig}-{iata_dest}"
+            
+            # Pega o valor real do banco em memória. Se a rota não existir na tabela, usa R$ 5.50
+            tarifa_virtual = CacheTarifas.get(chave_tarifa, 5.50)
+            # --------------------------------------------------
+
             Lista.append({
                 'id_unico': f"{to_str(row.Filial)}-{to_str(row.CTC)}",
                 'origem_dados': NomeBloco,
                 'filial': to_str(row.Filial),
+                'nomefilial': to_str(getattr(row, 'Filial_Nome', '')),
                 'ctc': to_str(row.CTC),
                 'serie': to_str(row.Serie),
                 'data_emissao': data_emissao,
@@ -182,6 +265,8 @@ class PlanejamentoService:
                 'tem_planejamento': bool(info),
                 'status_planejamento': info['status'] if info else None,
                 'id_planejamento': info['id_plan'] if info else None,
+                'custo_planejado': info['custo_planejado'] if info else 0.0,
+                'tarifa_estimada': info['tarifa_rota'] if info and info.get('tarifa_rota', 0) > 0 else tarifa_virtual,
                 'full_data': { 
                      'filial': row.Filial, 'filialctc': row.CTC, 'seriectc': row.Serie,
                      'data': str(row.DataEmissao), 'hora': str(row.HoraEmissao),
@@ -192,7 +277,7 @@ class PlanejamentoService:
         return Lista
 
     @staticmethod
-    def BuscarCtcsDiario(mapa_cache=None):
+    def BuscarCtcsDiario(mapa_cache=None, cache_tarifas=None): # ADICIONADO AQUI
         Sessao = ObterSessaoSqlServer()
         try:
             if not mapa_cache: mapa_cache = PlanejamentoService._ObterMapaCache()
@@ -203,14 +288,16 @@ class PlanejamentoService:
             """
             Query = text(PlanejamentoService._QueryBase + FiltroSQL + " ORDER BY c.data DESC, c.hora DESC")
             Rows = Sessao.execute(Query, {'data_alvo': Hoje}).fetchall()
-            return PlanejamentoService._SerializarResultados(Rows, "DIARIO", mapa_cache)
+            
+            # ADICIONADO O cache_tarifas AQUI NO RETORNO:
+            return PlanejamentoService._SerializarResultados(Rows, "DIARIO", mapa_cache, cache_tarifas)
         except Exception as e:
             LogService.Error("PlanejamentoService", "Erro Buscar Diario", e)
             return []
         finally: Sessao.close()
 
     @staticmethod
-    def BuscarCtcsReversa(mapa_cache=None):
+    def BuscarCtcsReversa(mapa_cache=None, cache_tarifas=None): # ADICIONADO AQUI
         Sessao = ObterSessaoSqlServer()
         try:
             if not mapa_cache: mapa_cache = PlanejamentoService._ObterMapaCache()
@@ -220,14 +307,15 @@ class PlanejamentoService:
             """
             Query = text(PlanejamentoService._QueryBase + FiltroSQL + " ORDER BY c.data DESC")
             Rows = Sessao.execute(Query).fetchall()
-            return PlanejamentoService._SerializarResultados(Rows, "REVERSA", mapa_cache)
+            
+            return PlanejamentoService._SerializarResultados(Rows, "REVERSA", mapa_cache, cache_tarifas)
         except Exception as e:
             LogService.Error("PlanejamentoService", "Erro Buscar Reversa", e)
             return []
         finally: Sessao.close()
 
     @staticmethod
-    def BuscarCtcsBacklog(mapa_cache=None):
+    def BuscarCtcsBacklog(mapa_cache=None, cache_tarifas=None): # ADICIONADO AQUI
         Sessao = ObterSessaoSqlServer()
         try:
             if not mapa_cache: mapa_cache = PlanejamentoService._ObterMapaCache()
@@ -240,7 +328,9 @@ class PlanejamentoService:
             """
             Query = text(PlanejamentoService._QueryBase + FiltroSQL + " ORDER BY c.data ASC")
             Rows = Sessao.execute(Query, {'data_hoje': Hoje, 'data_corte': Corte}).fetchall()
-            return PlanejamentoService._SerializarResultados(Rows, "BACKLOG", mapa_cache)
+            
+            # ADICIONADO O cache_tarifas AQUI NO RETORNO:
+            return PlanejamentoService._SerializarResultados(Rows, "BACKLOG", mapa_cache, cache_tarifas)
         except Exception as e:
             LogService.Error("PlanejamentoService", "Erro Buscar Backlog", e)
             return []
@@ -250,9 +340,15 @@ class PlanejamentoService:
     def BuscarCtcsPlanejamento():
         LogService.Debug("PlanejamentoService", "Iniciando busca GLOBAL (3 Blocos)...")
         Cache = PlanejamentoService._ObterMapaCache()
-        ListaDiario = PlanejamentoService.BuscarCtcsDiario(Cache)
-        ListaReversa = PlanejamentoService.BuscarCtcsReversa(Cache)
-        ListaBacklog = PlanejamentoService.BuscarCtcsBacklog(Cache)
+        
+        # NOVO: Carrega as tarifas virtuais 1 única vez para toda a tela
+        CacheTarifas = PlanejamentoService._CarregarCacheTarifas() 
+        
+        # Passamos o CacheTarifas para dentro das buscas
+        ListaDiario = PlanejamentoService.BuscarCtcsDiario(Cache, CacheTarifas)
+        ListaReversa = PlanejamentoService.BuscarCtcsReversa(Cache, CacheTarifas)
+        ListaBacklog = PlanejamentoService.BuscarCtcsBacklog(Cache, CacheTarifas)
+        
         Total = len(ListaDiario) + len(ListaReversa) + len(ListaBacklog)
         LogService.Info("PlanejamentoService", f"Busca Concluída. Total: {Total} (D:{len(ListaDiario)}, R:{len(ListaReversa)}, B:{len(ListaBacklog)})")
         return ListaDiario + ListaReversa + ListaBacklog
@@ -1206,7 +1302,7 @@ class PlanejamentoService:
             return ArquivoMemoria
 
         except Exception as ErroProcessamento:
-            LogService.Error("PlanejamentoService", "Erro ao Gerar Excel dos Planejamentos", ErroProcessamento)
+            LogService.Error("PlanejamentoService", "Erro ao Gerar Excel dos Planeja mentos", ErroProcessamento)
             return None
         finally:
             SessaoPG.close()

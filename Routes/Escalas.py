@@ -10,7 +10,7 @@ EscalasBp = Blueprint('Escalas', __name__)
 @login_required
 @RequerPermissao('CADASTROS.MALHA.VISUALIZAR')
 def mapa():
-    return render_template('Cadastros/Escalas/Index.html')
+    return render_template('Pages/Escalas/Index.html')
 
 @EscalasBp.route('/Api/OtimizarRotas', methods=['GET'])
 @login_required

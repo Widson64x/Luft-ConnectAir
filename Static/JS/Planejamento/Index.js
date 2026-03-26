@@ -70,13 +70,17 @@ class GerenciadorPlanejamento {
             const horaLimpa = item.hora_emissao ? item.hora_emissao.replace(':', '') : '0000';
             
             item.dataRaw = Number(`${partesData[2]}${partesData[1]}${partesData[0]}${horaLimpa}`);
-            item.buscaTexto = `${item.ctc} ${item.remetente} ${item.destinatario} ${item.origem} ${item.destino} ${item.filial} ${item.tipo_carga} ${item.motivodoc} ${item.prioridade}`.toLowerCase();
+            item.buscaTexto = `${item.ctc} ${item.remetente} ${item.destinatario} ${item.origem} ${item.destino} ${item.filial} ${item.nomefilial || ''} ${item.tipo_carga} ${item.motivodoc} ${item.prioridade}`.toLowerCase();
             
             item.pesoFisico = Number(item.peso_fisico || 0);
             item.pesoTaxado = Number(item.peso_taxado || 0); 
             item.valorMercadoria = Number(item.raw_val_mercadoria || 0);
             item.volumes = Number(item.volumes || 0);
             item.quantidadeNotas = Number(item.qtd_notas || 0);
+            
+            // NOVOS CAMPOS LINDOS VINDOS DO BACKEND
+            item.custoPlanejado = Number(item.custo_planejado || 0);
+            item.tarifaEstimada = Number(item.tarifa_estimada || 5.50);
         });
 
         if (this.dadosOriginais.length === 0) {
@@ -131,7 +135,6 @@ class GerenciadorPlanejamento {
             else if (linha.origem_dados === 'BACKLOG') crachaOrigem = '<span class="luft-badge luft-badge-warning">Backlog</span>';
             else if (linha.origem_dados === 'REVERSA') crachaOrigem = '<span class="luft-badge luft-badge-secondary">Reversa</span>';
 
-            // Utilizando a rota injetada e substituindo os placeholders
             const linkMontagem = rotasPlanejamento.montarRota
                 .replace('__F__', linha.filial)
                 .replace('__S__', linha.serie)
@@ -268,23 +271,58 @@ class GerenciadorPlanejamento {
         const elementoPeso = document.getElementById('kpi-peso');
         const elementoValor = document.getElementById('kpi-valor');
         const elementoNotas = document.getElementById('kpi-notas');
+        
+        // Novos elementos
+        const elementoFretePlanejado = document.getElementById('kpi-frete-planejado');
+        const elementoCustoEstimado = document.getElementById('kpi-custo-estimado');
+        const elementoDiferenca = document.getElementById('kpi-diferenca');
+        const elementoPercentual = document.getElementById('kpi-percentual-economia');
 
         if (!elementoTotal) return; 
 
         let pesoAcumulado = 0;
         let valorAcumulado = 0;
         let notasAcumuladas = 0;
+        
+        // Novas variáveis de acúmulo
+        let fretePlanejadoAcumulado = 0;
+        let custoEstimadoAcumulado = 0;
 
         this.dadosVisiveis.forEach(dado => {
             pesoAcumulado += dado.pesoTaxado;
             valorAcumulado += dado.valorMercadoria;
             notasAcumuladas += dado.quantidadeNotas;
+
+            // 1. Analisa os CTCs já planejados usando o Custo Real das Tarifas Aéreas!
+            if (dado.tem_planejamento) {
+                fretePlanejadoAcumulado += dado.custoPlanejado;
+            }
+
+            // 2. Faz o cálculo teórico do Custo para TODOS os CTCs na tela
+            custoEstimadoAcumulado += (dado.pesoTaxado * dado.tarifaEstimada);
         });
 
         elementoTotal.innerText = this.dadosVisiveis.length;
         elementoPeso.innerText = this.formatadorNumero.format(pesoAcumulado);
         elementoValor.innerText = valorAcumulado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         elementoNotas.innerText = notasAcumuladas;
+        
+        // Atualiza os novos cards
+        if (elementoFretePlanejado) elementoFretePlanejado.innerText = this.formatadorNumero.format(fretePlanejadoAcumulado);
+        if (elementoCustoEstimado) elementoCustoEstimado.innerText = this.formatadorNumero.format(custoEstimadoAcumulado);
+
+        // --- LÓGICA DE ECONOMIA / DIFERENÇA ---
+        const diferenca = custoEstimadoAcumulado - fretePlanejadoAcumulado;
+        const percentual = custoEstimadoAcumulado > 0 ? (diferenca / custoEstimadoAcumulado) * 100 : 0;
+
+        if (elementoDiferenca) {
+            elementoDiferenca.innerText = this.formatadorNumero.format(diferenca);
+        }
+        
+        if (elementoPercentual) {
+            // Arredonda para 2 casas decimais e garante formato pt-BR
+            elementoPercentual.innerText = this.formatadorNumero.format(percentual);
+        }
     }
 
     ordenarTabela(colunaDesejada) {
@@ -297,7 +335,7 @@ class GerenciadorPlanejamento {
         
         document.querySelectorAll('.luft-planejamento-tabela th i').forEach(icone => icone.className = 'ph-bold ph-caret-up-down text-muted');
         
-        const cabecalhoAtual = document.querySelector(`th[onclick="ordenarTabela('${colunaDesejada}')"] i`);
+        const cabecalhoAtual = document.querySelector(`th[onclick="Ordenar('${colunaDesejada}')"] i`);
         if (cabecalhoAtual) {
             cabecalhoAtual.className = this.ordemAtual.direcao === 'asc' ? 'ph-bold ph-caret-up text-primary' : 'ph-bold ph-caret-down text-primary';
         }
@@ -324,11 +362,15 @@ class GerenciadorPlanejamento {
     }
 
     popularListasSelecao(dadosParaProcessar) {
-        const conjuntoFiliais = new Set();
+        // Usamos um Map para guardar a relação: código da filial (chave) -> nome da filial (valor)
+        const mapaFiliais = new Map();
         const conjuntoMotivos = new Set();
 
         dadosParaProcessar.forEach(item => {
-            if (item.filial) conjuntoFiliais.add(item.filial);
+            if (item.filial) {
+                // Guarda a filial. Se por acaso a API não trouxer 'nomefilial', faz um fallback mostrando o próprio código
+                mapaFiliais.set(item.filial, item.nomefilial || item.filial);
+            }
             if (item.motivodoc) conjuntoMotivos.add(item.motivodoc);
         });
 
@@ -336,9 +378,13 @@ class GerenciadorPlanejamento {
         const selecaoMotivo = document.getElementById('filtro-motivo');
 
         if (selecaoFilial) {
-            Array.from(conjuntoFiliais).sort().forEach(filial => {
-                selecaoFilial.innerHTML += `<option value="${filial}">${filial}</option>`;
-            });
+            // Converte o Map para array, ordena alfabeticamente pelo NOME da filial e popula o select
+            Array.from(mapaFiliais.entries())
+                .sort((a, b) => String(a[1]).localeCompare(String(b[1])))
+                .forEach(([codigo, nome]) => {
+                    // O "value" continua sendo o código para não quebrar a filtragem, mas o usuário vê o nome
+                    selecaoFilial.innerHTML += `<option value="${codigo}">${nome}</option>`;
+                });
         }
 
         if (selecaoMotivo) {
