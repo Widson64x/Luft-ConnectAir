@@ -33,7 +33,7 @@ Prefix = ConfiguracaoAtual.ROUTE_PREFIX
 
 # Define a aplicação Flask, configurando o caminho para arquivos estáticos com o prefixo
 app = Flask(ConfiguracaoAtual.APP_NAME,
-            static_url_path=f'{Prefix}/Static', 
+            static_url_path='/Static', 
             static_folder='Static')
 
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
@@ -126,26 +126,26 @@ luftcore_app = LuftCorePackages(
 )
 
 # O Auth geralmente fica separado, ex: /Luft-ConnectAir/auth
-app.register_blueprint(AuthBp, url_prefix=f'{Prefix}/auth')
+app.register_blueprint(AuthBp, url_prefix='/auth')
 
 # Os demais módulos assumem o prefixo base, pois suas rotas internas já possuem nomes (ex: /malha/...)
-app.register_blueprint(ConfiguracoesBp, url_prefix=f'{Prefix}/Configuracoes')
-app.register_blueprint(Seguranca_BP, url_prefix=f'{Prefix}/Seguranca')
-app.register_blueprint(CortesBp, url_prefix=f'{Prefix}/Cortes')
-app.register_blueprint(PlanejamentoBp, url_prefix=f'{Prefix}/Planejamento')
-app.register_blueprint(EscalasBp, url_prefix=f'{Prefix}/Escalas')
-app.register_blueprint(AcompanhamentoBP, url_prefix=f'{Prefix}/Acompanhamento')
-app.register_blueprint(FreteBp, url_prefix=f'{Prefix}/Fretes')
-app.register_blueprint(ReversaBp, url_prefix=f'{Prefix}/Reversa')
-app.register_blueprint(MalhaBp, url_prefix=f'{Prefix}/Malha')
-app.register_blueprint(AeroportoBp, url_prefix=f'{Prefix}/Aeroportos')
-app.register_blueprint(CidadeBp, url_prefix=f'{Prefix}/Cidades')
-app.register_blueprint(ServicosClientesBp, url_prefix=f'{Prefix}/Servicos') # Exemplo de rota específica para um módulo
-app.register_blueprint(GlobalBp, url_prefix=f'{Prefix}/Global')
+app.register_blueprint(ConfiguracoesBp, url_prefix='/Configuracoes')
+app.register_blueprint(Seguranca_BP, url_prefix='/Seguranca')
+app.register_blueprint(CortesBp, url_prefix='/Cortes')
+app.register_blueprint(PlanejamentoBp, url_prefix='/Planejamento')
+app.register_blueprint(EscalasBp, url_prefix='/Escalas')
+app.register_blueprint(AcompanhamentoBP, url_prefix='/Acompanhamento')
+app.register_blueprint(FreteBp, url_prefix='/Fretes')
+app.register_blueprint(ReversaBp, url_prefix='/Reversa')
+app.register_blueprint(MalhaBp, url_prefix='/Malha')
+app.register_blueprint(AeroportoBp, url_prefix='/Aeroportos')
+app.register_blueprint(CidadeBp, url_prefix='/Cidades')
+app.register_blueprint(ServicosClientesBp, url_prefix='/Servicos') # Exemplo de rota específica para um módulo
+app.register_blueprint(GlobalBp, url_prefix='/Global')
 
 
 # Rota principal do Dashboard com o prefixo
-@app.route(f'{Prefix}/')
+@app.route('/')
 @login_required
 def Dashboard():
     return render_template('HomeDashboard.html')

@@ -20,7 +20,7 @@ except ImportError:
 if __name__ == "__main__": 
     # Configurações do ambiente
     host = os.environ.get("HOST", "127.0.0.1")
-    port = int(os.environ.get("PORT", "9007"))
+    port = int(os.environ.get("PORT", "9003"))
 
     # Pega o prefixo usando a mesma lógica do App.py
     from Configuracoes import ConfiguracaoAtual
