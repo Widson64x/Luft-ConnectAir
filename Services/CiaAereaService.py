@@ -4,6 +4,14 @@ from Models.SQL_SERVER.MalhaAerea import VooMalha, RemessaMalha
 from Services.LogService import LogService
 
 class CiaAereaService:
+
+    @staticmethod
+    def _NormalizarNomeCia(nome_cia):
+        if nome_cia is None:
+            return None
+
+        nome_normalizado = str(nome_cia).strip().upper()
+        return nome_normalizado or None
     
     @staticmethod
     def ObterTodasCias():
@@ -14,8 +22,13 @@ class CiaAereaService:
         Sessao = ObterSessaoSqlServer()
         try:
             # 1. Busca Cias Configuradas
-            Configs = Sessao.query(CiaConfig).all()
-            MapConfigs = {c.CiaAerea: c.ScoreParceria for c in Configs}
+            Configs = Sessao.query(CiaConfig).filter(CiaConfig.Ativo == True).all()
+            MapConfigs = {}
+
+            for config in Configs:
+                nome_config = CiaAereaService._NormalizarNomeCia(config.CiaAerea)
+                if nome_config:
+                    MapConfigs[nome_config] = config.ScoreParceria
             
             # 2. Busca Cias da Malha Ativa (para garantir que novas apareçam)
             CiasMalha = Sessao.query(VooMalha.CiaAerea).join(RemessaMalha)\
@@ -26,15 +39,20 @@ class CiaAereaService:
 
             # Adiciona as da Malha
             for (nome_cia,) in CiasMalha:
-                nome_cia = nome_cia.strip().upper()
+                nome_cia = CiaAereaService._NormalizarNomeCia(nome_cia)
+                if not nome_cia or nome_cia in CiasVistas:
+                    continue
+
                 score = MapConfigs.get(nome_cia, 50) # Padrão 50 (Neutro)
                 ListaFinal.append({'cia': nome_cia, 'score': score})
                 CiasVistas.add(nome_cia)
             
             # Adiciona as configuradas que talvez não estejam na malha hoje (histórico)
             for c in Configs:
-                if c.CiaAerea not in CiasVistas:
-                    ListaFinal.append({'cia': c.CiaAerea, 'score': c.ScoreParceria})
+                nome_cia = CiaAereaService._NormalizarNomeCia(c.CiaAerea)
+                if nome_cia and nome_cia not in CiasVistas:
+                    ListaFinal.append({'cia': nome_cia, 'score': c.ScoreParceria})
+                    CiasVistas.add(nome_cia)
             
             # Ordena por nome
             ListaFinal.sort(key=lambda x: x['cia'])
@@ -51,7 +69,10 @@ class CiaAereaService:
         """Atualiza o índice de 'parceria' de uma cia."""
         Sessao = ObterSessaoSqlServer()
         try:
-            cia = cia.strip().upper()
+            cia = CiaAereaService._NormalizarNomeCia(cia)
+            if not cia:
+                return False
+
             Config = Sessao.query(CiaConfig).filter(CiaConfig.CiaAerea == cia).first()
             
             if not Config:

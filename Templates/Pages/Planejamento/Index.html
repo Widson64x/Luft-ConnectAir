@@ -222,9 +222,19 @@
                 <label class="form-label text-xs font-bold text-muted mb-1" style="text-transform: uppercase;">Pesquisar</label>
                 <div class="relative">
                     <i class="ph-bold ph-magnifying-glass absolute" style="left: 14px; top: 50%; transform: translateY(-50%); color: var(--luft-text-muted);"></i>
-                    <input type="text" id="input-busca" class="form-control pl-10" placeholder="Buscar por CTC, cidade, cliente..." onkeyup="FiltrarTabela()" style="padding-left: 40px;">
+                        <input type="text" id="input-busca" class="form-control pl-10" placeholder="Buscar em todas as colunas..." onkeyup="FiltrarTabela()" style="padding-left: 40px;">
                 </div>
             </div>
+
+                <div style="flex: 1; min-width: 180px;">
+                    <label class="form-label text-xs font-bold text-muted mb-1" style="text-transform: uppercase;">Status</label>
+                    <div class="relative">
+                        <i class="ph-bold ph-check-circle absolute" style="left: 14px; top: 50%; transform: translateY(-50%); color: var(--luft-text-muted);"></i>
+                        <select id="filtro-status" class="form-control pl-10" onchange="FiltrarTabela()" style="padding-left: 40px; cursor: pointer;">
+                            <option value="TODOS">Todos Status</option>
+                        </select>
+                    </div>
+                </div>
 
             <div style="flex: 1; min-width: 180px;">
                 <label class="form-label text-xs font-bold text-muted mb-1" style="text-transform: uppercase;">Prioridade</label>

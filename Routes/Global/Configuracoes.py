@@ -22,7 +22,7 @@ def gerenciarCias():
 def salvarScoreCia():
     try:
         dadosRequisicao = request.json
-        nomeCia = dadosRequisicao.get('cia')
+        nomeCia = (dadosRequisicao.get('cia') or '').strip()
         valorScore = dadosRequisicao.get('score')
         
         if not nomeCia: return jsonify({'sucesso': False, 'msg': 'Nome obrigatório'}), 400
