@@ -25,6 +25,9 @@ class RouteIntelligenceService:
         servico_str = str(servico_contratado).upper().strip() if servico_contratado else 'PADRÃO'
         carga_str = str(tipo_carga).upper().strip() if tipo_carga else 'GERAL'
         
+        # Se a carga for perecível e o serviço contratado tiver "Expresso", 
+        # priorizamos apenas os serviços mais rápidos e aderentes, 
+        # ignorando opções econômicas.
         if carga_str == 'PERECIVEL' and 'EXPRESSO' in servico_str:
             return ['GOL LOG SAÚDE', 'GOL LOG RAPIDO', 'LATAM EXPRESSO (VELOZ)', 'LATAM RESERVADO']
         elif 'EXPRESSO' in servico_str:
@@ -47,8 +50,24 @@ class RouteIntelligenceService:
         ScoresParceria = CiaAereaService.ObterDicionarioScores()
         lista_servicos_alvo = RouteIntelligenceService._DeParaServicoIdeal(servico_contratado, tipo_carga)
         
-        # 2. Montagem do Grafo filtrando parcerias bloqueadas
+        """ 2. Montagem do Grafo filtrando parcerias bloqueadas
+        
+            - Cada aresta representa um trecho aéreo entre dois aeroportos, e 
+              carrega a lista de voos disponíveis para aquele trecho.
+
+            - Voos de companhias com score de parceria <= 0 são ignorados, 
+              bloqueando efetivamente aquelas companhias de aparecerem como 
+              opções nas rotas.
+
+            - O grafo é direcionado, ou seja, um voo de A para B não implica que 
+              exista um voo de B para A.
+        
+        """
         G = nx.DiGraph()
+        # Para cada voo, verificamos se a companhia aérea tem score de parceria positivo. 
+        # Se tiver, adicionamos o voo como uma aresta no grafo entre o aeroporto de origem 
+        # e destino. Cada aresta carrega uma lista de voos disponíveis para aquele trecho 
+        # específico.
         for Voo in voos_db:
             NomeCia = Voo.CiaAerea.strip().upper()
             if ScoresParceria.get(NomeCia, 50) <= 0:

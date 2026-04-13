@@ -51,43 +51,63 @@ def apiCtcsHoje():
 def montarPlanejamento(filial, serie, ctc):
     LogService.Info("Routes.Planejamento", f"Iniciando Montagem Planejamento: {filial}-{serie}-{ctc}")
     
+    # Busca detalhada do CTC para obter todas as informações necessárias para o planejamento
     dadosCtc = PlanejamentoService.ObterCtcDetalhado(filial, serie, ctc)
+    
+    # Se os dados do CTC não forem encontrados ou já tiverem sido processados, redireciona de volta com mensagem de erro
     if not dadosCtc: 
         flash(f"Erro: O CTC {filial}-{serie}-{ctc} não foi encontrado ou já foi processado.", "danger")
         return redirect(url_for('Planejamento.dashboard'))
 
+    # Busca das coordenadas de origem e destino para encontrar aeroportos estratégicos e opções de rotas
     coordOrigem = BuscarCoordenadasCidade(dadosCtc['origem_cidade'], dadosCtc['origem_uf'])
     coordDestino = BuscarCoordenadasCidade(dadosCtc['destino_cidade'], dadosCtc['destino_uf'])
     
+    # Busca CTCs candidatos para consolidação com base nas coordenadas e outros parâmetros
     ctcsCandidatos = PlanejamentoService.BuscarCtcsConsolidaveis(
         dadosCtc['origem_cidade'], dadosCtc['origem_uf'],
         dadosCtc['destino_cidade'], dadosCtc['destino_uf'],
         dadosCtc['data_emissao_real'], filial, ctc, dadosCtc['tipo_carga'],
         servico_alvo=dadosCtc.get('servico_contratado') 
     )
+    # Unificação dos dados do CTC principal com os candidatos para criar um conjunto de informações completo para o planejamento
     dadosUnificados = PlanejamentoService.UnificarConsolidacao(dadosCtc, ctcsCandidatos)
 
+    # Se houver consolidação, exibe uma mensagem informando quantos CTCs foram consolidados para este planejamento
     if dadosUnificados.get('is_consolidado'):
         flash(f"Lote virtual criado: {dadosUnificados.get('qtd_docs')} CTCs foram consolidados para esta rota.", "success")
 
+    # Busca de um planejamento já salvo para este CTC, caso exista, para pré-carregar as informações e opções de rota previamente selecionadas
     planejamentoSalvo = PlanejamentoService.ObterPlanejamentoPorCtc(filial, serie, ctc)
-    
+
+    # Busca dos aeroportos estratégicos mais próximos da origem e destino para sugerir opções de rota aérea
     listaOrigem = BuscarTopAeroportos(coordOrigem['lat'], coordOrigem['lon'], limite=5)
     listaDestino = BuscarTopAeroportos(coordDestino['lat'], coordDestino['lon'], limite=5)
     iatasOrigem = [a['iata'] for a in listaOrigem]
     iatasDestino = [a['iata'] for a in listaDestino]
     
+    # Seleção do aeroporto principal para origem e destino, que será o primeiro da lista de aeroportos estratégicos encontrados. Esses serão usados como pontos de partida para a busca de rotas aéreas.
     aeroOrigemPrincipal = listaOrigem[0] if listaOrigem else None
     aeroDestinoPrincipal = listaDestino[0] if listaDestino else None
 
+    # Busca das opções de rotas aéreas disponíveis entre os aeroportos 
+    # estratégicos de origem e destino, considerando o peso total da carga e a 
+    # data de emissão do CTC para encontrar voos que estejam dentro do prazo de 
+    # entrega esperado. As opções de rota serão exibidas para o usuário 
+    # escolher a melhor opção para o planejamento.
     opcoesRotas = {}
     if iatasOrigem and iatasDestino:
         dataInicioBusca = dadosUnificados['data_busca'] 
         pesoTotal = float(dadosUnificados.get('peso_taxado', 0.0))
-        if pesoTotal <= 0: pesoTotal = float(dadosUnificados.get('peso_fisico', 10.0))
+        # Se o peso taxado for zero ou não estiver disponível, utiliza o peso físico como fallback para a busca de rotas, garantindo que a busca seja realizada mesmo quando o peso taxado não estiver presente.
+        if pesoTotal <= 0: 
+            pesoTotal = float(dadosUnificados.get('peso_fisico', 10.0))
         
+        # Determinação de um limite de data para a busca de rotas, que é definida como 7 dias a partir da data de emissão do CTC. Isso garante que as opções de rota apresentadas sejam relevantes para o prazo de entrega esperado.
         dataLimite = dataInicioBusca + timedelta(days=7)
         
+        # Log detalhado dos parâmetros usados para a busca de rotas, para facilitar a depuração e análise de possíveis problemas na busca de opções de rota.
+        LogService.Info("Routes.Planejamento", f"Buscando opções de rotas de {iatasOrigem} para {iatasDestino} entre {dataInicioBusca} e {dataLimite} com peso {pesoTotal}kg.")
         opcoesRotas = MalhaService.BuscarOpcoesDeRotas(
             dataInicioBusca, 
             dataLimite, 
