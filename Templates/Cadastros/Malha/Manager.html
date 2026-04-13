@@ -118,21 +118,15 @@
                 <form method="POST" enctype="multipart/form-data" id="form-upload-malha">
                     <label class="form-label text-xs font-bold text-muted mb-2 text-uppercase d-block">ARQUIVO EXCEL (.XLSX)</label>
                     
+                    <input type="file" id="inputArquivoExcel" name="arquivo_xlsx" accept=".xlsx" style="display: none;">
+
                     <div class="luft-upload-container" id="area-upload">
                         <i class="ph-duotone ph-file-xls luft-upload-icon"></i>
                         <div class="font-bold text-main">Clique ou arraste aqui</div>
                         <div class="text-xs text-muted mt-1">Suporta apenas arquivos .xlsx</div>
-                        <input type="file" id="inputArquivoExcel" name="arquivo_xlsx" accept=".xlsx" style="display: none;">
                     </div>
-
-                    <div class="luft-alert luft-alert-info mt-4" style="margin-bottom: 0;">
-                        <i class="ph-fill ph-info luft-alert-icon"></i>
-                        <div class="luft-alert-content">
-                            <h4 class="luft-alert-title">Instruções</h4>
-                            <p class="luft-alert-text">O sistema detecta automaticamente o mês de referência baseada nas datas do arquivo.</p>
-                        </div>
-                    </div>
-                </form>
+                    
+                    </form>
             </div>
         </div>
 
