@@ -9,7 +9,7 @@ ServicosClientesBp = Blueprint('ServicosClientes', __name__)
 
 @ServicosClientesBp.route('/', methods=['GET'])
 @login_required
-@RequerPermissao('PLANEJAMENTO.SERVICOS_CLIENTES.VISUALIZAR')
+@RequerPermissao('CADASTROS.SERVICOS_CLIENTES.VISUALIZAR')
 def gerenciar():
     listaClientesView = ServicoClienteService.ObterClientesParaSelecao()
     return render_template('Cadastros/ServicoCliente/Manager.html', Clientes=listaClientesView)
@@ -17,7 +17,7 @@ def gerenciar():
 @ServicosClientesBp.route('/DadosCliente/<int:CodigoCliente>', methods=['GET'])
 @login_required
 @require_ajax
-@RequerPermissao('PLANEJAMENTO.SERVICOS_CLIENTES.VISUALIZAR')
+@RequerPermissao('CADASTROS.SERVICOS_CLIENTES.VISUALIZAR')
 def obterDadosCliente(CodigoCliente):
     dadosClienteObj = ServicoClienteService.ObterDadosCliente(CodigoCliente)
     if dadosClienteObj:
@@ -28,7 +28,7 @@ def obterDadosCliente(CodigoCliente):
 @ServicosClientesBp.route('/Listagem', methods=['GET'])
 @login_required
 @require_ajax
-@RequerPermissao('PLANEJAMENTO.SERVICOS_CLIENTES.VISUALIZAR')
+@RequerPermissao('CADASTROS.SERVICOS_CLIENTES.VISUALIZAR')
 def listaServicosContratados():
     listaServicosObj = ServicoClienteService.ListarServicosContratados()
     
@@ -54,7 +54,7 @@ def listaServicosContratados():
 
 @ServicosClientesBp.route('/Salvar', methods=['POST'])
 @login_required
-@RequerPermissao('PLANEJAMENTO.SERVICOS_CLIENTES.EDITAR')
+@RequerPermissao('CADASTROS.SERVICOS_CLIENTES.EDITAR')
 def salvarServico():
     usuarioLogadoReq = current_user.Login if current_user and hasattr(current_user, 'Login') else "UsuarioDesconhecido"
     
@@ -89,7 +89,7 @@ def salvarServico():
 
 @ServicosClientesBp.route('/Editar/<int:IdServico>', methods=['POST'])
 @login_required
-@RequerPermissao('PLANEJAMENTO.SERVICOS_CLIENTES.EDITAR')
+@RequerPermissao('CADASTROS.SERVICOS_CLIENTES.EDITAR')
 def editarServico(IdServico):
     usuarioLogadoReq = current_user.Login if current_user and hasattr(current_user, 'Login') else "UsuarioDesconhecido"
     
@@ -110,7 +110,7 @@ def editarServico(IdServico):
 
 @ServicosClientesBp.route('/Excluir/<int:IdServico>', methods=['POST'])
 @login_required
-@RequerPermissao('PLANEJAMENTO.SERVICOS_CLIENTES.DELETAR')
+@RequerPermissao('CADASTROS.SERVICOS_CLIENTES.DELETAR')
 def excluirServico(IdServico):
     usuarioLogadoReq = current_user.Login if current_user and hasattr(current_user, 'Login') else "UsuarioDesconhecido"
     
