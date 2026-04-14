@@ -182,9 +182,32 @@ class CtcEspFarma(Base):
     filialctc = Column(String(10), primary_key=True)
     seriectc = Column(String(3), primary_key=True)
 
-    # --- Colunas que precisamos para a subcontratação ---
-    respons_nome = Column(String(40))
+    # --- Colunas usadas para sobrepor os dados de cadastro do CTC correspondente ---
+    origem = Column(String(12))
+    remet_cgc = Column(String(14))
+    remet_nome = Column(String(40))
+    remet_end = Column(String(40))
+    remet_cidade = Column(String(35))
+    remet_uf = Column(String(2))
+    remet_cep = Column(String(8))
+    remet_ie = Column(String(15))
     respons_cgc = Column(String(14))
+    respons_nome = Column(String(40))
+    respons_end = Column(String(40))
+    respons_cidade = Column(String(35))
+    respons_uf = Column(String(2))
+    respons_ie = Column(String(15))
+    dest_cgc = Column(String(14))
+    dest_nome = Column(String(40))
+    dest_end = Column(String(40))
+    dest_cidade = Column(String(35))
+    dest_uf = Column(String(3))
+    dest_cep = Column(String(8))
+    dest_ie = Column(String(15))
+    cidade_orig = Column(String(35))
+    uf_orig = Column(String(2))
+    cidade_dest = Column(String(35))
+    uf_dest = Column(String(2))
 
 class CtcEspCpl(Base):
     __tablename__ = 'tb_ctc_esp_cpl'

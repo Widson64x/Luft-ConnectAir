@@ -148,6 +148,7 @@ class GerenciadorPlanejamento {
 
         this.dadosVisiveis.forEach(linha => {
             const tr = document.createElement('tr');
+            const clienteNome = linha.cliente_nome || linha.remetente || '-';
             
             const prioridade = (linha.prioridade || 'NORMAL').toUpperCase();
             let iconePrioridade = '<i class="ph-bold ph-minus" title="NORMAL"></i>'; 
@@ -180,7 +181,7 @@ class GerenciadorPlanejamento {
             tr.innerHTML = `
                 <td style="text-align: center; min-width: 110px;">
                     <div class="d-flex align-items-center justify-content-center gap-2">
-                        <button class="btn btn-secondary d-flex align-items-center justify-content-center" style="padding: 6px; width: 36px; height: 36px;" onclick="AbrirModalGlobal('26', '1', '2601233063')" title="Ver Detalhes">
+                        <button class="btn btn-secondary d-flex align-items-center justify-content-center" style="padding: 6px; width: 36px; height: 36px;" onclick="AbrirModalGlobal('${linha.filial}', '${linha.serie}', '${linha.ctc}')" title="Ver Detalhes">
                             <i class="ph-bold ph-file-text" style="font-size: 1.1rem;"></i>
                         </button>
                         <a href="${linkMontagem}" class="btn btn-primary d-flex align-items-center justify-content-center" style="padding: 6px; width: 36px; height: 36px;" title="Planejar Rota">
@@ -216,8 +217,8 @@ class GerenciadorPlanejamento {
                     </span>
                 </td>
                 <td>
-                    <div class="font-medium text-main mb-1" style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${linha.remetente}">
-                        ${linha.remetente}
+                    <div class="font-medium text-main mb-1" style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${clienteNome}">
+                        ${clienteNome}
                     </div>
                     <span class="luft-badge luft-badge-secondary" style="font-size: 0.65rem;">${linha.tipo_carga || 'NORMAL'}</span>
                 </td>

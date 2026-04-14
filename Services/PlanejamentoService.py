@@ -41,17 +41,36 @@ class PlanejamentoService:
              ,c.valmerc as Valor
              ,c.fretetotalbruto as FreteTotal
              
-             -- LÓGICA DE SUBCONTRATAÇÃO FARMA: NOME
+             -- LÓGICA DE SUBCONTRATAÇÃO FARMA: CAMPOS HOMÔNIMOS DO CTC CORRESPONDENTE
              ,CASE 
-                 WHEN ISNULL(cl.ctc_corresp, '') <> '' AND f.respons_nome IS NOT NULL THEN UPPER(f.respons_nome)
+                 WHEN ISNULL(cl.ctc_corresp, '') <> '' AND f.remet_nome IS NOT NULL THEN UPPER(f.remet_nome)
                  ELSE UPPER(c.remet_nome)
               END as Remetente
               
-             ,upper(c.dest_nome) as Destinatario
-             ,c.cidade_orig as CidadeOrigem
-             ,c.uf_orig as UFOrigem
-             ,c.cidade_dest as CidadeDestino
-             ,c.uf_dest as UFDestino
+             ,CASE 
+                 WHEN ISNULL(cl.ctc_corresp, '') <> '' AND f.dest_nome IS NOT NULL THEN UPPER(f.dest_nome)
+                 ELSE UPPER(c.dest_nome)
+              END as Destinatario
+             ,CASE 
+                 WHEN ISNULL(cl.ctc_corresp, '') <> '' AND f.respons_nome IS NOT NULL THEN UPPER(f.respons_nome)
+                 ELSE UPPER(c.respons_nome)
+              END as ClienteNome
+             ,CASE 
+                 WHEN ISNULL(cl.ctc_corresp, '') <> '' AND f.cidade_orig IS NOT NULL THEN f.cidade_orig
+                 ELSE c.cidade_orig
+              END as CidadeOrigem
+             ,CASE 
+                 WHEN ISNULL(cl.ctc_corresp, '') <> '' AND f.uf_orig IS NOT NULL THEN f.uf_orig
+                 ELSE c.uf_orig
+              END as UFOrigem
+             ,CASE 
+                 WHEN ISNULL(cl.ctc_corresp, '') <> '' AND f.cidade_dest IS NOT NULL THEN f.cidade_dest
+                 ELSE c.cidade_dest
+              END as CidadeDestino
+             ,CASE 
+                 WHEN ISNULL(cl.ctc_corresp, '') <> '' AND f.uf_dest IS NOT NULL THEN f.uf_dest
+                 ELSE c.uf_dest
+              END as UFDestino
              ,c.rotafilialdest as UnidadeDestino
              ,c.prioridade as Prioridade
              ,cl.StatusCTC as StatusCTC
@@ -61,10 +80,13 @@ class PlanejamentoService:
              
              -- LÓGICA DE SUBCONTRATAÇÃO FARMA: CNPJS
              ,CASE 
-                 WHEN ISNULL(cl.ctc_corresp, '') <> '' AND f.respons_cgc IS NOT NULL THEN f.respons_cgc
+                 WHEN ISNULL(cl.ctc_corresp, '') <> '' AND f.remet_cgc IS NOT NULL THEN f.remet_cgc
                  ELSE c.remet_cgc
               END as RemetCGC   
-             ,c.dest_cgc as DestCGC     
+             ,CASE 
+                 WHEN ISNULL(cl.ctc_corresp, '') <> '' AND f.dest_cgc IS NOT NULL THEN f.dest_cgc
+                 ELSE c.dest_cgc
+              END as DestCGC     
              ,CASE 
                  WHEN ISNULL(cl.ctc_corresp, '') <> '' AND f.respons_cgc IS NOT NULL THEN f.respons_cgc
                  ELSE c.respons_cgc
@@ -359,6 +381,7 @@ class PlanejamentoService:
             is_dev = to_str(row.MotivoCTC) == 'DEV'
             remetente_final = to_str(row.Destinatario) if is_dev else to_str(row.Remetente)
             destinatario_final = to_str(row.Remetente) if is_dev else to_str(row.Destinatario)
+            cliente_nome = to_str(getattr(row, 'ClienteNome', '')) or remetente_final or destinatario_final
             
 
             # --- NOVA LÓGICA DE PLANEJAMENTO VIRTUAL RÁPIDO ---
@@ -390,6 +413,7 @@ class PlanejamentoService:
                 'origem': f"{to_str(row.CidadeOrigem)}/{to_str(row.UFOrigem)}",
                 'destino': f"{to_str(row.CidadeDestino)}/{to_str(row.UFDestino)}",
                 'unid_lastmile': to_str(row.UnidadeDestino),
+                'cliente_nome': cliente_nome,
                 'remetente': remetente_final,
                 'destinatario': destinatario_final,
                 'volumes': to_int(row.Volumes),
@@ -562,15 +586,71 @@ class PlanejamentoService:
                 try:
                     ctc_farma = str(CplEncontrado.ctc_corresp).strip()
                     # Busca pontual no banco da Farma
-                    query_farma = text("SELECT respons_nome, respons_cgc FROM farma.dbo.tb_ctc_esp (NOLOCK) WHERE filialctc = :ctc")
+                    query_farma = text("""
+                        SELECT TOP 1
+                            origem,
+                            remet_nome,
+                            remet_cgc,
+                            remet_end,
+                            remet_cidade,
+                            remet_uf,
+                            remet_cep,
+                            remet_ie,
+                            respons_nome,
+                            respons_cgc,
+                            respons_end,
+                            respons_cidade,
+                            respons_uf,
+                            respons_ie,
+                            dest_nome,
+                            dest_cgc,
+                            dest_end,
+                            dest_cidade,
+                            dest_uf,
+                            dest_cep,
+                            dest_ie,
+                            cidade_orig,
+                            uf_orig,
+                            cidade_dest,
+                            uf_dest
+                        FROM farma.dbo.tb_ctc_esp (NOLOCK)
+                        WHERE filialctc = :ctc
+                    """)
                     farma_data = Sessao.execute(query_farma, {'ctc': ctc_farma}).fetchone()
                     
                     if farma_data:
-                        # Sobrescreve as propriedades em memória do CTC para exibir o cliente real!
-                        CtcEncontrado.remet_nome = farma_data.respons_nome
-                        CtcEncontrado.remet_cgc = farma_data.respons_cgc
-                        CtcEncontrado.respons_nome = farma_data.respons_nome
-                        CtcEncontrado.respons_cgc = farma_data.respons_cgc
+                        campos_farma = (
+                            'origem',
+                            'remet_nome',
+                            'remet_cgc',
+                            'remet_end',
+                            'remet_cidade',
+                            'remet_uf',
+                            'remet_cep',
+                            'remet_ie',
+                            'respons_nome',
+                            'respons_cgc',
+                            'respons_end',
+                            'respons_cidade',
+                            'respons_uf',
+                            'respons_ie',
+                            'dest_nome',
+                            'dest_cgc',
+                            'dest_end',
+                            'dest_cidade',
+                            'dest_uf',
+                            'dest_cep',
+                            'dest_ie',
+                            'cidade_orig',
+                            'uf_orig',
+                            'cidade_dest',
+                            'uf_dest',
+                        )
+
+                        for campo in campos_farma:
+                            valor = getattr(farma_data, campo, None)
+                            if valor is not None and str(valor).strip() != '':
+                                setattr(CtcEncontrado, campo, valor)
                 except Exception as e_farma:
                     LogService.Warning("PlanejamentoService", f"Erro ao buscar subcontratação Farma: {e_farma}")
 
@@ -603,6 +683,8 @@ class PlanejamentoService:
                 remetente_nome = str(CtcEncontrado.remet_nome).strip()
                 destinatario_nome = str(CtcEncontrado.dest_nome).strip()
 
+            cliente_nome = str(getattr(CtcEncontrado, 'respons_nome', '') or '').strip() or remetente_nome or destinatario_nome
+
             servico_contratado = PlanejamentoService.BuscarServicoContratadoCliente(cnpj_alvo)
 
             return {
@@ -620,6 +702,7 @@ class PlanejamentoService:
                 'peso_taxado': float(CtcEncontrado.pesotax or 0),
                 'volumes': int(CtcEncontrado.volumes or 0),
                 'valor': (CtcEncontrado.valmerc or 0),
+                'cliente_nome': cliente_nome,
                 'remetente': remetente_nome,
                 'destinatario': destinatario_nome,
                 'tipo_carga': TipoCarga,
@@ -683,6 +766,8 @@ class PlanejamentoService:
                     remetente_nome = to_str(row.Remetente)
                     destinatario_nome = to_str(row.Destinatario)
 
+                cliente_nome = to_str(getattr(row, 'ClienteNome', '')) or remetente_nome or destinatario_nome
+
                 servico_cand = PlanejamentoService.BuscarServicoContratadoCliente(
                     getattr(row, 'ResponsCGC', None), 
                     getattr(row, 'RemetCGC', None), 
@@ -705,6 +790,7 @@ class PlanejamentoService:
                     'peso_fisico': to_float(row.PesoFisico),
                     'peso_taxado': to_float(row.PesoTaxado),
                     'val_mercadoria': to_float(row.Valor),
+                    'cliente_nome': cliente_nome,
                     'remetente': remetente_nome,
                     'destinatario': destinatario_nome,
                     'data_emissao': row.DataEmissao,
@@ -732,6 +818,7 @@ class PlanejamentoService:
             overrides = PlanejamentoService._NormalizarMapaServicosEscolhidos(servicos_escolhidos)
             unificado = ctc_principal.copy()
             unificado['cnpj_cliente'] = ctc_principal.get('cnpj_cliente', '')
+            unificado['cliente_nome'] = ctc_principal.get('cliente_nome', '')
             docs = []
 
             def montar_doc(origem_doc, principal=False):
@@ -758,7 +845,7 @@ class PlanejamentoService:
                     'motivodoc': origem_doc.get('motivodoc'),
                     'cnpj_cliente': origem_doc.get('cnpj_cliente', ''),
                     'cliente_key': cliente_key,
-                    'cliente_nome': origem_doc.get('remetente') or origem_doc.get('destinatario') or 'Cliente sem identificação',
+                    'cliente_nome': origem_doc.get('cliente_nome') or origem_doc.get('remetente') or origem_doc.get('destinatario') or 'Cliente sem identificação',
                     'servico_contratado_original': servico_base,
                     'servico_contratado': servico_final,
                     'data_emissao_real': origem_doc.get('data_emissao_real') or origem_doc.get('data_emissao'),
@@ -1281,6 +1368,7 @@ class PlanejamentoService:
                 CtcEsp.motivodoc,
                 CtcEsp.remet_nome,
                 CtcEsp.dest_nome,
+                CtcEsp.respons_nome,
                 CtcEspCpl.ctc_corresp,
                 CtcEspCpl.TipoCarga,
                 Filial.nomefilial
@@ -1318,6 +1406,7 @@ class PlanejamentoService:
                 
                 RemetNome = Row.remet_nome if Row.remet_nome else Item.Remetente
                 DestNome = Row.dest_nome if Row.dest_nome else Item.Destinatario
+                ClienteNome = Row.respons_nome if Row.respons_nome else Item.Remetente
                 CtcCorresp = Row.ctc_corresp
 
                 # --- LÓGICA DE SUBCONTRATAÇÃO FARMA ---
@@ -1337,10 +1426,10 @@ class PlanejamentoService:
                     
                     nome_farma = CacheFarma.get(ctc_farma)
                     if nome_farma:
-                        RemetNome = nome_farma
+                        ClienteNome = nome_farma
 
                 # --- LÓGICA DE REVERSA (DEV) ---
-                ClienteFinal = DestNome if MotivoDoc == 'DEV' else RemetNome
+                ClienteFinal = ClienteNome
                 DestinatarioFinal = RemetNome if MotivoDoc == 'DEV' else DestNome
 
                 if not ClienteFinal: ClienteFinal = Item.Remetente
