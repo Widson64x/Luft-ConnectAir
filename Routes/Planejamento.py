@@ -29,6 +29,59 @@ COORDENADAS_UFS = {
     'TO': {'lat': -10.17, 'lon': -48.33}
 }
 
+
+def _carregar_dados_editor_planejamento(filial, serie, ctc, servicos_escolhidos=None):
+    return PlanejamentoService.MontarDadosPlanejamento(filial, serie, ctc, servicos_escolhidos)
+
+
+def _calcular_contexto_rotas_editor(dados_ctc, dados_unificados, emitir_flash=False):
+    coord_origem = BuscarCoordenadasCidade(dados_ctc['origem_cidade'], dados_ctc['origem_uf'])
+    coord_destino = BuscarCoordenadasCidade(dados_ctc['destino_cidade'], dados_ctc['destino_uf'])
+
+    lista_origem = BuscarTopAeroportos(coord_origem['lat'], coord_origem['lon'], limite=5) if coord_origem else []
+    lista_destino = BuscarTopAeroportos(coord_destino['lat'], coord_destino['lon'], limite=5) if coord_destino else []
+
+    opcoes_rotas = {}
+    if dados_unificados and not dados_unificados.get('servico_pendente'):
+        iatas_origem = [a['iata'] for a in lista_origem]
+        iatas_destino = [a['iata'] for a in lista_destino]
+
+        if iatas_origem and iatas_destino:
+            data_inicio_busca = dados_unificados['data_busca']
+            peso_total = float(dados_unificados.get('peso_taxado', 0.0))
+            if peso_total <= 0:
+                peso_total = float(dados_unificados.get('peso_fisico', 10.0))
+
+            data_limite = data_inicio_busca + timedelta(days=7)
+            LogService.Info(
+                "Routes.Planejamento",
+                f"Buscando opções de rotas de {iatas_origem} para {iatas_destino} entre {data_inicio_busca} e {data_limite} com peso {peso_total}kg."
+            )
+            opcoes_rotas = MalhaService.BuscarOpcoesDeRotas(
+                data_inicio_busca,
+                data_limite,
+                iatas_origem,
+                iatas_destino,
+                peso_total,
+                tipo_carga=dados_unificados.get('tipo_carga'),
+                servico_contratado=dados_unificados.get('servico_roteamento') or dados_unificados.get('servico_contratado')
+            )
+
+            if not opcoes_rotas and emitir_flash:
+                flash("Atenção: Nenhuma rota aérea ativa foi encontrada para os parâmetros informados.", "warning")
+        elif emitir_flash:
+            flash("Atenção: Não foram encontrados aeroportos viáveis próximos à origem ou destino.", "warning")
+    elif dados_unificados and dados_unificados.get('servico_pendente') and emitir_flash:
+        flash("Defina o serviço dos clientes com regra por destino para calcular as rotas deste lote.", "info")
+
+    return {
+        'coord_origem': coord_origem,
+        'coord_destino': coord_destino,
+        'aero_origem_principal': lista_origem[0] if lista_origem else None,
+        'aero_destino_principal': lista_destino[0] if lista_destino else None,
+        'opcoes_rotas': opcoes_rotas
+    }
+
 @PlanejamentoBp.route('/Dashboard')
 @login_required
 @RequerPermissao('PLANEJAMENTO.ROTAS.VISUALIZAR')
@@ -50,28 +103,13 @@ def apiCtcsHoje():
 @RequerPermissao('PLANEJAMENTO.ROTAS.EDITAR')
 def montarPlanejamento(filial, serie, ctc):
     LogService.Info("Routes.Planejamento", f"Iniciando Montagem Planejamento: {filial}-{serie}-{ctc}")
-    
-    # Busca detalhada do CTC para obter todas as informações necessárias para o planejamento
-    dadosCtc = PlanejamentoService.ObterCtcDetalhado(filial, serie, ctc)
+
+    dadosCtc, _, dadosUnificados = _carregar_dados_editor_planejamento(filial, serie, ctc)
     
     # Se os dados do CTC não forem encontrados ou já tiverem sido processados, redireciona de volta com mensagem de erro
     if not dadosCtc: 
         flash(f"Erro: O CTC {filial}-{serie}-{ctc} não foi encontrado ou já foi processado.", "danger")
         return redirect(url_for('Planejamento.dashboard'))
-
-    # Busca das coordenadas de origem e destino para encontrar aeroportos estratégicos e opções de rotas
-    coordOrigem = BuscarCoordenadasCidade(dadosCtc['origem_cidade'], dadosCtc['origem_uf'])
-    coordDestino = BuscarCoordenadasCidade(dadosCtc['destino_cidade'], dadosCtc['destino_uf'])
-    
-    # Busca CTCs candidatos para consolidação com base nas coordenadas e outros parâmetros
-    ctcsCandidatos = PlanejamentoService.BuscarCtcsConsolidaveis(
-        dadosCtc['origem_cidade'], dadosCtc['origem_uf'],
-        dadosCtc['destino_cidade'], dadosCtc['destino_uf'],
-        dadosCtc['data_emissao_real'], filial, ctc, dadosCtc['tipo_carga'],
-        servico_alvo=dadosCtc.get('servico_contratado') 
-    )
-    # Unificação dos dados do CTC principal com os candidatos para criar um conjunto de informações completo para o planejamento
-    dadosUnificados = PlanejamentoService.UnificarConsolidacao(dadosCtc, ctcsCandidatos)
 
     # Se houver consolidação, exibe uma mensagem informando quantos CTCs foram consolidados para este planejamento
     if dadosUnificados.get('is_consolidado'):
@@ -80,56 +118,51 @@ def montarPlanejamento(filial, serie, ctc):
     # Busca de um planejamento já salvo para este CTC, caso exista, para pré-carregar as informações e opções de rota previamente selecionadas
     planejamentoSalvo = PlanejamentoService.ObterPlanejamentoPorCtc(filial, serie, ctc)
 
-    # Busca dos aeroportos estratégicos mais próximos da origem e destino para sugerir opções de rota aérea
-    listaOrigem = BuscarTopAeroportos(coordOrigem['lat'], coordOrigem['lon'], limite=5)
-    listaDestino = BuscarTopAeroportos(coordDestino['lat'], coordDestino['lon'], limite=5)
-    iatasOrigem = [a['iata'] for a in listaOrigem]
-    iatasDestino = [a['iata'] for a in listaDestino]
-    
-    # Seleção do aeroporto principal para origem e destino, que será o primeiro da lista de aeroportos estratégicos encontrados. Esses serão usados como pontos de partida para a busca de rotas aéreas.
-    aeroOrigemPrincipal = listaOrigem[0] if listaOrigem else None
-    aeroDestinoPrincipal = listaDestino[0] if listaDestino else None
-
-    # Busca das opções de rotas aéreas disponíveis entre os aeroportos 
-    # estratégicos de origem e destino, considerando o peso total da carga e a 
-    # data de emissão do CTC para encontrar voos que estejam dentro do prazo de 
-    # entrega esperado. As opções de rota serão exibidas para o usuário 
-    # escolher a melhor opção para o planejamento.
-    opcoesRotas = {}
-    if iatasOrigem and iatasDestino:
-        dataInicioBusca = dadosUnificados['data_busca'] 
-        pesoTotal = float(dadosUnificados.get('peso_taxado', 0.0))
-        # Se o peso taxado for zero ou não estiver disponível, utiliza o peso físico como fallback para a busca de rotas, garantindo que a busca seja realizada mesmo quando o peso taxado não estiver presente.
-        if pesoTotal <= 0: 
-            pesoTotal = float(dadosUnificados.get('peso_fisico', 10.0))
-        
-        # Determinação de um limite de data para a busca de rotas, que é definida como 7 dias a partir da data de emissão do CTC. Isso garante que as opções de rota apresentadas sejam relevantes para o prazo de entrega esperado.
-        dataLimite = dataInicioBusca + timedelta(days=7)
-        
-        # Log detalhado dos parâmetros usados para a busca de rotas, para facilitar a depuração e análise de possíveis problemas na busca de opções de rota.
-        LogService.Info("Routes.Planejamento", f"Buscando opções de rotas de {iatasOrigem} para {iatasDestino} entre {dataInicioBusca} e {dataLimite} com peso {pesoTotal}kg.")
-        opcoesRotas = MalhaService.BuscarOpcoesDeRotas(
-            dataInicioBusca, 
-            dataLimite, 
-            iatasOrigem, 
-            iatasDestino, 
-            pesoTotal,
-            tipo_carga=dadosUnificados.get('tipo_carga'),
-            servico_contratado=dadosUnificados.get('servico_contratado')
-        )
-        
-        if not opcoesRotas:
-            flash("Atenção: Nenhuma rota aérea ativa foi encontrada para os parâmetros informados.", "warning")
-    else:
-        flash("Atenção: Não foram encontrados aeroportos viáveis próximos à origem ou destino.", "warning")
+    contexto_rotas = _calcular_contexto_rotas_editor(dadosCtc, dadosUnificados, emitir_flash=True)
 
     return render_template('Pages/Planejamento/Editor.html', 
                            Ctc=dadosUnificados, 
-                           Origem=coordOrigem, Destino=coordDestino,
-                           AeroOrigem=aeroOrigemPrincipal,
-                           AeroDestino=aeroDestinoPrincipal,
-                           OpcoesRotas=opcoesRotas,
+                           Origem=contexto_rotas['coord_origem'], Destino=contexto_rotas['coord_destino'],
+                           AeroOrigem=contexto_rotas['aero_origem_principal'],
+                           AeroDestino=contexto_rotas['aero_destino_principal'],
+                           OpcoesRotas=contexto_rotas['opcoes_rotas'],
                            PlanejamentoSalvo=planejamentoSalvo) 
+
+
+@PlanejamentoBp.route('/API/OpcoesRotas', methods=['POST'])
+@login_required
+@require_ajax
+@RequerPermissao('PLANEJAMENTO.ROTAS.EDITAR')
+def apiOpcoesRotasPlanejamento():
+    try:
+        dadosFront = request.json or {}
+        filial = dadosFront.get('filial')
+        serie = dadosFront.get('serie')
+        ctc = dadosFront.get('ctc')
+        servicos_escolhidos = dadosFront.get('servicos_escolhidos', {})
+
+        dadosCtc, _, dadosUnificados = _carregar_dados_editor_planejamento(
+            filial,
+            serie,
+            ctc,
+            servicos_escolhidos=servicos_escolhidos
+        )
+
+        if not dadosCtc or not dadosUnificados:
+            return jsonify({'sucesso': False, 'msg': 'CTC não encontrado para cálculo de rotas.'}), 404
+
+        if dadosUnificados.get('servico_pendente'):
+            return jsonify({'sucesso': False, 'msg': 'Existem clientes com serviço pendente de definição.', 'ctc': dadosUnificados}), 400
+
+        contexto_rotas = _calcular_contexto_rotas_editor(dadosCtc, dadosUnificados, emitir_flash=False)
+        return jsonify({
+            'sucesso': True,
+            'ctc': dadosUnificados,
+            'opcoes_rotas': contexto_rotas['opcoes_rotas']
+        })
+    except Exception as e:
+        LogService.Error("Routes.Planejamento", "Erro ao recalcular opções de rota", e)
+        return jsonify({'sucesso': False, 'msg': f'Erro ao calcular rotas: {str(e)}'}), 500
 
 @PlanejamentoBp.route('/API/Cancelar', methods=['POST'])
 @login_required
@@ -162,20 +195,24 @@ def salvarPlanejamento():
         filial = dadosFront.get('filial')
         serie = dadosFront.get('serie')
         ctc = dadosFront.get('ctc')
+        servicos_escolhidos = dadosFront.get('servicos_escolhidos', {})
         
         LogService.Info("Routes.Planejamento", f"Recebendo requisição de salvamento para {filial}-{serie}-{ctc}")
 
         rotaCompleta = dadosFront.get('rota_completa', []) 
 
-        dadosCtc = PlanejamentoService.ObterCtcDetalhado(filial, serie, ctc)
-        ctcsCandidatos = PlanejamentoService.BuscarCtcsConsolidaveis(
-            dadosCtc['origem_cidade'], dadosCtc['origem_uf'],
-            dadosCtc['destino_cidade'], dadosCtc['destino_uf'],
-            dadosCtc['data_emissao_real'], filial, ctc,
-            dadosCtc['tipo_carga'],
-            servico_alvo=dadosCtc.get('servico_contratado') 
+        dadosCtc, ctcsCandidatos, dadosUnificados = _carregar_dados_editor_planejamento(
+            filial,
+            serie,
+            ctc,
+            servicos_escolhidos=servicos_escolhidos
         )
-        dadosUnificados = PlanejamentoService.UnificarConsolidacao(dadosCtc, ctcsCandidatos)
+
+        if not dadosCtc or not dadosUnificados:
+            return jsonify({'sucesso': False, 'msg': 'CTC não encontrado para gravação.'}), 404
+
+        if dadosUnificados.get('servico_pendente'):
+            return jsonify({'sucesso': False, 'msg': 'Defina o serviço de todos os clientes pendentes antes de confirmar a rota.'}), 400
         
         coordOrigem = BuscarCoordenadasCidade(dadosCtc['origem_cidade'], dadosCtc['origem_uf'])
         coordDestino = BuscarCoordenadasCidade(dadosCtc['destino_cidade'], dadosCtc['destino_uf'])

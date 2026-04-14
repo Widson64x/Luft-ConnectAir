@@ -15,6 +15,29 @@ class GerenciadorPlanejamento {
         this.formatadorNumero = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
+    normalizarTexto(valor) {
+        return String(valor ?? '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase();
+    }
+
+    coletarValoresBusca(valor) {
+        if (valor === null || valor === undefined) {
+            return [];
+        }
+
+        if (Array.isArray(valor)) {
+            return valor.flatMap(item => this.coletarValoresBusca(item));
+        }
+
+        if (typeof valor === 'object') {
+            return Object.values(valor).flatMap(item => this.coletarValoresBusca(item));
+        }
+
+        return [String(valor)];
+    }
+
     inicializar() {
         this.atualizarDataExtenso();
         this.buscarDados();
@@ -23,11 +46,13 @@ class GerenciadorPlanejamento {
 
     configurarOuvintes() {
         const campoBusca = document.getElementById('input-busca');
+        const filtroStatus = document.getElementById('filtro-status');
         const filtroPrioridade = document.getElementById('filtro-prioridade');
         const filtroFilial = document.getElementById('filtro-filial');
         const filtroMotivo = document.getElementById('filtro-motivo');
 
         if (campoBusca) campoBusca.addEventListener('input', () => this.filtrarTabela());
+        if (filtroStatus) filtroStatus.addEventListener('change', () => this.filtrarTabela());
         if (filtroPrioridade) filtroPrioridade.addEventListener('change', () => this.filtrarTabela());
         if (filtroFilial) filtroFilial.addEventListener('change', () => this.filtrarTabela());
         if (filtroMotivo) filtroMotivo.addEventListener('change', () => this.filtrarTabela());
@@ -69,8 +94,6 @@ class GerenciadorPlanejamento {
             const horaLimpa = item.hora_emissao ? item.hora_emissao.replace(':', '') : '0000';
             
             item.dataRaw = Number(`${partesData[2]}${partesData[1]}${partesData[0]}${horaLimpa}`);
-            item.buscaTexto = `${item.ctc} ${item.remetente} ${item.destinatario} ${item.origem} ${item.destino} ${item.filial} ${item.nomefilial || ''} ${item.tipo_carga} ${item.motivodoc} ${item.prioridade}`.toLowerCase();
-            
             item.pesoFisico = Number(item.peso_fisico || 0);
             item.pesoTaxado = Number(item.peso_taxado || 0); 
             item.valorMercadoria = Number(item.raw_val_mercadoria || 0);
@@ -85,6 +108,10 @@ class GerenciadorPlanejamento {
             item.lucroEstimadoInd = item.freteTotal - item.custoEstimadoInd;
             // Evita divisão por zero
             item.margemEstimadaInd = item.freteTotal > 0 ? (item.lucroEstimadoInd / item.freteTotal) * 100 : 0;
+            item.statusPlanejamentoFiltro = item.tem_planejamento
+                ? String(item.status_planejamento || 'SEM STATUS').trim().toUpperCase()
+                : 'PENDENTE';
+            item.buscaTexto = this.normalizarTexto(this.coletarValoresBusca(item).join(' '));
         });
 
         if (this.dadosOriginais.length === 0) {
@@ -121,6 +148,7 @@ class GerenciadorPlanejamento {
 
         this.dadosVisiveis.forEach(linha => {
             const tr = document.createElement('tr');
+            const clienteNome = linha.cliente_nome || linha.remetente || '-';
             
             const prioridade = (linha.prioridade || 'NORMAL').toUpperCase();
             let iconePrioridade = '<i class="ph-bold ph-minus" title="NORMAL"></i>'; 
@@ -153,7 +181,7 @@ class GerenciadorPlanejamento {
             tr.innerHTML = `
                 <td style="text-align: center; min-width: 110px;">
                     <div class="d-flex align-items-center justify-content-center gap-2">
-                        <button class="btn btn-secondary d-flex align-items-center justify-content-center" style="padding: 6px; width: 36px; height: 36px;" onclick="AbrirModalGlobal('26', '1', '2601233063')" title="Ver Detalhes">
+                        <button class="btn btn-secondary d-flex align-items-center justify-content-center" style="padding: 6px; width: 36px; height: 36px;" onclick="AbrirModalGlobal('${linha.filial}', '${linha.serie}', '${linha.ctc}')" title="Ver Detalhes">
                             <i class="ph-bold ph-file-text" style="font-size: 1.1rem;"></i>
                         </button>
                         <a href="${linkMontagem}" class="btn btn-primary d-flex align-items-center justify-content-center" style="padding: 6px; width: 36px; height: 36px;" title="Planejar Rota">
@@ -189,8 +217,8 @@ class GerenciadorPlanejamento {
                     </span>
                 </td>
                 <td>
-                    <div class="font-medium text-main mb-1" style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${linha.remetente}">
-                        ${linha.remetente}
+                    <div class="font-medium text-main mb-1" style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${clienteNome}">
+                        ${clienteNome}
                     </div>
                     <span class="luft-badge luft-badge-secondary" style="font-size: 0.65rem;">${linha.tipo_carga || 'NORMAL'}</span>
                 </td>
@@ -249,7 +277,10 @@ class GerenciadorPlanejamento {
 
     filtrarTabela() {
         const elementoBusca = document.getElementById('input-busca');
-        const termoBusca = elementoBusca ? elementoBusca.value.toLowerCase() : '';
+        const termoBusca = this.normalizarTexto(elementoBusca ? elementoBusca.value : '');
+
+        const elementoStatus = document.getElementById('filtro-status');
+        const filtroStatus = elementoStatus ? elementoStatus.value : 'TODOS';
         
         const elementoPrioridade = document.getElementById('filtro-prioridade');
         const filtroPrioridade = elementoPrioridade ? elementoPrioridade.value : 'TODOS';
@@ -262,6 +293,7 @@ class GerenciadorPlanejamento {
 
         this.dadosVisiveis = this.dadosOriginais.filter(item => {
             const combinouTexto = !termoBusca || item.buscaTexto.includes(termoBusca);
+            const combinouStatus = (filtroStatus === 'TODOS') || (item.statusPlanejamentoFiltro === filtroStatus);
             
             let combinouPrioridade = true;
             const prioridadeItem = (item.prioridade || 'NORMAL').toUpperCase();
@@ -280,7 +312,7 @@ class GerenciadorPlanejamento {
             const combinouMotivo = (filtroMotivo === 'TODOS') || (item.motivodoc === filtroMotivo);
             const combinouAba = (this.abaAtual === 'TODOS') || (item.origem_dados === this.abaAtual);
 
-            return combinouTexto && combinouPrioridade && combinouFilial && combinouMotivo && combinouAba;
+            return combinouTexto && combinouStatus && combinouPrioridade && combinouFilial && combinouMotivo && combinouAba;
         });
 
         this.aplicarOrdenacao();
@@ -395,17 +427,28 @@ class GerenciadorPlanejamento {
     popularListasSelecao(dadosParaProcessar) {
         // Usamos um Map para guardar a relação: código da filial (chave) -> nome da filial (valor)
         const mapaFiliais = new Map();
+        const conjuntoStatus = new Set(['PENDENTE']);
         const conjuntoMotivos = new Set();
 
         dadosParaProcessar.forEach(item => {
             if (item.filial) {
                 mapaFiliais.set(item.filial, item.nomefilial || item.filial);
             }
+            if (item.tem_planejamento && item.status_planejamento) {
+                conjuntoStatus.add(String(item.status_planejamento).trim().toUpperCase());
+            }
             if (item.motivodoc) conjuntoMotivos.add(item.motivodoc);
         });
 
+        const selecaoStatus = document.getElementById('filtro-status');
         const selecaoFilial = document.getElementById('filtro-filial');
         const selecaoMotivo = document.getElementById('filtro-motivo');
+
+        if (selecaoStatus) {
+            Array.from(conjuntoStatus).sort().forEach(status => {
+                selecaoStatus.innerHTML += `<option value="${status}">${status}</option>`;
+            });
+        }
 
         if (selecaoFilial) {
             Array.from(mapaFiliais.entries())
@@ -429,5 +472,6 @@ document.addEventListener('DOMContentLoaded', () => {
     gerenciador.inicializar();
 
     window.Ordenar = (coluna) => gerenciador.ordenarTabela(coluna);
+    window.FiltrarTabela = () => gerenciador.filtrarTabela();
     window.MudarAba = (aba) => gerenciador.mudarAbaVisivel(aba);
 });

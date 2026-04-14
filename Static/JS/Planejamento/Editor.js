@@ -10,7 +10,8 @@ class GerenciadorEditor {
         
         this.estadoAtual = {
             estrategia: 'recomendada',
-            rotaSelecionada: null
+            rotaSelecionada: null,
+            servicosEscolhidos: {}
         };
 
         this.configuracoesCias = {
@@ -26,8 +27,168 @@ class GerenciadorEditor {
         
         if (dadosEditor.planejamentoSalvo && dadosEditor.planejamentoSalvo.id_planejamento) {
             this.iniciarModoVisualizacao(dadosEditor.planejamentoSalvo);
+        } else if (this.possuiPendenciaServico()) {
+            this.renderizarMensagemServicoPendente();
+            this.aplicarServicosNoResumo();
+            this.atualizarBotaoSalvar(null);
+            this.abrirModalServicoDestino();
         } else {
+            this.aplicarServicosNoResumo();
             setTimeout(() => this.selecionarEstrategia('recomendada'), 300);
+        }
+    }
+
+    possuiPendenciaServico() {
+        return Boolean(dadosEditor.ctc && dadosEditor.ctc.servico_pendente);
+    }
+
+    normalizarChaveCliente(chave) {
+        const somenteDigitos = String(chave || '').replace(/\D/g, '');
+        return somenteDigitos || String(chave || '').trim();
+    }
+
+    atualizarBadgeServico(elemento, servico, incluirIcone = false) {
+        if (!elemento) return;
+
+        const valor = String(servico || 'PADRÃO').trim().toUpperCase();
+        const valorExibicao = valor.replace(/_/g, ' ');
+        elemento.classList.remove('luft-badge-success', 'luft-badge-warning', 'luft-badge-info', 'luft-badge-secondary');
+
+        let classe = 'luft-badge-success';
+        if (valor.includes('EXPRESSO')) classe = 'luft-badge-warning';
+        if (valor.includes('DEPENDE')) classe = 'luft-badge-info';
+        if (valor.includes('DEFINIR')) classe = 'luft-badge-secondary';
+
+        elemento.classList.add(classe);
+        elemento.innerHTML = incluirIcone ? `<i class="ph-bold ph-handshake"></i> ${valorExibicao}` : valorExibicao;
+    }
+
+    aplicarServicosNoResumo() {
+        this.atualizarBadgeServico(document.getElementById('badge-servico-contratado'), dadosEditor.ctc.servico_contratado, true);
+
+        const aviso = document.getElementById('aviso-servico-pendente');
+        if (aviso) {
+            aviso.classList.toggle('hidden', !this.possuiPendenciaServico());
+        }
+
+        const docsPorCliente = new Map();
+        (dadosEditor.ctc.lista_docs || []).forEach(doc => {
+            const chave = this.normalizarChaveCliente(doc.cliente_key || doc.cnpj_cliente);
+            if (!docsPorCliente.has(chave)) {
+                docsPorCliente.set(chave, doc.servico_contratado || 'PADRÃO');
+            }
+        });
+
+        document.querySelectorAll('.js-servico-doc').forEach((elemento) => {
+            const chave = this.normalizarChaveCliente(elemento.dataset.clienteKey);
+            const servico = docsPorCliente.get(chave) || elemento.textContent;
+            this.atualizarBadgeServico(elemento, servico);
+        });
+    }
+
+    renderizarMensagemServicoPendente() {
+        document.getElementById('timeline-content').innerHTML = `
+            <div style="text-align: center; padding: 60px 20px; color: var(--luft-text-muted);">
+                <i class="ph-duotone ph-handshake" style="font-size: 3rem; margin-bottom: 10px;"></i>
+                <p class="font-bold text-main">Defina o serviço por cliente</p>
+                <p class="text-xs">As rotas serão calculadas depois que os serviços dependentes do destino forem escolhidos.</p>
+            </div>`;
+        this.atualizarMetricas(null);
+    }
+
+    abrirModalServicoDestino() {
+        const fundo = document.getElementById('modal-servico-backdrop');
+        if (!fundo) return;
+
+        document.querySelectorAll('.js-servico-pendente').forEach((select) => {
+            const chave = this.normalizarChaveCliente(select.dataset.clienteKey);
+            if (this.estadoAtual.servicosEscolhidos[chave]) {
+                select.value = this.estadoAtual.servicosEscolhidos[chave];
+            }
+        });
+
+        fundo.classList.remove('hidden');
+    }
+
+    fecharModalServicoDestino() {
+        const fundo = document.getElementById('modal-servico-backdrop');
+        if (fundo) fundo.classList.add('hidden');
+    }
+
+    coletarServicosPendentes() {
+        const escolhas = {};
+        const faltantes = [];
+
+        document.querySelectorAll('.js-servico-pendente').forEach((select) => {
+            const chave = this.normalizarChaveCliente(select.dataset.clienteKey);
+            const valor = String(select.value || '').trim();
+            if (!valor) {
+                faltantes.push(chave);
+                return;
+            }
+            escolhas[chave] = valor;
+        });
+
+        return { escolhas, faltantes };
+    }
+
+    async confirmarServicosDestino() {
+        const { escolhas, faltantes } = this.coletarServicosPendentes();
+        if (faltantes.length > 0) {
+            alert('Selecione o serviço para todos os clientes pendentes antes de calcular as rotas.');
+            return;
+        }
+
+        const rotaAnterior = this.estadoAtual.rotaSelecionada;
+
+        const botao = document.getElementById('btn-confirmar-servicos-destino');
+        const textoOriginal = botao ? botao.innerHTML : '';
+        if (botao) {
+            botao.disabled = true;
+            botao.innerHTML = '<i class="ph-bold ph-spinner ph-spin"></i> Calculando...';
+        }
+
+        this.renderizarMensagemServicoPendente();
+
+        try {
+            const resposta = await fetch(rotasEditor.opcoesRotas, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    filial: dadosEditor.ctc.filial,
+                    serie: dadosEditor.ctc.serie,
+                    ctc: dadosEditor.ctc.ctc,
+                    servicos_escolhidos: escolhas
+                })
+            });
+            const dados = await resposta.json();
+
+            if (!resposta.ok || !dados.sucesso) {
+                throw new Error(dados.msg || 'Falha ao recalcular as rotas.');
+            }
+
+            this.estadoAtual.servicosEscolhidos = escolhas;
+            dadosEditor.ctc = dados.ctc;
+            dadosEditor.opcoesRotas = dados.opcoes_rotas || {};
+
+            this.aplicarServicosNoResumo();
+            this.fecharModalServicoDestino();
+            this.selecionarEstrategia('recomendada');
+        } catch (erro) {
+            console.error(erro);
+            alert(erro.message || 'Erro ao calcular as rotas.');
+            if (rotaAnterior && rotaAnterior.length > 0) {
+                this.renderizarRotaNoMapa(rotaAnterior);
+                this.renderizarLinhaDoTempo(rotaAnterior);
+                this.atualizarMetricas(rotaAnterior);
+                this.atualizarBotaoSalvar(rotaAnterior);
+            }
+            this.abrirModalServicoDestino();
+        } finally {
+            if (botao) {
+                botao.disabled = false;
+                botao.innerHTML = textoOriginal;
+            }
         }
     }
 
@@ -151,6 +312,11 @@ class GerenciadorEditor {
     }
 
     selecionarEstrategia(tipoEstrategia) {
+        if (this.possuiPendenciaServico()) {
+            this.abrirModalServicoDestino();
+            return;
+        }
+
         this.estadoAtual.estrategia = tipoEstrategia;
 
         document.querySelectorAll('.luft-strategy-btn').forEach(botao => botao.classList.remove('active'));
@@ -180,6 +346,15 @@ class GerenciadorEditor {
 
     atualizarBotaoSalvar(rotas) {
         const botaoSalvar = document.getElementById('btn-confirmar');
+        if (this.possuiPendenciaServico()) {
+            botaoSalvar.disabled = true;
+            botaoSalvar.innerHTML = '<i class="ph-bold ph-handshake"></i> Defina o Serviço';
+            botaoSalvar.classList.remove('btn-success');
+            botaoSalvar.classList.add('btn-secondary');
+            botaoSalvar.style.cursor = 'not-allowed';
+            return;
+        }
+
         if(!rotas || rotas.length === 0) {
             botaoSalvar.disabled = true;
             botaoSalvar.innerHTML = '<i class="ph-bold ph-warning"></i> Indisponível';
@@ -441,6 +616,11 @@ class GerenciadorEditor {
     }
 
     async confirmarPlanejamento() {
+        if (this.possuiPendenciaServico()) {
+            this.abrirModalServicoDestino();
+            return;
+        }
+
         if (!this.estadoAtual.rotaSelecionada) return;
         const botao = document.getElementById('btn-confirmar');
         const textoOriginal = botao.innerHTML;
@@ -471,7 +651,8 @@ class GerenciadorEditor {
             serie: dadosEditor.ctc.serie,
             ctc: dadosEditor.ctc.ctc,
             rota_completa: rotaFormatada,
-            estrategia: this.estadoAtual.estrategia
+            estrategia: this.estadoAtual.estrategia,
+            servicos_escolhidos: this.estadoAtual.servicosEscolhidos
         };
 
         try {
@@ -526,6 +707,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const fundo = document.getElementById('modal-lote-backdrop');
         if(fundo) fundo.classList.remove('hidden'); 
     };
+
+    window.abrirModalServicoDestino = () => editor.abrirModalServicoDestino();
+    window.confirmarServicosDestino = () => editor.confirmarServicosDestino();
 
     window.fecharModalLote = (evento) => {
         if (evento && !evento.target.classList.contains('luft-modal-lote-backdrop') && !evento.target.classList.contains('btn-icon-only')) return;

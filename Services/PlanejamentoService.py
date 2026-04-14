@@ -1,6 +1,7 @@
 from datetime import datetime, date, time, timedelta
 from decimal import Decimal
 import random
+import unicodedata
 import pandas as pd
 import io
 from sqlalchemy.orm import joinedload
@@ -40,17 +41,36 @@ class PlanejamentoService:
              ,c.valmerc as Valor
              ,c.fretetotalbruto as FreteTotal
              
-             -- LÓGICA DE SUBCONTRATAÇÃO FARMA: NOME
+             -- LÓGICA DE SUBCONTRATAÇÃO FARMA: CAMPOS HOMÔNIMOS DO CTC CORRESPONDENTE
              ,CASE 
-                 WHEN ISNULL(cl.ctc_corresp, '') <> '' AND f.respons_nome IS NOT NULL THEN UPPER(f.respons_nome)
+                 WHEN ISNULL(cl.ctc_corresp, '') <> '' AND f.remet_nome IS NOT NULL THEN UPPER(f.remet_nome)
                  ELSE UPPER(c.remet_nome)
               END as Remetente
               
-             ,upper(c.dest_nome) as Destinatario
-             ,c.cidade_orig as CidadeOrigem
-             ,c.uf_orig as UFOrigem
-             ,c.cidade_dest as CidadeDestino
-             ,c.uf_dest as UFDestino
+             ,CASE 
+                 WHEN ISNULL(cl.ctc_corresp, '') <> '' AND f.dest_nome IS NOT NULL THEN UPPER(f.dest_nome)
+                 ELSE UPPER(c.dest_nome)
+              END as Destinatario
+             ,CASE 
+                 WHEN ISNULL(cl.ctc_corresp, '') <> '' AND f.respons_nome IS NOT NULL THEN UPPER(f.respons_nome)
+                 ELSE UPPER(c.respons_nome)
+              END as ClienteNome
+             ,CASE 
+                 WHEN ISNULL(cl.ctc_corresp, '') <> '' AND f.cidade_orig IS NOT NULL THEN f.cidade_orig
+                 ELSE c.cidade_orig
+              END as CidadeOrigem
+             ,CASE 
+                 WHEN ISNULL(cl.ctc_corresp, '') <> '' AND f.uf_orig IS NOT NULL THEN f.uf_orig
+                 ELSE c.uf_orig
+              END as UFOrigem
+             ,CASE 
+                 WHEN ISNULL(cl.ctc_corresp, '') <> '' AND f.cidade_dest IS NOT NULL THEN f.cidade_dest
+                 ELSE c.cidade_dest
+              END as CidadeDestino
+             ,CASE 
+                 WHEN ISNULL(cl.ctc_corresp, '') <> '' AND f.uf_dest IS NOT NULL THEN f.uf_dest
+                 ELSE c.uf_dest
+              END as UFDestino
              ,c.rotafilialdest as UnidadeDestino
              ,c.prioridade as Prioridade
              ,cl.StatusCTC as StatusCTC
@@ -60,10 +80,13 @@ class PlanejamentoService:
              
              -- LÓGICA DE SUBCONTRATAÇÃO FARMA: CNPJS
              ,CASE 
-                 WHEN ISNULL(cl.ctc_corresp, '') <> '' AND f.respons_cgc IS NOT NULL THEN f.respons_cgc
+                 WHEN ISNULL(cl.ctc_corresp, '') <> '' AND f.remet_cgc IS NOT NULL THEN f.remet_cgc
                  ELSE c.remet_cgc
               END as RemetCGC   
-             ,c.dest_cgc as DestCGC     
+             ,CASE 
+                 WHEN ISNULL(cl.ctc_corresp, '') <> '' AND f.dest_cgc IS NOT NULL THEN f.dest_cgc
+                 ELSE c.dest_cgc
+              END as DestCGC     
              ,CASE 
                  WHEN ISNULL(cl.ctc_corresp, '') <> '' AND f.respons_cgc IS NOT NULL THEN f.respons_cgc
                  ELSE c.respons_cgc
@@ -118,6 +141,143 @@ class PlanejamentoService:
         'SE': 'AJU', 'PI': 'THE', 'RO': 'PVH', 'RR': 'BVB', 'AP': 'MCP',
         'AC': 'RBR', 'TO': 'PMW'
     }
+
+    @staticmethod
+    def _RemoverAcentos(texto):
+        return ''.join(
+            char for char in unicodedata.normalize('NFKD', str(texto or ''))
+            if not unicodedata.combining(char)
+        )
+
+    @staticmethod
+    def _NormalizarServicoContratado(servico):
+        valor_original = str(servico or '').strip()
+        if not valor_original:
+            return 'STANDARD'
+
+        valor = PlanejamentoService._RemoverAcentos(valor_original).upper()
+        valor = valor.replace('-', '_').replace(' ', '_')
+        valor = re.sub(r'_+', '_', valor).strip('_')
+
+        if 'DEPEND' in valor and 'DESTINO' in valor:
+            return 'DEPENDE_DO_DESTINO'
+        if 'EXPRESSO' in valor:
+            return 'EXPRESSO'
+        if 'ECON' in valor:
+            return 'ECONÔMICO'
+        if valor in {'PADRAO', 'STANDARD'}:
+            return 'STANDARD'
+
+        return valor_original.upper()
+
+    @staticmethod
+    def _ServicoEhDependenteDestino(servico):
+        return PlanejamentoService._NormalizarServicoContratado(servico) == 'DEPENDE_DO_DESTINO'
+
+    @staticmethod
+    def _NormalizarChaveCliente(cnpj):
+        return re.sub(r'[^0-9]', '', str(cnpj or ''))
+
+    @staticmethod
+    def _ObterChaveServicoCliente(doc):
+        chave = PlanejamentoService._NormalizarChaveCliente(doc.get('cnpj_cliente'))
+        if chave:
+            return chave
+        return f"{doc.get('filial', '')}-{doc.get('serie', '')}-{doc.get('ctc', '')}"
+
+    @staticmethod
+    def _NormalizarMapaServicosEscolhidos(servicos_escolhidos):
+        mapa_normalizado = {}
+        if not isinstance(servicos_escolhidos, dict):
+            return mapa_normalizado
+
+        for chave, servico in servicos_escolhidos.items():
+            chave_normalizada = PlanejamentoService._NormalizarChaveCliente(chave) or str(chave or '').strip()
+            servico_normalizado = PlanejamentoService._NormalizarServicoContratado(servico)
+            if chave_normalizada and servico_normalizado:
+                mapa_normalizado[chave_normalizada] = servico_normalizado
+
+        return mapa_normalizado
+
+    @staticmethod
+    def _DeterminarServicoRoteamento(lista_docs):
+        if not lista_docs:
+            return 'STANDARD'
+
+        servicos = [
+            PlanejamentoService._NormalizarServicoContratado(doc.get('servico_contratado'))
+            for doc in lista_docs
+        ]
+
+        if any(PlanejamentoService._ServicoEhDependenteDestino(servico) for servico in servicos):
+            return None
+
+        if any(servico == 'EXPRESSO' for servico in servicos):
+            return 'EXPRESSO'
+
+        for servico in servicos:
+            if servico not in {'', 'STANDARD'}:
+                return servico
+
+        return 'STANDARD'
+
+    @staticmethod
+    def _MontarPendenciasServico(lista_docs):
+        grupos = {}
+
+        for doc in lista_docs:
+            if not PlanejamentoService._ServicoEhDependenteDestino(doc.get('servico_contratado')):
+                continue
+
+            chave_cliente = doc.get('cliente_key') or PlanejamentoService._ObterChaveServicoCliente(doc)
+            grupo = grupos.get(chave_cliente)
+
+            if not grupo:
+                grupo = {
+                    'cliente_key': chave_cliente,
+                    'cliente_cnpj': doc.get('cnpj_cliente', ''),
+                    'cliente_nome': doc.get('cliente_nome') or doc.get('remetente') or doc.get('destinatario') or 'Cliente sem identificação',
+                    'quantidade_docs': 0,
+                    'peso_total': 0.0,
+                    'opcoes': ['ECONÔMICO', 'EXPRESSO'],
+                    'docs': []
+                }
+                grupos[chave_cliente] = grupo
+
+            grupo['quantidade_docs'] += 1
+            grupo['peso_total'] += float(doc.get('peso_taxado') or 0)
+            grupo['docs'].append({
+                'filial': doc.get('filial'),
+                'serie': doc.get('serie'),
+                'ctc': doc.get('ctc'),
+                'destinatario': doc.get('destinatario'),
+                'peso_taxado': float(doc.get('peso_taxado') or 0),
+                'volumes': int(doc.get('volumes') or 0)
+            })
+
+        return list(grupos.values())
+
+    @staticmethod
+    def MontarDadosPlanejamento(filial, serie, ctc, servicos_escolhidos=None):
+        dados_ctc = PlanejamentoService.ObterCtcDetalhado(filial, serie, ctc)
+        if not dados_ctc:
+            return None, [], None
+
+        ctcs_candidatos = PlanejamentoService.BuscarCtcsConsolidaveis(
+            dados_ctc['origem_cidade'], dados_ctc['origem_uf'],
+            dados_ctc['destino_cidade'], dados_ctc['destino_uf'],
+            dados_ctc['data_emissao_real'], filial, ctc,
+            dados_ctc['tipo_carga'],
+            servico_alvo=dados_ctc.get('servico_contratado')
+        )
+
+        dados_unificados = PlanejamentoService.UnificarConsolidacao(
+            dados_ctc,
+            ctcs_candidatos,
+            servicos_escolhidos=servicos_escolhidos
+        )
+
+        return dados_ctc, ctcs_candidatos, dados_unificados
 
     @staticmethod
     def _CarregarCacheTarifas():
@@ -221,6 +381,7 @@ class PlanejamentoService:
             is_dev = to_str(row.MotivoCTC) == 'DEV'
             remetente_final = to_str(row.Destinatario) if is_dev else to_str(row.Remetente)
             destinatario_final = to_str(row.Remetente) if is_dev else to_str(row.Destinatario)
+            cliente_nome = to_str(getattr(row, 'ClienteNome', '')) or remetente_final or destinatario_final
             
 
             # --- NOVA LÓGICA DE PLANEJAMENTO VIRTUAL RÁPIDO ---
@@ -252,6 +413,7 @@ class PlanejamentoService:
                 'origem': f"{to_str(row.CidadeOrigem)}/{to_str(row.UFOrigem)}",
                 'destino': f"{to_str(row.CidadeDestino)}/{to_str(row.UFDestino)}",
                 'unid_lastmile': to_str(row.UnidadeDestino),
+                'cliente_nome': cliente_nome,
                 'remetente': remetente_final,
                 'destinatario': destinatario_final,
                 'volumes': to_int(row.Volumes),
@@ -381,7 +543,7 @@ class PlanejamentoService:
                 ServicoCliente.ServicoContratado != 'STANDARD' 
             ).first()
             
-            return Servico.ServicoContratado if Servico else "STANDARD"
+            return PlanejamentoService._NormalizarServicoContratado(Servico.ServicoContratado if Servico else "STANDARD")
         except Exception as e:
             LogService.Error("PlanejamentoService", "Erro em BuscarServicoContratadoCliente", e)
             return "STANDARD"
@@ -424,15 +586,71 @@ class PlanejamentoService:
                 try:
                     ctc_farma = str(CplEncontrado.ctc_corresp).strip()
                     # Busca pontual no banco da Farma
-                    query_farma = text("SELECT respons_nome, respons_cgc FROM farma.dbo.tb_ctc_esp (NOLOCK) WHERE filialctc = :ctc")
+                    query_farma = text("""
+                        SELECT TOP 1
+                            origem,
+                            remet_nome,
+                            remet_cgc,
+                            remet_end,
+                            remet_cidade,
+                            remet_uf,
+                            remet_cep,
+                            remet_ie,
+                            respons_nome,
+                            respons_cgc,
+                            respons_end,
+                            respons_cidade,
+                            respons_uf,
+                            respons_ie,
+                            dest_nome,
+                            dest_cgc,
+                            dest_end,
+                            dest_cidade,
+                            dest_uf,
+                            dest_cep,
+                            dest_ie,
+                            cidade_orig,
+                            uf_orig,
+                            cidade_dest,
+                            uf_dest
+                        FROM farma.dbo.tb_ctc_esp (NOLOCK)
+                        WHERE filialctc = :ctc
+                    """)
                     farma_data = Sessao.execute(query_farma, {'ctc': ctc_farma}).fetchone()
                     
                     if farma_data:
-                        # Sobrescreve as propriedades em memória do CTC para exibir o cliente real!
-                        CtcEncontrado.remet_nome = farma_data.respons_nome
-                        CtcEncontrado.remet_cgc = farma_data.respons_cgc
-                        CtcEncontrado.respons_nome = farma_data.respons_nome
-                        CtcEncontrado.respons_cgc = farma_data.respons_cgc
+                        campos_farma = (
+                            'origem',
+                            'remet_nome',
+                            'remet_cgc',
+                            'remet_end',
+                            'remet_cidade',
+                            'remet_uf',
+                            'remet_cep',
+                            'remet_ie',
+                            'respons_nome',
+                            'respons_cgc',
+                            'respons_end',
+                            'respons_cidade',
+                            'respons_uf',
+                            'respons_ie',
+                            'dest_nome',
+                            'dest_cgc',
+                            'dest_end',
+                            'dest_cidade',
+                            'dest_uf',
+                            'dest_cep',
+                            'dest_ie',
+                            'cidade_orig',
+                            'uf_orig',
+                            'cidade_dest',
+                            'uf_dest',
+                        )
+
+                        for campo in campos_farma:
+                            valor = getattr(farma_data, campo, None)
+                            if valor is not None and str(valor).strip() != '':
+                                setattr(CtcEncontrado, campo, valor)
                 except Exception as e_farma:
                     LogService.Warning("PlanejamentoService", f"Erro ao buscar subcontratação Farma: {e_farma}")
 
@@ -465,6 +683,8 @@ class PlanejamentoService:
                 remetente_nome = str(CtcEncontrado.remet_nome).strip()
                 destinatario_nome = str(CtcEncontrado.dest_nome).strip()
 
+            cliente_nome = str(getattr(CtcEncontrado, 'respons_nome', '') or '').strip() or remetente_nome or destinatario_nome
+
             servico_contratado = PlanejamentoService.BuscarServicoContratadoCliente(cnpj_alvo)
 
             return {
@@ -482,6 +702,7 @@ class PlanejamentoService:
                 'peso_taxado': float(CtcEncontrado.pesotax or 0),
                 'volumes': int(CtcEncontrado.volumes or 0),
                 'valor': (CtcEncontrado.valmerc or 0),
+                'cliente_nome': cliente_nome,
                 'remetente': remetente_nome,
                 'destinatario': destinatario_nome,
                 'tipo_carga': TipoCarga,
@@ -545,13 +766,21 @@ class PlanejamentoService:
                     remetente_nome = to_str(row.Remetente)
                     destinatario_nome = to_str(row.Destinatario)
 
+                cliente_nome = to_str(getattr(row, 'ClienteNome', '')) or remetente_nome or destinatario_nome
+
                 servico_cand = PlanejamentoService.BuscarServicoContratadoCliente(
                     getattr(row, 'ResponsCGC', None), 
                     getattr(row, 'RemetCGC', None), 
                     getattr(row, 'DestCGC', None)
                 )
-                if servico_alvo and str(servico_cand).strip().upper() != str(servico_alvo).strip().upper():
-                    continue 
+                if servico_alvo:
+                    servico_alvo_norm = PlanejamentoService._NormalizarServicoContratado(servico_alvo)
+                    servico_cand_norm = PlanejamentoService._NormalizarServicoContratado(servico_cand)
+                    if not (
+                        PlanejamentoService._ServicoEhDependenteDestino(servico_alvo_norm) or
+                        PlanejamentoService._ServicoEhDependenteDestino(servico_cand_norm)
+                    ) and servico_cand_norm != servico_alvo_norm:
+                        continue 
 
                 ListaConsolidados.append({
                     'filial': to_str(row.Filial),
@@ -561,6 +790,7 @@ class PlanejamentoService:
                     'peso_fisico': to_float(row.PesoFisico),
                     'peso_taxado': to_float(row.PesoTaxado),
                     'val_mercadoria': to_float(row.Valor),
+                    'cliente_nome': cliente_nome,
                     'remetente': remetente_nome,
                     'destinatario': destinatario_nome,
                     'data_emissao': row.DataEmissao,
@@ -583,84 +813,76 @@ class PlanejamentoService:
             Sessao.close()
 
     @staticmethod
-    def UnificarConsolidacao(ctc_principal, lista_candidatos):
+    def UnificarConsolidacao(ctc_principal, lista_candidatos, servicos_escolhidos=None):
         try:
-            if not lista_candidatos:
-                ctc_principal['is_consolidado'] = False
-                ctc_principal['lista_docs'] = [ctc_principal.copy()] 
-                ctc_principal['qtd_docs'] = 1
-                return ctc_principal
-
+            overrides = PlanejamentoService._NormalizarMapaServicosEscolhidos(servicos_escolhidos)
             unificado = ctc_principal.copy()
-            unificado['servico_contratado'] = ctc_principal.get('servico_contratado', 'STANDARD')
             unificado['cnpj_cliente'] = ctc_principal.get('cnpj_cliente', '')
-            
-            docs = [{
-                'filial': ctc_principal['filial'],
-                'serie': ctc_principal['serie'],
-                'ctc': ctc_principal['ctc'],
-                'volumes': int(ctc_principal['volumes']),
-                'peso_fisico': float(ctc_principal['peso_fisico']),
-                'peso_taxado': float(ctc_principal['peso_taxado']),
-                'valor': float(ctc_principal['valor']),
-                'remetente': ctc_principal['remetente'],
-                'destinatario': ctc_principal['destinatario'],
-                'tipo_carga': ctc_principal['tipo_carga'],
-                'motivodoc': ctc_principal.get('motivodoc'), # Adicionado
-                'cnpj_cliente': ctc_principal.get('cnpj_cliente', ''),
-                'servico_contratado': ctc_principal.get('servico_contratado', 'STANDARD'),
-                'data_emissao_real': ctc_principal.get('data_emissao_real'),
-                'hora_formatada': ctc_principal.get('hora_formatada'),
-                'origem_cidade': ctc_principal.get('origem_cidade'),
-                'origem_uf': ctc_principal.get('origem_uf'),
-                'destino_cidade': ctc_principal.get('destino_cidade'),
-                'destino_uf': ctc_principal.get('destino_uf')
-            }]
-            
-            total_volumes = docs[0]['volumes']
-            total_peso_fisico = docs[0]['peso_fisico']
-            total_peso_taxado = docs[0]['peso_taxado']
-            total_valor = docs[0]['valor']
+            unificado['cliente_nome'] = ctc_principal.get('cliente_nome', '')
+            docs = []
 
-            for c in lista_candidatos:
-                serv_filho = PlanejamentoService.BuscarServicoContratadoCliente(c.get('cnpj_cliente', ''))
+            def montar_doc(origem_doc, principal=False):
+                servico_base = PlanejamentoService._NormalizarServicoContratado(origem_doc.get('servico_contratado', 'STANDARD'))
+                cliente_key = PlanejamentoService._NormalizarChaveCliente(origem_doc.get('cnpj_cliente'))
+                if not cliente_key:
+                    cliente_key = f"{origem_doc.get('filial', '')}-{origem_doc.get('serie', '')}-{origem_doc.get('ctc', '')}"
 
-                c_doc = {
-                    'filial': c['filial'],
-                    'serie': c['serie'],
-                    'ctc': c['ctc'],
-                    'volumes': int(c['volumes']),
-                    'peso_fisico': float(c['peso_fisico']),
-                    'peso_taxado': float(c['peso_taxado']),
-                    'valor': float(c['val_mercadoria']),
-                    'remetente': c['remetente'],
-                    'destinatario': c['destinatario'],
-                    'tipo_carga': c['tipo_carga'],
-                    'motivodoc': c.get('motivodoc'), # Adicionado
-                    'cnpj_cliente': c.get('cnpj_cliente', ''),
-                    'servico_contratado': serv_filho,
-                    'data_emissao': c.get('data_emissao'),
-                    'hora_emissao': c.get('hora_emissao'),
-                    'origem_cidade': c.get('origem_cidade'),
-                    'origem_uf': c.get('origem_uf'),
-                    'destino_cidade': c.get('destino_cidade'),
-                    'destino_uf': c.get('destino_uf')
+                servico_final = overrides.get(cliente_key, servico_base)
+                if PlanejamentoService._ServicoEhDependenteDestino(servico_base) and cliente_key not in overrides:
+                    servico_final = 'DEPENDE_DO_DESTINO'
+
+                return {
+                    'filial': origem_doc.get('filial'),
+                    'serie': origem_doc.get('serie'),
+                    'ctc': origem_doc.get('ctc'),
+                    'volumes': int(origem_doc.get('volumes') or 0),
+                    'peso_fisico': float(origem_doc.get('peso_fisico') or 0),
+                    'peso_taxado': float(origem_doc.get('peso_taxado') or 0),
+                    'valor': float(origem_doc.get('valor', origem_doc.get('val_mercadoria', 0)) or 0),
+                    'remetente': origem_doc.get('remetente', ''),
+                    'destinatario': origem_doc.get('destinatario', ''),
+                    'tipo_carga': origem_doc.get('tipo_carga'),
+                    'motivodoc': origem_doc.get('motivodoc'),
+                    'cnpj_cliente': origem_doc.get('cnpj_cliente', ''),
+                    'cliente_key': cliente_key,
+                    'cliente_nome': origem_doc.get('cliente_nome') or origem_doc.get('remetente') or origem_doc.get('destinatario') or 'Cliente sem identificação',
+                    'servico_contratado_original': servico_base,
+                    'servico_contratado': servico_final,
+                    'data_emissao_real': origem_doc.get('data_emissao_real') or origem_doc.get('data_emissao'),
+                    'hora_formatada': origem_doc.get('hora_formatada') or origem_doc.get('hora_emissao'),
+                    'origem_cidade': origem_doc.get('origem_cidade'),
+                    'origem_uf': origem_doc.get('origem_uf'),
+                    'destino_cidade': origem_doc.get('destino_cidade'),
+                    'destino_uf': origem_doc.get('destino_uf'),
+                    'principal': principal
                 }
-                docs.append(c_doc)
-                total_volumes += c_doc['volumes']
-                total_peso_fisico += c_doc['peso_fisico']
-                total_peso_taxado += c_doc['peso_taxado']
-                total_valor += c_doc['valor']
+
+            docs.append(montar_doc(ctc_principal, principal=True))
+            for c in (lista_candidatos or []):
+                docs.append(montar_doc(c))
+
+            total_volumes = sum(doc['volumes'] for doc in docs)
+            total_peso_fisico = sum(doc['peso_fisico'] for doc in docs)
+            total_peso_taxado = sum(doc['peso_taxado'] for doc in docs)
+            total_valor = sum(doc['valor'] for doc in docs)
 
             unificado['volumes'] = total_volumes
             unificado['peso_fisico'] = total_peso_fisico
             unificado['peso_taxado'] = total_peso_taxado 
             unificado['valor'] = total_valor
-            
-            unificado['is_consolidado'] = True
+
+            unificado['is_consolidado'] = len(docs) > 1
             unificado['lista_docs'] = docs
             unificado['qtd_docs'] = len(docs)
             unificado['resumo_consol'] = f"Lote com {len(docs)} CTCs"
+
+            pendencias = PlanejamentoService._MontarPendenciasServico(docs)
+            servico_roteamento = PlanejamentoService._DeterminarServicoRoteamento(docs)
+
+            unificado['servicos_pendentes'] = pendencias
+            unificado['servico_pendente'] = len(pendencias) > 0
+            unificado['servico_roteamento'] = servico_roteamento
+            unificado['servico_contratado'] = servico_roteamento or 'DEFINIR NO PLANEJAMENTO'
 
             return unificado
         except Exception as e:
@@ -1146,6 +1368,7 @@ class PlanejamentoService:
                 CtcEsp.motivodoc,
                 CtcEsp.remet_nome,
                 CtcEsp.dest_nome,
+                CtcEsp.respons_nome,
                 CtcEspCpl.ctc_corresp,
                 CtcEspCpl.TipoCarga,
                 Filial.nomefilial
@@ -1183,6 +1406,7 @@ class PlanejamentoService:
                 
                 RemetNome = Row.remet_nome if Row.remet_nome else Item.Remetente
                 DestNome = Row.dest_nome if Row.dest_nome else Item.Destinatario
+                ClienteNome = Row.respons_nome if Row.respons_nome else Item.Remetente
                 CtcCorresp = Row.ctc_corresp
 
                 # --- LÓGICA DE SUBCONTRATAÇÃO FARMA ---
@@ -1202,10 +1426,10 @@ class PlanejamentoService:
                     
                     nome_farma = CacheFarma.get(ctc_farma)
                     if nome_farma:
-                        RemetNome = nome_farma
+                        ClienteNome = nome_farma
 
                 # --- LÓGICA DE REVERSA (DEV) ---
-                ClienteFinal = DestNome if MotivoDoc == 'DEV' else RemetNome
+                ClienteFinal = ClienteNome
                 DestinatarioFinal = RemetNome if MotivoDoc == 'DEV' else DestNome
 
                 if not ClienteFinal: ClienteFinal = Item.Remetente

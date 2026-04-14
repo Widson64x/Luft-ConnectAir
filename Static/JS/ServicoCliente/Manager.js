@@ -6,21 +6,144 @@
 
 class GerenciadorServicosClientes {
     constructor() {
+        this.modalId = 'modalServicoCliente';
         this.formServico = document.getElementById('FormServico');
         this.btnSubmit = document.getElementById('BtnSubmit');
-        this.btnCancel = document.getElementById('BtnCancel');
-        this.formTitle = document.getElementById('FormTitle');
         this.infoContagem = document.getElementById('InfoContagem');
         this.treeRoot = document.querySelector('.luft-tree-root');
         this.tbodyServicos = document.getElementById('tbody-servicos');
         this.loaderTabela = document.getElementById('loader-tabela');
         this.tabelaServicos = document.getElementById('tabela-servicos');
         this.emptyState = document.getElementById('empty-state');
+        this.modal = document.getElementById(this.modalId);
+        this.modalBackdrop = document.getElementById(`${this.modalId}-backdrop`);
+        this.modalCloseButton = this.modal ? this.modal.querySelector('.luft-modal-close') : null;
+        this.modalTitle = this.modal ? this.modal.querySelector('.luft-modal-title') : null;
+        this.blocoSelecaoClientes = document.getElementById('BlocoSelecaoClientes');
+        this.blocoClienteEdicao = document.getElementById('BlocoClienteEdicao');
+        this.clienteEdicaoCodigo = document.getElementById('ClienteEdicaoCodigo');
+        this.clienteEdicaoNome = document.getElementById('ClienteEdicaoNome');
+        this.clienteEdicaoCnpj = document.getElementById('ClienteEdicaoCnpj');
+        this.servicosPorId = new Map();
     }
 
     inicializar() {
         this.carregarListaServicos();
         this.configurarTreeview();
+        this.configurarModal();
+        this.resetarFormulario();
+    }
+
+    configurarModal() {
+        [this.modalBackdrop, this.modalCloseButton].forEach(elemento => {
+            if (elemento) {
+                elemento.addEventListener('click', () => this.resetarFormulario());
+            }
+        });
+    }
+
+    obterControladorModal() {
+        if (typeof LuftCore !== 'undefined') {
+            return LuftCore;
+        }
+
+        if (typeof window !== 'undefined' && window.LuftCore) {
+            return window.LuftCore;
+        }
+
+        return null;
+    }
+
+    abrirModalLuft() {
+        const controladorModal = this.obterControladorModal();
+
+        if (controladorModal?.abrirModal) {
+            controladorModal.abrirModal(this.modalId);
+            return;
+        }
+
+        if (this.modal && this.modalBackdrop) {
+            this.modalBackdrop.classList.add('show');
+            this.modal.classList.add('show');
+            document.body.style.overflow = 'hidden';
+        }
+    }
+
+    fecharModalLuft() {
+        const controladorModal = this.obterControladorModal();
+
+        if (controladorModal?.fecharModal) {
+            controladorModal.fecharModal(this.modalId);
+            return;
+        }
+
+        if (this.modal && this.modalBackdrop) {
+            this.modalBackdrop.classList.remove('show');
+            this.modal.classList.remove('show');
+            document.body.style.overflow = '';
+        }
+    }
+
+    resetarFormulario() {
+        if (!this.formServico) return;
+
+        this.formServico.reset();
+        this.formServico.action = rotasServicos.salvar;
+
+        document.querySelectorAll('.chk-cliente, .chk-grupo').forEach(checkbox => {
+            checkbox.checked = false;
+            checkbox.indeterminate = false;
+        });
+
+        document.querySelectorAll('.luft-tree-children').forEach(container => {
+            container.style.display = 'none';
+        });
+
+        document.querySelectorAll('.toggle-icon').forEach(icone => {
+            icone.classList.remove('open');
+        });
+
+        this.atualizarContagem();
+
+        if (this.modalTitle) {
+            this.modalTitle.innerHTML = '<i class="ph-bold ph-handshake text-primary"></i> Novo Serviço';
+        }
+
+        if (this.btnSubmit) {
+            this.btnSubmit.innerHTML = '<i class="ph-bold ph-floppy-disk"></i> Salvar';
+            this.btnSubmit.classList.remove('btn-success');
+            this.btnSubmit.classList.add('btn-primary');
+        }
+
+        if (this.blocoSelecaoClientes) {
+            this.blocoSelecaoClientes.classList.remove('luft-hidden');
+        }
+
+        if (this.blocoClienteEdicao) {
+            this.blocoClienteEdicao.classList.add('luft-hidden');
+        }
+
+        if (this.clienteEdicaoCodigo) {
+            this.clienteEdicaoCodigo.textContent = '';
+        }
+
+        if (this.clienteEdicaoNome) {
+            this.clienteEdicaoNome.textContent = '';
+        }
+
+        if (this.clienteEdicaoCnpj) {
+            this.clienteEdicaoCnpj.textContent = '';
+        }
+    }
+
+    abrirCadastro() {
+        this.resetarFormulario();
+        this.abrirModalLuft();
+    }
+
+    fecharModalCadastro() {
+        this.resetarFormulario();
+        this.fecharModalLuft();
     }
 
     // --- LÓGICA DO TREEVIEW ---
@@ -35,7 +158,7 @@ class GerenciadorServicosClientes {
     atualizarContagem() {
         if (!this.infoContagem) return;
         const clientesMarcados = document.querySelectorAll('.chk-cliente:checked').length;
-        this.infoContagem.innerHTML = `${clientesMarcados} Cliente(s) Selecionado(s)`;
+        this.infoContagem.textContent = `${clientesMarcados} Selecionado${clientesMarcados === 1 ? '' : 's'}`;
     }
 
     configurarTreeview() {
@@ -93,6 +216,11 @@ class GerenciadorServicosClientes {
             .then(resposta => resposta.json())
             .then(dados => {
                 this.tbodyServicos.innerHTML = '';
+                this.servicosPorId = new Map();
+
+                dados.forEach(item => {
+                    this.servicosPorId.set(Number(item.Id), item);
+                });
                 
                 if (dados.length === 0) {
                     this.loaderTabela.style.display = 'none';
@@ -156,8 +284,8 @@ class GerenciadorServicosClientes {
                             <td>${this.obterBadgeServico(item.ServicoContratado)}</td>
                             <td style="text-align: center;">
                                 <div class="d-flex justify-content-center gap-2">
-                                    <button class="btn btn-secondary text-primary d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; padding: 0;" title="Editar" 
-                                        onclick="prepararEdicao(${item.Id}, '${item.CodigoCliente}', '${item.DurabilidadeGelo}', '${item.AutorizacaoTrocaGelo}', '${item.AutorizacaoArmazenagem}', '${item.ServicoContratado}')">
+                                    <button type="button" class="btn btn-secondary text-primary d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; padding: 0;" title="Editar"
+                                        onclick="prepararEdicao(${item.Id})">
                                         <i class="ph-bold ph-pencil-simple text-lg"></i>
                                     </button>
                                     
@@ -213,15 +341,18 @@ class GerenciadorServicosClientes {
         }
     }
 
-    prepararEdicao(id, codigoCliente, durabilidade, troca, armazenagem, servico) {
-        document.getElementById('DurabilidadeGelo').value = durabilidade;
-        document.getElementById('AutorizacaoTrocaGelo').value = troca;
-        document.getElementById('AutorizacaoArmazenagem').value = armazenagem;
-        document.getElementById('ServicoContratado').value = servico;
+    prepararEdicao(id) {
+        const item = this.servicosPorId.get(Number(id));
+        if (!item) return;
 
-        document.querySelectorAll('.chk-cliente, .chk-grupo').forEach(checkbox => checkbox.checked = false);
-        
-        const checkboxEdicao = document.getElementById('cliente_' + codigoCliente);
+        this.resetarFormulario();
+
+        document.getElementById('DurabilidadeGelo').value = item.DurabilidadeGelo || '';
+        document.getElementById('AutorizacaoTrocaGelo').value = item.AutorizacaoTrocaGelo || 'SIM';
+        document.getElementById('AutorizacaoArmazenagem').value = item.AutorizacaoArmazenagem || 'SIM';
+        document.getElementById('ServicoContratado').value = item.ServicoContratado || '';
+
+        const checkboxEdicao = document.getElementById('cliente_' + item.CodigoCliente);
         if (checkboxEdicao) {
             checkboxEdicao.checked = true;
             this.updateParentStatus(checkboxEdicao);
@@ -237,38 +368,39 @@ class GerenciadorServicosClientes {
         this.atualizarContagem();
 
         this.formServico.action = rotasServicos.editarBase.replace('0', id);
-        this.formTitle.innerHTML = '<i class="ph-bold ph-pencil-simple text-warning"></i> Editando Parametrização';
-        
-        this.btnSubmit.innerHTML = '<i class="ph-bold ph-check-circle"></i> Atualizar Configuração';
-        this.btnSubmit.classList.remove('btn-primary');
-        this.btnSubmit.classList.add('btn-success');
-        
-        this.btnCancel.style.display = 'flex';
-        
-        // Em telas pequenas rola pro topo do formulário
-        if (window.innerWidth < 1100) {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+        if (this.modalTitle) {
+            this.modalTitle.innerHTML = '<i class="ph-bold ph-pencil-simple text-warning"></i> Editar Serviço';
         }
+        
+        this.btnSubmit.innerHTML = '<i class="ph-bold ph-check-circle"></i> Atualizar';
+        this.btnSubmit.classList.remove('btn-success');
+        this.btnSubmit.classList.add('btn-primary');
+
+        if (this.blocoSelecaoClientes) {
+            this.blocoSelecaoClientes.classList.add('luft-hidden');
+        }
+
+        if (this.blocoClienteEdicao) {
+            this.blocoClienteEdicao.classList.remove('luft-hidden');
+        }
+
+        if (this.clienteEdicaoCodigo) {
+            this.clienteEdicaoCodigo.textContent = `COD ${item.CodigoCliente}`;
+        }
+
+        if (this.clienteEdicaoNome) {
+            this.clienteEdicaoNome.textContent = item.Fantasia || item.RazaoSocial || 'Cliente';
+        }
+
+        if (this.clienteEdicaoCnpj) {
+            this.clienteEdicaoCnpj.textContent = item.Cnpj || '';
+        }
+
+        this.abrirModalLuft();
     }
 
     cancelarEdicao() {
-        this.formServico.reset();
-        
-        document.querySelectorAll('.chk-cliente, .chk-grupo').forEach(checkbox => {
-            checkbox.checked = false;
-            checkbox.indeterminate = false;
-        });
-        
-        this.atualizarContagem();
-        
-        this.formServico.action = rotasServicos.salvar;
-        this.formTitle.innerHTML = '<i class="ph-bold ph-plus-circle text-primary"></i> Nova Parametrização Lote';
-        
-        this.btnSubmit.innerHTML = '<i class="ph-bold ph-floppy-disk"></i> Salvar Lote';
-        this.btnSubmit.classList.remove('btn-success');
-        this.btnSubmit.classList.add('btn-primary');
-        
-        this.btnCancel.style.display = 'none';
+        this.resetarFormulario();
     }
 }
 
@@ -281,8 +413,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Mapeamento global para os eventos inline
     window.toggleTree = (icone) => gerenciadorServicosClientes.toggleTree(icone);
+    window.abrirCadastro = () => gerenciadorServicosClientes.abrirCadastro();
     window.carregarListaServicos = () => gerenciadorServicosClientes.carregarListaServicos();
+    window.fecharModalCadastro = () => gerenciadorServicosClientes.fecharModalCadastro();
     window.toggleTabelaGrupo = (classeGrupo) => gerenciadorServicosClientes.toggleTabelaGrupo(classeGrupo);
-    window.prepararEdicao = (id, cod, dura, troca, armaz, serv) => gerenciadorServicosClientes.prepararEdicao(id, cod, dura, troca, armaz, serv);
-    window.cancelarEdicao = () => gerenciadorServicosClientes.cancelarEdicao();
+    window.prepararEdicao = (id) => gerenciadorServicosClientes.prepararEdicao(id);
 });

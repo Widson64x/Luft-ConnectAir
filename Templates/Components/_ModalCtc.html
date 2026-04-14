@@ -302,11 +302,38 @@
     const fmtM = (v) => (!v || isNaN(v)) ? '-' : parseFloat(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     const fmtD = (v) => (!v || String(v).includes('NULL')) ? '-' : String(v).split(' ')[0].split('-').reverse().join('/');
     const ck = (v) => (v === undefined || v === null || String(v).includes('NULL')) ? '-' : v;
+    const fmtCidadeUf = (cidade, uf) => {
+        const cidadeFmt = ck(cidade);
+        const ufFmt = ck(uf);
+
+        if (cidadeFmt === '-' && ufFmt === '-') return '-';
+        if (cidadeFmt === '-') return ufFmt;
+        if (ufFmt === '-') return cidadeFmt;
+        return `${cidadeFmt} - ${ufFmt}`;
+    };
     
     const kv = (label, val, cls='') => `
         <div class="kv">
             <span class="lb">${label}</span>
             <span class="vl ${cls}">${ck(val)}</span>
+        </div>`;
+
+    const renderCardCadastro = ({ titulo, icone, iconeStyle = '', nome, cnpj, ie, endereco, cidade, uf, cep, mostrarCep = true, extraHtml = '' }) => `
+        <div class="col-4 box-card">
+            <div class="box-header"><i class="bi ${icone}"${iconeStyle ? ` style="${iconeStyle}"` : ''}></i> ${titulo}</div>
+            <div class="box-body">
+                <div class="field-row">${kv('RAZÃO SOCIAL', nome, 'lg')}</div>
+                <div class="field-row">
+                    ${kv('CNPJ', cnpj, 'mono')}
+                    ${kv('IE', ie, 'mono')}
+                </div>
+                <div class="field-row">${kv('ENDEREÇO', endereco)}</div>
+                <div class="field-row">
+                    ${kv('CIDADE / UF', fmtCidadeUf(cidade, uf))}
+                    ${mostrarCep ? kv('CEP', cep, 'mono') : ''}
+                </div>
+                ${extraHtml}
+            </div>
         </div>`;
 
     // --- RENDERIZAÇÃO PRINCIPAL ---
@@ -356,39 +383,58 @@
             </div>
         </div>
 
-        <div class="col-4 box-card">
-            <div class="box-header"><i class="bi bi-star-fill" style="color:#f59e0b;"></i> Tomador & Regras de Serviço</div>
-            <div class="box-body">
-                <div class="field-row">${kv('Cliente / Pagador', d.respons_nome || d.remet_nome)}</div>
-                <div class="field-row">${kv('CNPJ', d.respons_cgc || d.remet_cgc, 'mono')}</div>
+        ${renderCardCadastro({
+            titulo: 'Remetente',
+            icone: 'bi-star-fill',
+            iconeStyle: 'color:#f59e0b;',
+            nome: d.remet_nome,
+            cnpj: d.remet_cgc,
+            ie: d.remet_ie,
+            endereco: d.remet_end,
+            cidade: d.remet_cidade,
+            uf: d.remet_uf,
+            cep: d.remet_cep,
+            extraHtml: `
                 <hr style="margin:8px 0; border:0; border-top:1px dashed #e2e8f0;">
-                
+                <div class="field-row">
+                    ${kv('ORIGEM OPERACIONAL', fmtCidadeUf(d.cidade_orig, d.uf_orig))}
+                    ${kv('VIA', d.via, 'mono')}
+                </div>
                 <div class="field-row" style="background:#f0fdf4; padding:10px; border-radius:6px; border:1px solid #bbf7d0;">
                     ${kv('Serviço Contratado', d.servico_contratado || 'PADRÃO', 'lg status-ok')}
                     ${kv('Tipo de Carga', d.TipoCarga || 'N/A', 'lg')}
-                </div>
-            </div>
-        </div>
+                </div>`
+        })}
 
-        <div class="col-4 box-card">
-            <div class="box-header"><i class="bi bi-box-arrow-in-down"></i> Destinatário</div>
-            <div class="box-body">
-                <div class="field-row">${kv('Razão Social', d.dest_nome, 'lg')}</div>
-                <div class="field-row">${kv('CNPJ', d.dest_cgc, 'mono')}</div>
+        ${renderCardCadastro({
+            titulo: 'Destinatário',
+            icone: 'bi-box-arrow-in-down',
+            nome: d.dest_nome,
+            cnpj: d.dest_cgc,
+            ie: d.dest_ie,
+            endereco: d.dest_end,
+            cidade: d.dest_cidade,
+            uf: d.dest_uf,
+            cep: d.dest_cep,
+            extraHtml: `
                 <hr style="margin:8px 0; border:0; border-top:1px dashed #e2e8f0;">
-                <div class="field-row">${kv('Endereço', `${ck(d.dest_cidade)} - ${ck(d.dest_uf)}`)}</div>
-            </div>
-        </div>
+                <div class="field-row">${kv('DESTINO OPERACIONAL', fmtCidadeUf(d.cidade_dest, d.uf_dest))}</div>`
+        })}
 
-        <div class="col-4 box-card">
-            <div class="box-header"><i class="bi bi-info-circle"></i> Tomador / Outros</div>
-            <div class="box-body">
-                <div class="field-row">${kv('Pagador do Frete', d.respons_nome)}</div>
-                <div class="field-row">${kv('CNPJ Pagador', d.respons_cgc, 'mono')}</div>
+        ${renderCardCadastro({
+            titulo: 'Responsável',
+            icone: 'bi-info-circle',
+            nome: d.respons_nome,
+            cnpj: d.respons_cgc,
+            ie: d.respons_ie,
+            endereco: d.respons_end,
+            cidade: d.respons_cidade,
+            uf: d.respons_uf,
+            mostrarCep: false,
+            extraHtml: `
                 <hr style="margin:8px 0; border:0; border-top:1px dashed #e2e8f0;">
-                <div class="field-row">${kv('Redespacho', d.redesp_nome || 'Não informado')}</div>
-            </div>
-        </div>
+                <div class="field-row">${kv('REDESPACHO', d.redesp_nome || 'Não informado')}</div>`
+        })}
 
         <div class="col-12 box-card">
             <div class="box-header"><i class="bi bi-chat-left-text"></i> Observações de Emissão</div>

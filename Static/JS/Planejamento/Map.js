@@ -112,6 +112,7 @@ class GerenciadorMapaGlobal {
 
         listaOrdenada.forEach(documento => {
             const ehUrgente = documento.eh_urgente;
+            const clienteNome = documento.cliente_nome || documento.remetente || '-';
             const estiloBorda = ehUrgente ? 'border-left: 4px solid var(--luft-danger);' : 'border-left: 4px solid var(--luft-primary-500);';
             const htmlCracha = ehUrgente ? `<span class="luft-badge luft-badge-danger"><i class="ph-bold ph-warning"></i> URGENTE</span>` : ``;
             
@@ -133,8 +134,8 @@ class GerenciadorMapaGlobal {
                         ${documento.destino.split('/')[0]}
                     </div>
                     
-                    <div class="text-xs text-muted mb-3" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${documento.remetente}">
-                        <i class="ph-bold ph-user"></i> ${documento.remetente}
+                    <div class="text-xs text-muted mb-3" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${clienteNome}">
+                        <i class="ph-bold ph-user"></i> ${clienteNome}
                     </div>
 
                     <div class="d-flex justify-content-between align-items-center mb-3 text-xs text-muted">

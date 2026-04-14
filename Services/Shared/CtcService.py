@@ -1,26 +1,11 @@
 from datetime import datetime, date, time
 from decimal import Decimal
+
 from Conexoes import ObterSessaoSqlServer
-from Models.SQL_SERVER.Ctc import CtcEsp, CtcEspFarma, CtcEspCpl
+from Models.SQL_SERVER.Ctc import CtcEsp, CtcEspCpl, CtcEspFarma
 from Models.SQL_SERVER.NfEsp import NfEsp
 from Models.SQL_SERVER.Ocorrencia import Ocorrencia
 from Services.LogService import LogService
-
-class CtcService:
-    """
-    Serviço Compartilhado para operações globais de CTC.
-    Acessível por qualquer módulo (Planejamento, Reversa, Monitoramento).
-    """
-
-from datetime import datetime, date, time
-from decimal import Decimal
-from Conexoes import ObterSessaoSqlServer
-from Models.SQL_SERVER.Ctc import CtcEsp, CtcEspCpl
-from Models.SQL_SERVER.NfEsp import NfEsp       
-from Models.SQL_SERVER.Ocorrencia import Ocorrencia 
-from Services.LogService import LogService
-
-# Importe para buscar as regras do cliente dinamicamente
 from Services.PlanejamentoService import PlanejamentoService
 
 class CtcService:
@@ -28,6 +13,65 @@ class CtcService:
     Serviço Compartilhado para operações globais de CTC.
     Acessível por qualquer módulo (Planejamento, Reversa, Monitoramento).
     """
+
+    CAMPOS_SOBREPOSICAO_FARMA = (
+        'origem',
+        'remet_cgc',
+        'remet_nome',
+        'remet_end',
+        'remet_cidade',
+        'remet_uf',
+        'remet_cep',
+        'remet_ie',
+        'respons_cgc',
+        'respons_nome',
+        'respons_end',
+        'respons_cidade',
+        'respons_uf',
+        'respons_ie',
+        'dest_cgc',
+        'dest_nome',
+        'dest_end',
+        'dest_cidade',
+        'dest_uf',
+        'dest_cep',
+        'dest_ie',
+        'cidade_orig',
+        'uf_orig',
+        'cidade_dest',
+        'uf_dest',
+    )
+
+    @staticmethod
+    def _buscar_ctc_farma(sessao, ctc_corresp):
+        candidatos = []
+        valor_base = str(ctc_corresp or '').strip()
+
+        for valor in (valor_base, valor_base.lstrip('0'), valor_base.zfill(10)):
+            if valor and valor not in candidatos:
+                candidatos.append(valor)
+
+        for candidato in candidatos:
+            ctc_farma = sessao.query(CtcEspFarma).filter(CtcEspFarma.filialctc == candidato).first()
+            if ctc_farma:
+                return ctc_farma
+
+        return None
+
+    @staticmethod
+    def _sobrepor_dados_cadastro_farma(dados_completos, ctc_farma, safe_val):
+        for campo in CtcService.CAMPOS_SOBREPOSICAO_FARMA:
+            valor = getattr(ctc_farma, campo, None)
+            if valor is None:
+                continue
+
+            valor_limpo = str(valor).strip() if isinstance(valor, str) else valor
+            if valor_limpo == '':
+                continue
+
+            dados_completos[campo] = safe_val(valor)
+
+        dados_completos['is_subcontratacao_farma'] = True
 
     @staticmethod
     def ObterCtcCompleto(filial, serie, ctc_num):
@@ -76,42 +120,20 @@ class CtcService:
                 for coluna in Cpl.__table__.columns:
                     dados_completos[coluna.name] = safe_val(getattr(Cpl, coluna.name))
                 
-                # ---------------------------------------------------------
-                # NOVA LÓGICA: INTERCEPTAÇÃO SUBCONTRATAÇÃO FARMA
-                # ---------------------------------------------------------
                 ctc_corresp = getattr(Cpl, 'ctc_corresp', None)
                 if ctc_corresp and str(ctc_corresp).strip():
-                    # Busca na tabela da Farma usando o ctc_corresp
-                    ctc_farma = Sessao.query(CtcEspFarma).filter(
-                        CtcEspFarma.filialctc == str(ctc_corresp).strip()
-                    ).first()
+                    ctc_farma = CtcService._buscar_ctc_farma(Sessao, ctc_corresp)
                     
                     if ctc_farma:
-                        # Temos uma subcontratação! Substituímos os dados no dict principal
-                        # Usando 'respons_nome' e 'respons_cgc' da Farma como você pediu
-                        cliente_real_nome = safe_val(getattr(ctc_farma, 'respons_nome'))
-                        cliente_real_cgc = safe_val(getattr(ctc_farma, 'respons_cgc'))
-                        
-                        # Sobrescreve as variáveis do remetente/responsável no dicionário final
-                        dados_completos['remet_nome'] = cliente_real_nome
-                        dados_completos['remet_cgc'] = cliente_real_cgc
-                        dados_completos['respons_nome'] = cliente_real_nome
-                        dados_completos['respons_cgc'] = cliente_real_cgc
-                        
-                        # Opcional: Criar uma flag para o Front-end saber que foi subcontratado
-                        dados_completos['is_subcontratacao_farma'] = True
+                        CtcService._sobrepor_dados_cadastro_farma(dados_completos, ctc_farma, safe_val)
             else:
                 dados_completos['StatusCTC'] = 'N/A'
                 dados_completos['TipoCarga'] = 'N/A'
 
-            # ---------------------------------------------------------
-            # 3.1. NOVO: Captura as Regras do Cliente e Serviço Contratado
-            # ---------------------------------------------------------
-            cnpj_alvo = getattr(Ctc, 'respons_cgc', None) or getattr(Ctc, 'remet_cgc', None)
             dados_completos['servico_contratado'] = PlanejamentoService.BuscarServicoContratadoCliente(
-                getattr(Ctc, 'respons_cgc', None),
-                getattr(Ctc, 'remet_cgc', None),
-                getattr(Ctc, 'dest_cgc', None)
+                dados_completos.get('respons_cgc'),
+                dados_completos.get('remet_cgc'),
+                dados_completos.get('dest_cgc')
             )
 
             # ---------------------------------------------------------
