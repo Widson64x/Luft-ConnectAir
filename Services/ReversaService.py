@@ -41,11 +41,11 @@ class ReversaService:
                     , c.volumes
                     , c.peso
                     
-                    -- Inversão de Praça para Devolução
-                    , c.dest_UF as UFOrigem
-                    , c.remet_uf as UFDestino
-                    , c.remet_cidade as CidadeDestino
-                    , c.dest_cidade as CidadeOrigem
+                    -- Rota Original (sem inversão para Devolução)
+                    , c.remet_uf as UFOrigem
+                    , c.dest_UF as UFDestino
+                    , c.remet_cidade as CidadeOrigem
+                    , c.dest_cidade as CidadeDestino
                     
                     , ISNULL(cl.TipoCarga, '') AS Tipo_carga
                     
