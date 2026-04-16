@@ -173,7 +173,7 @@ class RouteIntelligenceService:
                 else:
                     ChegadaAnt = datetime.combine(VoosEscolhidos[-1].DataPartida, VoosEscolhidos[-1].HorarioChegada)
                     if VoosEscolhidos[-1].HorarioChegada < VoosEscolhidos[-1].HorarioSaida: ChegadaAnt += timedelta(days=1)
-                    if SaidaVoo >= ChegadaAnt + timedelta(hours=1) and SaidaVoo <= ChegadaAnt + timedelta(hours=48): VooViavel = Voo; break
+                    if SaidaVoo >= ChegadaAnt + timedelta(hours=6) and SaidaVoo <= ChegadaAnt + timedelta(hours=12): VooViavel = Voo; break
             
             if VooViavel:
                 VoosEscolhidos.append(VooViavel)
