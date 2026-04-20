@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey
 from datetime import datetime
 from Models.SQL_SERVER.Base import Base
+from Models.SQL_SERVER.Permissoes import Tb_Sistema
 
 class VersaoSistema(Base):
     __tablename__ = 'Tb_VersaoSistema'
