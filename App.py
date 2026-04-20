@@ -1,6 +1,9 @@
-from flask import Flask, render_template, redirect, url_for
+from datetime import datetime, timedelta, timezone
+
+from flask import Flask, redirect, render_template, request, session, url_for
 from flask_login import LoginManager, login_required, current_user
 import os 
+from sqlalchemy import text
 from werkzeug.middleware.proxy_fix import ProxyFix
 from luftcore.extensions.flask_extension import LuftCorePackages, LuftUser
 
@@ -40,6 +43,8 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 # Chave secreta para sessões, criptografia ou outras operações sensíveis.
 app.secret_key = ConfiguracaoAtual.APP_SECRET_KEY # Trocar por algo seguro depois
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=ConfiguracaoAtual.SESSAO_TIMEOUT_MINUTOS)
+app.config['SESSION_REFRESH_EACH_REQUEST'] = True
 
 LogService.Inicializar()
 LogService.Info("App", f"Iniciando aplicação no ambiente: {os.getenv('AMBIENTE_APP', 'DEV')}")
@@ -53,10 +58,32 @@ GerenciadorLogin.login_view = 'Auth.login' # Nome da rota para redirecionar quem
 def InjetarDadosGlobais():
     """Disponibiliza a versão para todos os templates HTML"""
     versao_info = VersaoService.ObterVersaoAtual()
-    return dict(SistemaVersao=versao_info)
+    return dict(
+        SistemaVersao=versao_info,
+        SessaoTimeoutMinutos=ConfiguracaoAtual.SESSAO_TIMEOUT_MINUTOS,
+        SessaoKeepaliveSegundos=ConfiguracaoAtual.SESSAO_KEEPALIVE_SEGUNDOS,
+    )
+
+
+def _AtualizarMarcadorSessao():
+    session.permanent = True
+    session['sessao_ultima_atividade_utc'] = datetime.now(timezone.utc).isoformat()
+
+
+@app.before_request
+def RenovarContextoSessao():
+    if request.endpoint == 'static':
+        return
+
+    if session.get('_user_id') or session.get('usuario_autenticado'):
+        _AtualizarMarcadorSessao()
 
 @GerenciadorLogin.user_loader
 def CarregarUsuario(UserId):
+    UsuarioSessao = UsuarioSistema.DeSessao(session.get('usuario_autenticado'))
+    if UsuarioSessao and UsuarioSessao.get_id() == UserId:
+        return UsuarioSessao
+
     Sessao = ObterSessaoSqlServer()
     UsuarioEncontrado = None
 
@@ -65,23 +92,38 @@ def CarregarUsuario(UserId):
         # Log de debug para rastrear a persistência da sessão (opcional, bom para dev)
         # LogService.Debug("App.UserLoader", f"Recarregando usuário: {UserId}")
 
-        Resultado = Sessao.query(Usuario, UsuarioGrupo)\
-            .outerjoin(UsuarioGrupo, Usuario.codigo_usuariogrupo == UsuarioGrupo.codigo_usuariogrupo)\
-            .filter(Usuario.Login_Usuario == UserId)\
-            .first()
+        if not Sessao:
+            return None
+
+        Resultado = Sessao.execute(
+            text(
+                """
+                SELECT TOP 1
+                    U.Login_Usuario,
+                    U.Nome_Usuario,
+                    U.Email_Usuario,
+                    U.Codigo_Usuario,
+                    U.codigo_usuariogrupo,
+                    G.Sigla_UsuarioGrupo
+                FROM usuario AS U
+                LEFT JOIN usuariogrupo AS G
+                    ON U.codigo_usuariogrupo = G.codigo_usuariogrupo
+                WHERE U.Login_Usuario = :login
+                """
+            ),
+            {'login': UserId}
+        ).mappings().first()
 
         if Resultado:
-            DadosUsuario, DadosGrupo = Resultado
-            NomeGrupo = DadosGrupo.Sigla_UsuarioGrupo if DadosGrupo else "SEM_GRUPO"
-
             UsuarioEncontrado = UsuarioSistema(
-                Login=DadosUsuario.Login_Usuario,
-                Nome=DadosUsuario.Nome_Usuario,
-                Email=DadosUsuario.Email_Usuario,
-                Grupo=NomeGrupo,
-                IdBanco=DadosUsuario.Codigo_Usuario,
-                Id_Grupo_Banco = DadosUsuario.codigo_usuariogrupo
+                Login=Resultado['Login_Usuario'],
+                Nome=Resultado['Nome_Usuario'],
+                Email=Resultado['Email_Usuario'],
+                Grupo=Resultado['Sigla_UsuarioGrupo'] or 'SEM_GRUPO',
+                IdBanco=Resultado['Codigo_Usuario'],
+                Id_Grupo_Banco=Resultado['codigo_usuariogrupo']
             )
+            session['usuario_autenticado'] = UsuarioEncontrado.ParaSessao()
             
     except Exception as Erro:
         # AQUI O LOG É CRÍTICO

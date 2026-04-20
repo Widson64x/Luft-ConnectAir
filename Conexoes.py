@@ -16,7 +16,8 @@ def ObterEngineSqlServer():
     try:
         Engine = create_engine(
             URL_BANCO_SQL, 
-            poolclass=NullPool, 
+            poolclass=NullPool, # Desativa pooling para evitar conexões travadas no SQL Server legado 
+            pool_pre_ping=True, # Verifica se a conexão tá ativa antes de usar, evitando erros de timeout
             # echo=ConfiguracaoAtual.MOSTRAR_LOGS_DB
             echo=False
         )

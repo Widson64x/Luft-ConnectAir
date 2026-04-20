@@ -119,6 +119,12 @@
 {% endblock %}
 
 {% block extra_scripts %}
+    <script id="luft-session-config" type="application/json">{{ {
+        'timeoutMinutos': SessaoTimeoutMinutos,
+        'keepaliveIntervaloSegundos': SessaoKeepaliveSegundos,
+        'keepaliveUrl': url_for('Auth.keepalive'),
+        'logoutUrl': url_for('Auth.logout', motivo='inatividade')
+    } | tojson }}</script>
     <script src="{{ url_for('static', filename='JS/Base.js') }}"></script>
     {% block extra_js %}{% endblock %}
 {% endblock %}

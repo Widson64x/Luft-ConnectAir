@@ -17,6 +17,35 @@ class UsuarioSistema(UserMixin):
         # Cache simples para não consultar o banco 50x na mesma requisição
         self._cache_permissoes = {} 
 
+    def ParaSessao(self):
+        return {
+            'Login': self.Login,
+            'Nome': self.Nome,
+            'Email': self.Email,
+            'Grupo': self.Grupo,
+            'IdBanco': self.IdBanco,
+            'Id_Grupo_Banco': self.Id_Grupo_Banco,
+        }
+
+    @classmethod
+    def DeSessao(cls, DadosSessao):
+        if not DadosSessao:
+            return None
+
+        login = DadosSessao.get('Login')
+        nome = DadosSessao.get('Nome')
+        if not login or not nome:
+            return None
+
+        return cls(
+            Login=login,
+            Nome=nome,
+            Email=DadosSessao.get('Email'),
+            Grupo=DadosSessao.get('Grupo'),
+            IdBanco=DadosSessao.get('IdBanco'),
+            Id_Grupo_Banco=DadosSessao.get('Id_Grupo_Banco')
+        )
+
     def TemPermissao(self, ChavePermissao):
         """
         Verifica se o usuário possui a permissão solicitada.

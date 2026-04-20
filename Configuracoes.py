@@ -46,6 +46,10 @@ class ConfiguracaoBase:
 
     HOST = os.getenv("HOST", "127.0.0.1")
     PORT = int(os.getenv("PORT", "5000"))
+    SESSAO_TIMEOUT_MINUTOS = int(os.getenv("SESSION_TIMEOUT_MINUTES", "30"))
+    SESSAO_KEEPALIVE_SEGUNDOS = int(os.getenv("SESSION_KEEPALIVE_INTERVAL_SECONDS", "240"))
+    SQL_CONNECT_RETRY_COUNT = int(os.getenv("SQL_CONNECT_RETRY_COUNT", "3"))
+    SQL_CONNECT_RETRY_INTERVAL = int(os.getenv("SQL_CONNECT_RETRY_INTERVAL", "5"))
 
     # --- Lógica de Segurança da SECRET_KEY ---
     _chave_env = os.getenv("APP_SECRET_KEY")
@@ -63,16 +67,23 @@ class ConfiguracaoBase:
         """
         Gera a string de conexão para o SQL Server.
         """
+        parametros_conexao = (
+            f"driver=ODBC+Driver+17+for+SQL+Server"
+            f"&ConnectRetryCount={self.SQL_CONNECT_RETRY_COUNT}"
+            f"&ConnectRetryInterval={self.SQL_CONNECT_RETRY_INTERVAL}"
+            f"&TrustServerCertificate=yes"
+        )
+
         if not self.SQL_PASS:
             return (
                 f"mssql+pyodbc://{self.SQL_HOST}:{self.SQL_PORT}/{self.SQL_DB}"
-                "?driver=ODBC+Driver+17+for+SQL+Server&Trusted_Connection=yes"
+                f"?{parametros_conexao}&Trusted_Connection=yes"
             )
         
         SenhaCodificada = urllib.parse.quote_plus(self.SQL_PASS)
         return (
             f"mssql+pyodbc://{self.SQL_USER}:{SenhaCodificada}@{self.SQL_HOST}:{self.SQL_PORT}/{self.SQL_DB}"
-            "?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes"
+            f"?{parametros_conexao}"
         )
 
     def ObterUrlPostgres(self):
