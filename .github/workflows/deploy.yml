@@ -84,6 +84,7 @@ jobs:
             if (Test-Path "VERSION") {
               $VersionNum = Get-Content "VERSION" -Raw
               $VersionNum = $VersionNum.Trim() # Remove espaços extras
+              $VersionType = "Beta"
               $SistemaId = $env:SISTEMA_ID
             
               # Limpa aspas e quebras de linha da mensagem de commit para não quebrar o comando CMD
@@ -92,7 +93,7 @@ jobs:
               $Hash = $env:COMMIT_HASH
             
               # Roda o script Python usando a venv
-              cmd /c ".\.venv\Scripts\python.exe Scripts/GestaoVersao.py --sistema-id `"$SistemaId`" nova --numero `"$VersionNum`" --estagio `"Alpha`" --msg `"$CleanMsg`" --dev `"$Author`" --hash `"$Hash`""
+              cmd /c ".\.venv\Scripts\python.exe Scripts/GestaoVersao.py --sistema-id `"$SistemaId`" nova --numero `"$VersionNum`" --estagio `"$VersionType`" --msg `"$CleanMsg`" --dev `"$Author`" --hash `"$Hash`""
               if ($LASTEXITCODE -ne 0) {
                 Write-Error "ERRO FATAL: Falha ao registrar/atualizar a versão $VersionNum do sistema $SistemaId. Código: $LASTEXITCODE"
                 Stop-Transcript; exit $LASTEXITCODE
