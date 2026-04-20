@@ -3,6 +3,11 @@ name: Promover Estágio da Versão (Manual)
 on:
   workflow_dispatch:
     inputs:
+      sistema_id:
+        description: 'Id do sistema na Tb_Sistema'
+        required: true
+        default: '1'
+        type: string
       novo_estagio:
         description: 'Novo estágio da versão'
         required: true
@@ -23,13 +28,26 @@ jobs:
       shell: powershell
       run: |
         $AppPath = "C:\ProjetosPython\Luft-ConnectAir"
+        $SistemaId = "${{ inputs.sistema_id }}"
         $Estagio = "${{ inputs.novo_estagio }}"
         
         Write-Host "Iniciando promoção para $Estagio..."
         
         Set-Location $AppPath
+
+        if (-not (Test-Path "VERSION")) {
+          Write-Error "Arquivo VERSION não encontrado em $AppPath."
+          exit 1
+        }
+
+        $VersionNum = Get-Content "VERSION" -Raw
+        $VersionNum = $VersionNum.Trim()
         
         # Chama o Python direto da pasta do projeto já implantado
-        cmd /c ".\.venv\Scripts\python.exe Scripts/GestaoVersao.py promover --estagio `"$Estagio`""
+        cmd /c ".\.venv\Scripts\python.exe Scripts/GestaoVersao.py promover --sistema-id `"$SistemaId`" --numero `"$VersionNum`" --estagio `"$Estagio`""
+        if ($LASTEXITCODE -ne 0) {
+          Write-Error "Falha ao promover a versão $VersionNum do sistema $SistemaId. Código: $LASTEXITCODE"
+          exit $LASTEXITCODE
+        }
         
-        Write-Host "Promoção concluída!"
+        Write-Host "Promoção concluída para a versão $VersionNum do sistema $SistemaId."

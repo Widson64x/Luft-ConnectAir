@@ -19,6 +19,7 @@ jobs:
         COMMIT_MSG: ${{ github.event.head_commit.message }}
         COMMIT_AUTHOR: ${{ github.actor }}
         COMMIT_HASH: ${{ github.sha }}
+        SISTEMA_ID: "1"
         PYTHONUTF8: "1"            # Força o Python a usar UTF-8
         PYTHONIOENCODING: "utf-8"  # Garante a saída do console em UTF-8
       run: |
@@ -83,6 +84,7 @@ jobs:
             if (Test-Path "VERSION") {
               $VersionNum = Get-Content "VERSION" -Raw
               $VersionNum = $VersionNum.Trim() # Remove espaços extras
+              $SistemaId = $env:SISTEMA_ID
             
               # Limpa aspas e quebras de linha da mensagem de commit para não quebrar o comando CMD
               $CleanMsg = $env:COMMIT_MSG -replace '"', '' -replace '[\r\n]+', ' | '
@@ -90,10 +92,13 @@ jobs:
               $Hash = $env:COMMIT_HASH
             
               # Roda o script Python usando a venv
-              cmd /c ".\.venv\Scripts\python.exe Scripts/GestaoVersao.py nova --numero `"$VersionNum`" --estagio `"Alpha`" --msg `"$CleanMsg`" --dev `"$Author`" --hash `"$Hash`""
-              Write-Error "A sua versão $VersionNum do usuário $Author com a mensagem '$CleanMsg' e hash $Hash foi registrada no banco de dados."
+              cmd /c ".\.venv\Scripts\python.exe Scripts/GestaoVersao.py nova --sistema-id `"$SistemaId`" --numero `"$VersionNum`" --estagio `"Alpha`" --msg `"$CleanMsg`" --dev `"$Author`" --hash `"$Hash`""
+              if ($LASTEXITCODE -ne 0) {
+                Write-Error "ERRO FATAL: Falha ao registrar/atualizar a versão $VersionNum do sistema $SistemaId. Código: $LASTEXITCODE"
+                Stop-Transcript; exit $LASTEXITCODE
+              }
         
-              Write-Host "Versão $VersionNum registrada."
+              Write-Host "Versão $VersionNum sincronizada no banco para o sistema $SistemaId."
             } else {
               Write-Warning "Arquivo VERSION não encontrado. Pulei o registro de versão."
             }

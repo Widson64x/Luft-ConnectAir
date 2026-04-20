@@ -14,7 +14,7 @@ def Executar():
     subparsers = parser.add_subparsers(dest='comando', help='Comandos disponíveis')
 
     # Comando: Nova Versão (Usado no Merge)
-    parser_nova = subparsers.add_parser('nova', help='Registra uma nova versão')
+    parser_nova = subparsers.add_parser('nova', help='Registra ou atualiza uma versão')
     parser_nova.add_argument('--numero', required=True, help='Número da versão (ex: 1.0.0)')
     parser_nova.add_argument('--estagio', default='Alpha', help='Estágio inicial (ex: Alpha)')
     parser_nova.add_argument('--msg', default='Atualização automática', help='Notas da versão')
@@ -24,6 +24,7 @@ def Executar():
     # Comando: Promover (Usado pelo Dev)
     parser_promover = subparsers.add_parser('promover', help='Promove o estágio da versão atual')
     parser_promover.add_argument('--estagio', required=True, help='Novo estágio (ex: Beta, Stable)')
+    parser_promover.add_argument('--numero', default=None, help='Número da versão a promover. Se omitido, usa a versão atual do sistema.')
 
     # Comando: Atual (Visualizar)
     parser_atual = subparsers.add_parser('atual', help='Exibe a versão atual')
@@ -41,7 +42,7 @@ def Executar():
         )
     
     elif args.comando == 'promover':
-        VersaoService.PromoverEstagio(args.estagio, id_sistema=args.sistema_id)
+        VersaoService.PromoverEstagio(args.estagio, id_sistema=args.sistema_id, numero_versao=args.numero)
         
     elif args.comando == 'atual':
         dados = VersaoService.ObterVersaoAtual(id_sistema=args.sistema_id)
