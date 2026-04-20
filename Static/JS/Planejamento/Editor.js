@@ -10,6 +10,7 @@ class GerenciadorEditor {
         
         this.estadoAtual = {
             estrategia: 'recomendada',
+            motorEscolha: 'GRAFO',
             rotaSelecionada: null,
             servicosEscolhidos: {}
         };
@@ -230,6 +231,31 @@ class GerenciadorEditor {
         document.getElementById('btn-recalcular').classList.remove('hidden');
     }
 
+    possuiCoordenadaValida(local) {
+        if (!local || typeof local !== 'object') return false;
+
+        const lat = Number(local.lat);
+        const lon = Number(local.lon);
+        return Number.isFinite(lat) && Number.isFinite(lon) && (lat !== 0 || lon !== 0);
+    }
+
+    obterPontoComFallback(local, fallback = null) {
+        if (this.possuiCoordenadaValida(local)) {
+            return { ...local, lat: Number(local.lat), lon: Number(local.lon) };
+        }
+
+        if (this.possuiCoordenadaValida(fallback)) {
+            return {
+                ...fallback,
+                iata: local && local.iata ? local.iata : fallback.iata,
+                lat: Number(fallback.lat),
+                lon: Number(fallback.lon)
+            };
+        }
+
+        return null;
+    }
+
     enriquecerRotaSalva(rota) {
         const cacheAeroportos = {};
         
@@ -240,27 +266,73 @@ class GerenciadorEditor {
             });
         });
 
-        rota.forEach(trecho => {
-            if (typeof trecho.origem === 'object' && cacheAeroportos[trecho.origem.iata]) {
-                trecho.origem = cacheAeroportos[trecho.origem.iata];
-            } else if (trecho === rota[0]) {
-                 trecho.origem = { iata: trecho.origem.iata, lat: dadosEditor.origemCoords.lat, lon: dadosEditor.origemCoords.lon };
+        rota.forEach((trecho, indice) => {
+            const fallbackOrigem = indice === 0
+                ? { iata: trecho.origem?.iata, lat: dadosEditor.origemCoords.lat, lon: dadosEditor.origemCoords.lon }
+                : null;
+            const fallbackDestino = indice === rota.length - 1
+                ? { iata: trecho.destino?.iata, lat: dadosEditor.destinoCoords.lat, lon: dadosEditor.destinoCoords.lon }
+                : null;
+
+            const origemCache = typeof trecho.origem === 'object' ? cacheAeroportos[trecho.origem.iata] : null;
+            const destinoCache = typeof trecho.destino === 'object' ? cacheAeroportos[trecho.destino.iata] : null;
+
+            const origemFinal = this.obterPontoComFallback(
+                this.possuiCoordenadaValida(origemCache) ? origemCache : trecho.origem,
+                fallbackOrigem
+            );
+            if (origemFinal) {
+                trecho.origem = origemFinal;
             }
 
-            if (typeof trecho.destino === 'object' && cacheAeroportos[trecho.destino.iata]) {
-                trecho.destino = cacheAeroportos[trecho.destino.iata];
-            } else if (trecho === rota[rota.length-1]) {
-                 trecho.destino = { iata: trecho.destino.iata, lat: dadosEditor.destinoCoords.lat, lon: dadosEditor.destinoCoords.lon };
+            const destinoFinal = this.obterPontoComFallback(
+                this.possuiCoordenadaValida(destinoCache) ? destinoCache : trecho.destino,
+                fallbackDestino
+            );
+            if (destinoFinal) {
+                trecho.destino = destinoFinal;
             }
         });
     }
 
-    ativarModoEdicao() {
+    async ativarModoEdicao() {
         if(!confirm('Deseja descartar a visualização atual e calcular novas rotas?')) return;
+
+        const botao = document.getElementById('btn-recalcular');
+        const textoOriginal = botao.innerHTML;
+        botao.disabled = true;
+        botao.innerHTML = '<i class="ph-bold ph-spinner ph-spin"></i> Calculando...';
+
+        try {
+            const resposta = await fetch(rotasEditor.opcoesRotas, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    filial: dadosEditor.ctc.filial,
+                    serie: dadosEditor.ctc.serie,
+                    ctc: dadosEditor.ctc.ctc,
+                    servicos_escolhidos: this.estadoAtual.servicosEscolhidos
+                })
+            });
+            const dados = await resposta.json();
+
+            if (!resposta.ok || !dados.sucesso) {
+                throw new Error(dados.msg || 'Falha ao calcular as rotas.');
+            }
+
+            dadosEditor.opcoesRotas = dados.opcoes_rotas || {};
+            if (dados.ctc) dadosEditor.ctc = dados.ctc;
+
+        } catch (erro) {
+            console.error(erro);
+            alert(erro.message || 'Erro ao calcular as rotas.');
+            botao.disabled = false;
+            botao.innerHTML = textoOriginal;
+            return;
+        }
 
         document.getElementById('aviso-modo-visualizacao').classList.add('hidden');
         document.getElementById('container-estrategias').style.display = 'grid'; 
-        
         document.getElementById('btn-confirmar').style.display = 'inline-flex'; 
         document.getElementById('btn-recalcular').classList.add('hidden');
         document.getElementById('btn-cancelar-plan').classList.add('hidden');
@@ -324,6 +396,7 @@ class GerenciadorEditor {
         if(botaoAtivo) botaoAtivo.classList.add('active');
 
         const rotas = dadosEditor.opcoesRotas[tipoEstrategia];
+        this.estadoAtual.motorEscolha = (rotas && rotas.length > 0 && rotas[0].ml_ativo) ? 'ML' : 'GRAFO';
         this.estadoAtual.rotaSelecionada = rotas;
 
         if (rotas && rotas.length > 0) {
@@ -377,8 +450,18 @@ class GerenciadorEditor {
         const todasCoordenadas = [];
         const cidadeOrigem = [dadosEditor.origemCoords.lat, dadosEditor.origemCoords.lon];
         const cidadeDestino = [dadosEditor.destinoCoords.lat, dadosEditor.destinoCoords.lon];
-        const aeroOrigem = [listaTrechos[0].origem.lat, listaTrechos[0].origem.lon];
-        const aeroDestino = [listaTrechos[listaTrechos.length-1].destino.lat, listaTrechos[listaTrechos.length-1].destino.lon];
+        const primeiroAeroporto = this.obterPontoComFallback(listaTrechos[0].origem, {
+            iata: listaTrechos[0].origem?.iata,
+            lat: dadosEditor.origemCoords.lat,
+            lon: dadosEditor.origemCoords.lon
+        });
+        const ultimoAeroporto = this.obterPontoComFallback(listaTrechos[listaTrechos.length - 1].destino, {
+            iata: listaTrechos[listaTrechos.length - 1].destino?.iata,
+            lat: dadosEditor.destinoCoords.lat,
+            lon: dadosEditor.destinoCoords.lon
+        });
+        const aeroOrigem = primeiroAeroporto ? [primeiroAeroporto.lat, primeiroAeroporto.lon] : cidadeOrigem;
+        const aeroDestino = ultimoAeroporto ? [ultimoAeroporto.lat, ultimoAeroporto.lon] : cidadeDestino;
 
         // Trecho Coleta
         L.polyline([cidadeOrigem, aeroOrigem], {
@@ -397,8 +480,26 @@ class GerenciadorEditor {
 
         // Trechos Aéreos
         listaTrechos.forEach((trecho, indice) => {
-            const origem = [trecho.origem.lat, trecho.origem.lon];
-            const destino = [trecho.destino.lat, trecho.destino.lon];
+            const origemPonto = this.obterPontoComFallback(
+                trecho.origem,
+                indice === 0
+                    ? { iata: trecho.origem?.iata, lat: dadosEditor.origemCoords.lat, lon: dadosEditor.origemCoords.lon }
+                    : null
+            );
+            const destinoPonto = this.obterPontoComFallback(
+                trecho.destino,
+                indice === listaTrechos.length - 1
+                    ? { iata: trecho.destino?.iata, lat: dadosEditor.destinoCoords.lat, lon: dadosEditor.destinoCoords.lon }
+                    : null
+            );
+
+            if (!origemPonto || !destinoPonto) {
+                console.warn('Coordenadas inválidas para o trecho do planejamento:', trecho);
+                return;
+            }
+
+            const origem = [origemPonto.lat, origemPonto.lon];
+            const destino = [destinoPonto.lat, destinoPonto.lon];
             const ciaInfo = this.obterConfiguracaoCia(trecho.cia);
 
             const baseCalculo = trecho.base_calculo || {};
@@ -413,17 +514,17 @@ class GerenciadorEditor {
 
             if (indice === 0) {
                 L.circleMarker(origem, { color: ciaInfo.cor, radius: 5, fillOpacity: 1, fillColor: '#fff' })
-                 .addTo(this.camadaRotas).bindTooltip(`<b style="font-family: monospace;">${trecho.origem.iata}</b>`, {permanent: true, direction: 'top'});
+                 .addTo(this.camadaRotas).bindTooltip(`<b style="font-family: monospace;">${origemPonto.iata}</b>`, {permanent: true, direction: 'top'});
             }
             L.circleMarker(destino, { color: ciaInfo.cor, radius: 5, fillOpacity: 1, fillColor: '#fff' })
-             .addTo(this.camadaRotas).bindTooltip(`<b style="font-family: monospace;">${trecho.destino.iata}</b>`, {permanent: true, direction: 'top'});
+             .addTo(this.camadaRotas).bindTooltip(`<b style="font-family: monospace;">${destinoPonto.iata}</b>`, {permanent: true, direction: 'top'});
             
             todasCoordenadas.push(origem);
             todasCoordenadas.push(destino);
 
-            const meioLat = (trecho.origem.lat + trecho.destino.lat) / 2;
-            const meioLon = (trecho.origem.lon + trecho.destino.lon) / 2;
-            const angulo = this.calcularDirecaoVoo(trecho.origem.lat, trecho.origem.lon, trecho.destino.lat, trecho.destino.lon);
+            const meioLat = (origemPonto.lat + destinoPonto.lat) / 2;
+            const meioLon = (origemPonto.lon + destinoPonto.lon) / 2;
+            const angulo = this.calcularDirecaoVoo(origemPonto.lat, origemPonto.lon, destinoPonto.lat, destinoPonto.lon);
 
             const iconeAviao = L.divIcon({
                 className: '',
@@ -447,12 +548,12 @@ class GerenciadorEditor {
                     
                     <div style="display: flex; align-items: center; justify-content: space-between; background: #f8fafc; padding: 10px; border-radius: 8px; margin-bottom: 12px; border: 1px solid #e2e8f0;">
                         <div style="text-align: center;">
-                            <div style="font-weight: 900; color: #0f172a; font-size: 1.1rem;">${trecho.origem.iata}</div>
+                            <div style="font-weight: 900; color: #0f172a; font-size: 1.1rem;">${origemPonto.iata}</div>
                             <div style="font-size: 0.7rem; color: #64748b; font-weight: 700;">${trecho.horario_saida}</div>
                         </div>
                         <i class="ph-fill ph-airplane" style="color: #cbd5e1; font-size: 1.2rem;"></i>
                         <div style="text-align: center;">
-                            <div style="font-weight: 900; color: #0f172a; font-size: 1.1rem;">${trecho.destino.iata}</div>
+                            <div style="font-weight: 900; color: #0f172a; font-size: 1.1rem;">${destinoPonto.iata}</div>
                             <div style="font-size: 0.7rem; color: #64748b; font-weight: 700;">${trecho.horario_chegada}</div>
                         </div>
                     </div>
@@ -528,6 +629,12 @@ class GerenciadorEditor {
         let html = '<div style="padding: 16px;">';
         listaTrechos.forEach((trecho, indice) => {
             const ciaInfo = this.obterConfiguracaoCia(trecho.cia);
+            const origemPonto = this.obterPontoComFallback(
+                trecho.origem,
+                indice === 0
+                    ? { iata: trecho.origem?.iata, lat: dadosEditor.origemCoords.lat, lon: dadosEditor.origemCoords.lon }
+                    : null
+            );
             
             const baseCalculo = trecho.base_calculo || {};
             const idFrete = baseCalculo.id_frete || 'N/A';
@@ -540,7 +647,7 @@ class GerenciadorEditor {
             }
 
             html += `
-                <div class="luft-card p-3 mb-2 hover-lift" onclick="focarNoMapa(${trecho.origem.lat}, ${trecho.origem.lon})" style="cursor: pointer; border-left: 4px solid ${ciaInfo.cor}">
+                <div class="luft-card p-3 mb-2 hover-lift" onclick="focarNoMapa(${origemPonto ? origemPonto.lat : dadosEditor.origemCoords.lat}, ${origemPonto ? origemPonto.lon : dadosEditor.origemCoords.lon})" style="cursor: pointer; border-left: 4px solid ${ciaInfo.cor}">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div class="d-flex align-items-center gap-2">
                              <div class="d-flex align-items-center justify-content-center bg-app rounded border" style="width: 32px; height: 32px;">
@@ -652,6 +759,7 @@ class GerenciadorEditor {
             ctc: dadosEditor.ctc.ctc,
             rota_completa: rotaFormatada,
             estrategia: this.estadoAtual.estrategia,
+            motor_escolha: this.estadoAtual.motorEscolha,
             servicos_escolhidos: this.estadoAtual.servicosEscolhidos
         };
 

@@ -37,7 +37,11 @@ class GerenciadorRanking {
                 const aeroportosUf = dadosRanking[uf].map(aeroporto => ({...aeroporto, ufOrigem: uf}));
                 todos = [...todos, ...aeroportosUf];
             });
-            todos.sort((a, b) => b.importancia - a.importancia);
+            todos.sort((a, b) => {
+                const efA = (a.importancia || 0) > 0 ? (a.importancia || 0) : (a.importancia_uso || 0);
+                const efB = (b.importancia || 0) > 0 ? (b.importancia || 0) : (b.importancia_uso || 0);
+                return efB - efA;
+            });
             this.cacheGlobal = todos;
         }
 
@@ -147,40 +151,71 @@ class GerenciadorRanking {
     }
 
     construirCardHTML(aeroporto) {
-        const corEstilo = this.obterCorEstilo(aeroporto.importancia);
-        const corBorda = this.obterCorBorda(aeroporto.importancia);
-        const corFundoClaro = this.obterCorFundoClaro(aeroporto.importancia);
-        
+        const importanciaManual = aeroporto.importancia ?? 0;
+        const importanciaUso    = aeroporto.importancia_uso ?? 0;
+        const efetivo = importanciaManual > 0 ? importanciaManual : importanciaUso;
+
+        const corEstilo     = this.obterCorEstilo(efetivo);
+        const corBorda      = this.obterCorBorda(efetivo);
+        const corFundoClaro = this.obterCorFundoClaro(efetivo);
+
         const mostrarUf = this.estadoAtual.modo === 'GLOBAL' || aeroporto.ufOrigem;
-        const htmlUf = mostrarUf ? `<span class="luft-badge luft-badge-secondary font-black">${aeroporto.ufOrigem || ''}</span>` : '';
+        const htmlUf    = mostrarUf ? `<span class="luft-badge luft-badge-secondary font-black">${aeroporto.ufOrigem || ''}</span>` : '';
+
+        let corBadgeEfetivo, textoBadgeEfetivo;
+        if (importanciaManual > 0) {
+            textoBadgeEfetivo = 'Manual';
+            corBadgeEfetivo   = 'background:rgba(34,197,94,0.15);color:var(--luft-success);';
+        } else if (importanciaUso > 0) {
+            textoBadgeEfetivo = 'Por Uso';
+            corBadgeEfetivo   = 'background:rgba(59,130,246,0.15);color:var(--luft-primary-600);';
+        } else {
+            textoBadgeEfetivo = 'Sem Dados';
+            corBadgeEfetivo   = 'background:var(--luft-border);color:var(--luft-text-muted);';
+        }
 
         return `
             <div class="luft-card p-4 hover-lift" id="card-${aeroporto.id_aeroporto}" style="border-top: 4px solid ${corEstilo};">
-                <div class="d-flex justify-content-between align-items-start mb-3">
+                <div class="d-flex justify-content-between align-items-start mb-2">
                     <div class="font-black text-main text-2xl" style="font-family: monospace; letter-spacing: 1px;">${aeroporto.iata || '---'}</div>
-                    ${htmlUf}
+                    <div class="d-flex gap-2 align-items-center">
+                        <span id="badge-efetivo-${aeroporto.id_aeroporto}" class="text-xs font-bold px-2 py-1 rounded" style="${corBadgeEfetivo}">${textoBadgeEfetivo}</span>
+                        ${htmlUf}
+                    </div>
                 </div>
-                
-                <div class="mb-4">
-                    <h3 class="font-bold text-main m-0 mb-1 text-md" title="${aeroporto.nome}" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${aeroporto.nome}</h3>
+
+                <div class="mb-3">
+                    <h3 class="font-bold text-main m-0 mb-1 text-md" title="${aeroporto.nome}" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${aeroporto.nome}</h3>
                     <p class="text-xs text-muted font-medium d-flex align-items-center gap-1">
                         <i class="ph-fill ph-map-pin"></i> ${aeroporto.regiao || 'Região Desconhecida'}
                     </p>
                 </div>
-                
-                <div class="bg-app p-3 rounded border" style="border-color: var(--luft-border);">
+
+                <div class="bg-app p-3 rounded border mb-2" style="border-color:var(--luft-border);">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="text-xs font-bold text-muted text-uppercase">Importância</span>
-                        <span class="font-black" id="badge-${aeroporto.id_aeroporto}" style="color: ${corEstilo}; font-size: 1.1rem;">
-                            ${aeroporto.importancia}%
+                        <span class="text-xs font-bold text-muted text-uppercase d-flex align-items-center gap-1">
+                            <i class="ph-bold ph-pencil-simple"></i> Manual
                         </span>
+                        <span class="font-black" id="badge-${aeroporto.id_aeroporto}" style="color:${importanciaManual > 0 ? corEstilo : 'var(--luft-text-muted)'};font-size:1.1rem;">${importanciaManual}%</span>
                     </div>
-                    <div class="luft-range-wrapper" style="background: ${corFundoClaro}; border: 1px solid ${corBorda};">
-                        <div class="luft-range-fill" id="fill-${aeroporto.id_aeroporto}" style="width: ${aeroporto.importancia}%; background: ${corEstilo};"></div>
-                        <input type="range" min="0" max="100" value="${aeroporto.importancia}" 
-                               class="luft-range-input" 
+                    <div id="manual-wrapper-${aeroporto.id_aeroporto}" class="luft-range-wrapper" style="background:${importanciaManual > 0 ? corFundoClaro : 'var(--luft-border)'};border:1px solid ${importanciaManual > 0 ? corBorda : 'transparent'};">
+                        <div class="luft-range-fill" id="fill-${aeroporto.id_aeroporto}" style="width:${importanciaManual}%;background:${importanciaManual > 0 ? corEstilo : 'var(--luft-text-muted)'};">​</div>
+                        <input type="range" min="0" max="100" value="${importanciaManual}"
+                               class="luft-range-input"
                                oninput="atualizarInput(${aeroporto.id_aeroporto}, this.value, '${aeroporto.ufOrigem}')"
                                data-id="${aeroporto.id_aeroporto}">
+                    </div>
+                </div>
+
+                <div id="uso-section-${aeroporto.id_aeroporto}" class="p-3 rounded border" style="border-color:var(--luft-border);background:var(--luft-bg-app);opacity:${importanciaManual > 0 ? '0.5' : '1'};transition:opacity 0.2s;">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-xs font-bold text-muted text-uppercase d-flex align-items-center gap-1">
+                            <i class="ph-bold ph-chart-bar"></i> Por Uso
+                        </span>
+                        <span class="font-bold" style="font-size:0.9rem;color:${importanciaManual > 0 ? 'var(--luft-text-muted)' : 'var(--luft-primary-500)'};">${importanciaUso}%</span>
+                    </div>
+                    <div class="luft-range-wrapper" style="background:var(--luft-border);border:none;height:6px;">
+                        <div style="position:absolute;top:0;left:0;height:100%;border-radius:4px;width:${importanciaUso}%;background:${importanciaManual > 0 ? 'var(--luft-text-muted)' : 'var(--luft-primary-500)'};transition:width 0.3s;"></div>
                     </div>
                 </div>
             </div>
@@ -194,23 +229,82 @@ class GerenciadorRanking {
 
     atualizarInput(id, valor, ufRef) {
         valor = parseInt(valor);
-        
-        const badge = document.getElementById(`badge-${id}`);
-        const fill = document.getElementById(`fill-${id}`);
-        const card = document.getElementById(`card-${id}`);
-        
-        const cor = this.obterCorEstilo(valor);
-        const corBorda = this.obterCorBorda(valor);
-        const corFundoClaro = this.obterCorFundoClaro(valor);
-        
-        if (badge) { badge.innerText = `${valor}%`; badge.style.color = cor; }
-        if (fill) { fill.style.width = `${valor}%`; fill.style.background = cor; }
-        if (card) { card.style.borderTopColor = cor; }
-
         const ufAlvo = (ufRef && ufRef !== 'undefined') ? ufRef : this.estadoAtual.ufSelecionada;
+
+        // Busca o valor de uso atual no dado
+        let importanciaUso = 0;
+        if (ufAlvo && dadosRanking[ufAlvo]) {
+            const item = dadosRanking[ufAlvo].find(a => a.id_aeroporto === id);
+            if (item) importanciaUso = item.importancia_uso ?? 0;
+        }
+
+        const efetivo    = valor > 0 ? valor : importanciaUso;
+        const cor        = this.obterCorEstilo(efetivo);
+        const corBorda   = this.obterCorBorda(efetivo);
+        const corFundo   = this.obterCorFundoClaro(efetivo);
+
+        const badge         = document.getElementById(`badge-${id}`);
+        const fill          = document.getElementById(`fill-${id}`);
+        const manualWrapper = document.getElementById(`manual-wrapper-${id}`);
+        const usoSection    = document.getElementById(`uso-section-${id}`);
+        const card          = document.getElementById(`card-${id}`);
+        const badgeEfetivo  = document.getElementById(`badge-efetivo-${id}`);
+
+        if (badge) { badge.innerText = `${valor}%`; badge.style.color = valor > 0 ? cor : 'var(--luft-text-muted)'; }
+        if (fill)  { fill.style.width = `${valor}%`; fill.style.background = valor > 0 ? cor : 'var(--luft-text-muted)'; }
+        if (manualWrapper) {
+            manualWrapper.style.background   = valor > 0 ? corFundo : 'var(--luft-border)';
+            manualWrapper.style.borderColor  = valor > 0 ? corBorda  : 'transparent';
+        }
+        if (usoSection) usoSection.style.opacity = valor > 0 ? '0.5' : '1';
+        if (card) card.style.borderTopColor = cor;
+
+        if (badgeEfetivo) {
+            if (valor > 0) {
+                badgeEfetivo.textContent = 'Manual';
+                badgeEfetivo.style.background = 'rgba(34,197,94,0.15)';
+                badgeEfetivo.style.color      = 'var(--luft-success)';
+            } else if (importanciaUso > 0) {
+                badgeEfetivo.textContent = 'Por Uso';
+                badgeEfetivo.style.background = 'rgba(59,130,246,0.15)';
+                badgeEfetivo.style.color      = 'var(--luft-primary-600)';
+            } else {
+                badgeEfetivo.textContent = 'Sem Dados';
+                badgeEfetivo.style.background = 'var(--luft-border)';
+                badgeEfetivo.style.color      = 'var(--luft-text-muted)';
+            }
+        }
+
         if (ufAlvo && dadosRanking[ufAlvo]) {
             const indice = dadosRanking[ufAlvo].findIndex(aeroporto => aeroporto.id_aeroporto === id);
             if (indice >= 0) dadosRanking[ufAlvo][indice].importancia = valor;
+        }
+    }
+
+    async recalcularUso() {
+        const botao = document.getElementById('btn-recalcular-uso');
+        const textoOriginal = botao.innerHTML;
+        botao.innerHTML = `<i class="ph-bold ph-spinner ph-spin text-lg"></i> Calculando...`;
+        botao.disabled = true;
+
+        try {
+            const resp = await fetch(rotasRanking.recalcularUso, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const json = await resp.json();
+            if (json.sucesso) {
+                botao.innerHTML = `<i class="ph-bold ph-check text-lg"></i> ${json.msg}`;
+                setTimeout(() => window.location.reload(), 1800);
+            } else {
+                alert(`Erro: ${json.msg}`);
+                botao.innerHTML = textoOriginal;
+                botao.disabled = false;
+            }
+        } catch (e) {
+            alert('Erro de comunicação.');
+            botao.innerHTML = textoOriginal;
+            botao.disabled = false;
         }
     }
 
@@ -286,4 +380,5 @@ document.addEventListener('DOMContentLoaded', () => {
     window.filtrarGlobal = (termo) => gerenciadorRanking.filtrarGlobal(termo);
     window.atualizarInput = (id, valor, ufRef) => gerenciadorRanking.atualizarInput(id, valor, ufRef);
     window.salvarRankingAtual = () => gerenciadorRanking.salvarRankingAtual();
+    window.recalcularUso = () => gerenciadorRanking.recalcularUso();
 });

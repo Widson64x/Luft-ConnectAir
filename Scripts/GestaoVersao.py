@@ -9,6 +9,7 @@ from Services.VersaoService import VersaoService
 
 def Executar():
     parser = argparse.ArgumentParser(description='Gestão de Versionamento do Luft-ConnectAir')
+    parser.add_argument('--sistema-id', type=int, default=None, help='ID do sistema na Tb_Sistema. Se omitido, usa SISTEMA_ID ou 1.')
     
     subparsers = parser.add_subparsers(dest='comando', help='Comandos disponíveis')
 
@@ -30,14 +31,21 @@ def Executar():
     args = parser.parse_args()
 
     if args.comando == 'nova':
-        VersaoService.RegistrarNovaVersao(args.numero, args.estagio, args.msg, args.dev, hash_commit=args.hash)
+        VersaoService.RegistrarNovaVersao(
+            args.numero,
+            args.estagio,
+            args.msg,
+            args.dev,
+            hash_commit=args.hash,
+            id_sistema=args.sistema_id
+        )
     
     elif args.comando == 'promover':
-        VersaoService.PromoverEstagio(args.estagio)
+        VersaoService.PromoverEstagio(args.estagio, id_sistema=args.sistema_id)
         
     elif args.comando == 'atual':
-        dados = VersaoService.ObterVersaoAtual()
-        print(f"Versão Atual: {dados['NumeroVersao']} - {dados['Estagio']}")
+        dados = VersaoService.ObterVersaoAtual(id_sistema=args.sistema_id)
+        print(f"Versão Atual (Sistema {dados['Id_Sistema']}): {dados['NumeroVersao']} - {dados['Estagio']}")
     
     else:
         parser.print_help()

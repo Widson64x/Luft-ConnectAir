@@ -21,6 +21,8 @@ class PlanejamentoCabecalho(Base):
 
     IdCortePln = Column(Integer, ForeignKey('intec.dbo.Tb_PLN_CortePlanejamento.IdCortePln'), nullable=True)
 
+    MotorEscolha = Column(String(10), default='DEFAULT')  # 'ML' | 'GRAFO' | 'MANUAL' | 'DEFAULT'
+
     TotalVolumes = Column(Integer, default=0)
     TotalPeso = Column(Numeric(10,2), default=0.00)
     TotalValor = Column(Numeric(15,2), default=0.00)
@@ -111,9 +113,8 @@ class RankingAeroportos(Base):
     __table_args__ = {'schema': 'intec.dbo'}
     Id = Column(Integer, primary_key=True, autoincrement=True)
     Uf = Column(String(2), nullable=False)  # A Sigla (SP, RJ, etc.)
-    IdAeroporto = Column(Integer, ForeignKey('intec.dbo.Tb_PLN_Aeroporto.Id'), nullable=False) # Ajuste se o nome real da tabela for diferente
-    IndiceImportancia = Column(Integer, default=0) # 0 a 100
-    
-    # Relacionamentos
-    # Pegar na tabela de Aeroporto para mostrar o nome completo, cidade, etc.
+    IdAeroporto = Column(Integer, ForeignKey('intec.dbo.Tb_PLN_Aeroporto.Id'), nullable=False)
+    IndiceImportancia = Column(Integer, default=0)  # Prioridade Manual (0 a 100)
+    IndiceUso = Column(Integer, default=0)           # Prioridade por Uso — calculada automaticamente dos planejamentos (0 a 100)
+
     Aeroporto = relationship("Aeroporto", backref="rankings")

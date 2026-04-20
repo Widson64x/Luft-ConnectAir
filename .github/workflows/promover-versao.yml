@@ -6,7 +6,7 @@ on:
       novo_estagio:
         description: 'Novo estágio da versão'
         required: true
-        default: 'Alpha'
+        default: 'Beta'
         type: choice
         options:
         - Alpha                # <--- Desenvolvimento inicial
