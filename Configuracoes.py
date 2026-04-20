@@ -39,6 +39,7 @@ class ConfiguracaoBase:
     DIR_UPLOADS = os.path.join(DIR_BASE, "Data", "Uploads")
     DIR_TEMP    = os.path.join(DIR_BASE, "Data", "Temp")
     DIR_LOGS    = os.path.join(DIR_BASE, "Logs")
+    DIR_MODELS  = os.path.join(DIR_BASE, "Data", "ML_Models")
 
     HOST = os.getenv("HOST", "127.0.0.1")
     PORT = int(os.getenv("PORT", "5000"))

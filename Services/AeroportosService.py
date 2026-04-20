@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import math # Importante para verificações numéricas se necessário
 from datetime import datetime, date
-from sqlalchemy import desc
+from sqlalchemy import desc, text
 # AJUSTE 1: Importar a conexão correta (se você renomeou no Conexoes.py, ajuste aqui)
 # Se você manteve o nome da função mas mudou o conteúdo, pode manter. 
 # Recomendado: Usar a conexão do SQL Server explicitamente.
@@ -248,7 +248,7 @@ class AeroportoService:
 
             # 2. Busca Rankings Já Salvos
             Rankings = Sessao.query(RankingAeroportos).all()
-            MapRankings = {f"{r.Uf}-{r.IdAeroporto}": r.IndiceImportancia for r in Rankings}
+            MapRankings = {f"{r.Uf}-{r.IdAeroporto}": (r.IndiceImportancia, r.IndiceUso) for r in Rankings}
 
             DadosAgrupados = {}
 
@@ -265,15 +265,15 @@ class AeroportoService:
 
                 # Verifica se já tem ranking salvo
                 chave = f"{uf_sigla}-{aero.Id}"
-                importancia = MapRankings.get(chave, 0) # Default 0
+                manual, uso = MapRankings.get(chave, (0, 0))
 
                 DadosAgrupados[uf_sigla].append({
                     'id_aeroporto': aero.Id,
                     'iata': aero.CodigoIata,
                     'nome': aero.NomeAeroporto,
-                    # CORREÇÃO AQUI: Usando NomeRegiao e a chave 'regiao'
-                    'regiao': aero.NomeRegiao, 
-                    'importancia': importancia
+                    'regiao': aero.NomeRegiao,
+                    'importancia': manual,
+                    'importancia_uso': uso,
                 })
 
             # Retorna ordenado por UF
@@ -322,6 +322,93 @@ class AeroportoService:
         except Exception as e:
             Sessao.rollback()
             LogService.Error("AeroportosService", f"Erro ao salvar ranking UF {uf}", e)
+            return False, str(e)
+        finally:
+            Sessao.close()
+
+    @staticmethod
+    def RecalcularUsoAeroportos():
+        """
+        Conta quantas vezes cada aeroporto aparece nos PlanejamentoTrecho (origem/destino),
+        normaliza 0-100 por UF e persiste em RankingAeroportos.IndiceUso.
+        Só atualiza IndiceUso — nunca toca em IndiceImportancia (manual).
+        """
+        Sessao = ObterSessao()
+        try:
+            MapaRegiaoUf = {
+                'SAO PAULO': 'SP', 'RIO DE JANEIRO': 'RJ', 'MINAS GERAIS': 'MG',
+                'ESPIRITO SANTO': 'ES', 'PARANA': 'PR', 'SANTA CATARINA': 'SC',
+                'RIO GRANDE DO SUL': 'RS', 'BAHIA': 'BA', 'PERNAMBUCO': 'PE',
+                'CEARA': 'CE', 'DISTRITO FEDERAL': 'DF', 'GOIAS': 'GO',
+                'AMAZONAS': 'AM', 'PARA': 'PA', 'MATO GROSSO': 'MT',
+                'MATO GROSSO DO SUL': 'MS', 'ACRE': 'AC', 'ALAGOAS': 'AL',
+                'AMAPA': 'AP', 'MARANHAO': 'MA', 'PARAIBA': 'PB',
+                'PIAUI': 'PI', 'RIO GRANDE DO NORTE': 'RN', 'RONDONIA': 'RO',
+                'RORAIMA': 'RR', 'SERGIPE': 'SE', 'TOCANTINS': 'TO'
+            }
+
+            # 1. Contar aparições por IATA nos trechos de planejamento
+            sql = text("""
+                SELECT iata, SUM(cnt) AS total FROM (
+                    SELECT AeroportoOrigem AS iata, COUNT(*) AS cnt
+                    FROM intec.dbo.Tb_PLN_PlanejamentoTrecho
+                    WHERE AeroportoOrigem IS NOT NULL AND AeroportoOrigem != ''
+                    GROUP BY AeroportoOrigem
+                    UNION ALL
+                    SELECT AeroportoDestino AS iata, COUNT(*) AS cnt
+                    FROM intec.dbo.Tb_PLN_PlanejamentoTrecho
+                    WHERE AeroportoDestino IS NOT NULL AND AeroportoDestino != ''
+                    GROUP BY AeroportoDestino
+                ) t GROUP BY iata
+            """)
+            contagem_bruta = {row[0]: int(row[1]) for row in Sessao.execute(sql).fetchall()}
+
+            if not contagem_bruta:
+                return True, "Nenhum dado de uso encontrado nos planejamentos."
+
+            # 2. Busca aeroportos brasileiros da remessa ativa
+            Aeroportos = Sessao.query(Aeroporto).join(
+                RemessaAeroportos, Aeroporto.IdRemessa == RemessaAeroportos.Id
+            ).filter(
+                RemessaAeroportos.Ativo == True,
+                Aeroporto.CodigoPais == 'BR'
+            ).all()
+
+            # 3. Agrupa por UF com uso
+            uso_por_uf = {}  # { 'SP': [(id_aero, uso), ...] }
+            for aero in Aeroportos:
+                if not aero.NomeRegiao: continue
+                uf = MapaRegiaoUf.get(str(aero.NomeRegiao).upper().strip())
+                if not uf: continue
+                uso = contagem_bruta.get(aero.CodigoIata, 0)
+                uso_por_uf.setdefault(uf, []).append((aero.Id, uso))
+
+            # 4. Normaliza 0-100 por UF e faz upsert em RankingAeroportos
+            atualizados = 0
+            for uf, lista in uso_por_uf.items():
+                max_uso = max(u for _, u in lista) if lista else 0
+                for id_aero, uso in lista:
+                    indice = round(uso * 100 / max_uso) if max_uso > 0 else 0
+                    Registro = Sessao.query(RankingAeroportos).filter(
+                        RankingAeroportos.Uf == uf,
+                        RankingAeroportos.IdAeroporto == id_aero
+                    ).first()
+                    if Registro:
+                        Registro.IndiceUso = indice
+                    else:
+                        Sessao.add(RankingAeroportos(
+                            Uf=uf, IdAeroporto=id_aero,
+                            IndiceImportancia=0, IndiceUso=indice
+                        ))
+                    atualizados += 1
+
+            Sessao.commit()
+            LogService.Info("AeroportosService", f"RecalcularUso: {atualizados} registros atualizados.")
+            return True, f"{atualizados} aeroportos recalculados com base nos planejamentos."
+
+        except Exception as e:
+            Sessao.rollback()
+            LogService.Error("AeroportosService", "Erro ao recalcular uso de aeroportos.", e)
             return False, str(e)
         finally:
             Sessao.close()

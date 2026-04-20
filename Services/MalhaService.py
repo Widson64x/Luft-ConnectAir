@@ -11,6 +11,7 @@ from Services.TabelaFreteService import TabelaFreteService
 from Services.CiaAereaService import CiaAereaService
 from Services.LogService import LogService
 from Services.Logic.RouteIntelligenceService import RouteIntelligenceService
+from Services.Logic.RouteMLEngine import RouteMLEngine
 from Configuracoes import ConfiguracaoBase
 
 class MalhaService:
@@ -180,7 +181,7 @@ class MalhaService:
     
     # --- MÉTODO PRINCIPAL DE BUSCA ---
     @staticmethod
-    def BuscarOpcoesDeRotas(data_inicio, data_fim, lista_origens, lista_destinos, peso_total=100.0, tipo_carga=None, servico_contratado=None):
+    def BuscarOpcoesDeRotas(data_inicio, data_fim, lista_origens, lista_destinos, peso_total=100.0, tipo_carga=None, servico_contratado=None, ml_context=None):
         """Rota inteligente que busca opções de rotas na malha aérea, calcula métricas, e aplica inteligência para categorização.
 
         Args:
@@ -238,6 +239,18 @@ class MalhaService:
                 servico_contratado=servico_contratado
             )
 
+            # Registro ML: captura features brutas antes da formatação visual
+            if ml_context and any(v for v in OpcoesBrutas.values() if v):
+                RouteMLEngine.RegistrarSessaoAnalise(
+                    opcoes_brutas=OpcoesBrutas,
+                    filial=ml_context.get('filial', ''),
+                    serie=ml_context.get('serie', ''),
+                    ctc=ml_context.get('ctc', ''),
+                    tipo_carga=tipo_carga,
+                    servico_contratado=servico_contratado,
+                    usuario=ml_context.get('usuario', ''),
+                )
+
             # 3. Formatação Visual (Presentation Layer mantida aqui ou no Controller)
             DadosAeroportos = {}
             VoosParaCache = []
@@ -248,7 +261,11 @@ class MalhaService:
 
             def formatar_candidato(candidato, tag):
                 if not candidato: return []
-                return MalhaService._FormatarListaRotas(candidato['rota'], DadosAeroportos, tag, candidato['metricas'], candidato['detalhes_tarifas'])
+                return MalhaService._FormatarListaRotas(
+                    candidato['rota'], DadosAeroportos, tag,
+                    candidato['metricas'], candidato['detalhes_tarifas'],
+                    bonus_ml=candidato.get('_bonus_ml', 0.0),
+                )
 
             ResultadosFormatados['recomendada'] = formatar_candidato(OpcoesBrutas.get('recomendada'), 'Recomendada')
             ResultadosFormatados['direta'] = formatar_candidato(OpcoesBrutas.get('direta'), 'Voo Direto')
@@ -276,7 +293,7 @@ class MalhaService:
                 Cache[a.CodigoIata] = {'nome': a.NomeAeroporto, 'lat': float(a.Latitude or 0), 'lon': float(a.Longitude or 0)}
 
     @staticmethod
-    def _FormatarListaRotas(ListaVoos, Cache, Tipo, Metricas=None, DetalhesTarifas=None):
+    def _FormatarListaRotas(ListaVoos, Cache, Tipo, Metricas=None, DetalhesTarifas=None, bonus_ml: float = 0.0):
         Resultado = []
         InfoAdicional = {}
         if Metricas:
@@ -285,7 +302,14 @@ class MalhaService:
             horas, mins = divmod(resto, 3600); mins //= 60
             duracao_fmt = f"{dias}d {horas:02}:{mins:02}" if dias > 0 else f"{horas:02}:{mins:02}"
             custo_fmt = f"R$ {Metricas['custo']:,.2f}"
-            InfoAdicional = {'total_duracao': duracao_fmt, 'total_custo': custo_fmt, 'total_custo_fmt': custo_fmt, 'total_custo_raw': Metricas['custo']}
+            InfoAdicional = {
+                'total_duracao': duracao_fmt,
+                'total_custo': custo_fmt,
+                'total_custo_fmt': custo_fmt,
+                'total_custo_raw': Metricas['custo'],
+                'ml_ativo': abs(bonus_ml) > 1.0,
+                'ml_bonus': round(bonus_ml, 2),
+            }
         
         for i, Voo in enumerate(ListaVoos):
             Orig = Cache.get(Voo.AeroportoOrigem, {'nome': Voo.AeroportoOrigem})

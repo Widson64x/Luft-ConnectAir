@@ -42,6 +42,88 @@ class TabelaFreteService:
         return s
 
     @staticmethod
+    def CarregarCacheParaVoos(lista_voos: list) -> dict:
+        """
+        Carrega todas as tarifas relevantes para os voos informados em um único batch SQL.
+
+        Retorna um cache de consulta O(1):
+          {(cia_normalizada, origem, destino): {'id_frete', 'tarifa_base', 'servico', 'cia_tarifaria', 'tarifa_missing'}}
+
+        Substitui N chamadas individuais a CalcularCustoEstimado durante a montagem de rotas.
+        """
+        if not lista_voos:
+            return {}
+
+        origens    = set()
+        destinos   = set()
+        cias_norm  = set()
+
+        for voo in lista_voos:
+            orig      = str(voo.AeroportoOrigem or '').strip().upper()
+            dest      = str(voo.AeroportoDestino or '').strip().upper()
+            cia_norm  = TabelaFreteService._NormalizarNomeCia(voo.CiaAerea)
+            if orig and dest and cia_norm:
+                origens.add(orig)
+                destinos.add(dest)
+                cias_norm.add(cia_norm)
+
+        if not origens or not destinos:
+            return {}
+
+        from sqlalchemy import or_
+        Sessao = ObterSessaoSqlServer()
+        try:
+            filtros_cia = or_(*[TabelaFrete.CiaAerea.like(f"%{cia}%") for cia in cias_norm])
+
+            registros = (
+                Sessao.query(
+                    TabelaFrete.Id,
+                    TabelaFrete.Origem,
+                    TabelaFrete.Destino,
+                    TabelaFrete.CiaAerea,
+                    TabelaFrete.Tarifa,
+                    TabelaFrete.Servico,
+                )
+                .join(RemessaFrete, TabelaFrete.IdRemessa == RemessaFrete.Id)
+                .filter(
+                    RemessaFrete.Ativo == True,
+                    func.upper(func.trim(TabelaFrete.Origem)).in_(list(origens)),
+                    func.upper(func.trim(TabelaFrete.Destino)).in_(list(destinos)),
+                    TabelaFrete.Tarifa.isnot(None),
+                    filtros_cia,
+                )
+                .order_by(TabelaFrete.Tarifa.asc())
+                .all()
+            )
+
+            cache = {}
+            for reg in registros:
+                if not reg.Tarifa:
+                    continue
+                orig_key  = str(reg.Origem  or '').strip().upper()
+                dest_key  = str(reg.Destino or '').strip().upper()
+                cia_k     = TabelaFreteService._NormalizarNomeCia(reg.CiaAerea)
+                chave     = (cia_k, orig_key, dest_key)
+                if chave not in cache:  # ORDER BY Tarifa ASC → primeiro = menor tarifa
+                    cache[chave] = {
+                        'id_frete':      reg.Id,
+                        'tarifa_base':   float(reg.Tarifa),
+                        'servico':       str(reg.Servico or 'STD'),
+                        'cia_tarifaria': str(reg.CiaAerea or ''),
+                        'tarifa_missing': False,
+                    }
+
+            LogService.Info("TabelaFreteService",
+                f"Cache batch: {len(cache)} tarifas carregadas para {len(lista_voos)} voos.")
+            return cache
+
+        except Exception as e:
+            LogService.Error("TabelaFreteService", "Erro ao carregar cache batch de tarifas", e)
+            return {}
+        finally:
+            Sessao.close()
+
+    @staticmethod
     def ListarRemessas():
         Sessao = ObterSessaoSqlServer()
         try:

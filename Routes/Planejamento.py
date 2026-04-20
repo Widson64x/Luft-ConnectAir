@@ -9,6 +9,7 @@ from Services.PlanejamentoService import PlanejamentoService
 from Services.Shared.GeoService import BuscarCoordenadasCidade, BuscarAeroportoEstrategico, BuscarTopAeroportos
 from Services.MalhaService import MalhaService
 from Services.LogService import LogService
+from Services.Logic.RouteMLEngine import RouteMLEngine
 
 PlanejamentoBp = Blueprint('Planejamento', __name__)
 
@@ -34,7 +35,7 @@ def _carregar_dados_editor_planejamento(filial, serie, ctc, servicos_escolhidos=
     return PlanejamentoService.MontarDadosPlanejamento(filial, serie, ctc, servicos_escolhidos)
 
 
-def _calcular_contexto_rotas_editor(dados_ctc, dados_unificados, emitir_flash=False):
+def _calcular_contexto_rotas_editor(dados_ctc, dados_unificados, emitir_flash=False, ml_context=None):
     coord_origem = BuscarCoordenadasCidade(dados_ctc['origem_cidade'], dados_ctc['origem_uf'])
     coord_destino = BuscarCoordenadasCidade(dados_ctc['destino_cidade'], dados_ctc['destino_uf'])
 
@@ -64,7 +65,8 @@ def _calcular_contexto_rotas_editor(dados_ctc, dados_unificados, emitir_flash=Fa
                 iatas_destino,
                 peso_total,
                 tipo_carga=dados_unificados.get('tipo_carga'),
-                servico_contratado=dados_unificados.get('servico_roteamento') or dados_unificados.get('servico_contratado')
+                servico_contratado=dados_unificados.get('servico_roteamento') or dados_unificados.get('servico_contratado'),
+                ml_context=ml_context,
             )
 
             if not opcoes_rotas and emitir_flash:
@@ -115,10 +117,28 @@ def montarPlanejamento(filial, serie, ctc):
     if dadosUnificados.get('is_consolidado'):
         flash(f"Lote virtual criado: {dadosUnificados.get('qtd_docs')} CTCs foram consolidados para esta rota.", "success")
 
-    # Busca de um planejamento já salvo para este CTC, caso exista, para pré-carregar as informações e opções de rota previamente selecionadas
+    # Se já existe planejamento ativo para este CTC, abre direto em modo visualização
+    # sem calcular rotas (evita o processo caro de ~2 minutos)
     planejamentoSalvo = PlanejamentoService.ObterPlanejamentoPorCtc(filial, serie, ctc)
 
-    contexto_rotas = _calcular_contexto_rotas_editor(dadosCtc, dadosUnificados, emitir_flash=True)
+    if planejamentoSalvo:
+        LogService.Info("Routes.Planejamento", f"Planejamento ativo encontrado (ID {planejamentoSalvo['id_planejamento']}) — abrindo modo visualização.")
+        coord_origem = BuscarCoordenadasCidade(dadosCtc['origem_cidade'], dadosCtc['origem_uf'])
+        coord_destino = BuscarCoordenadasCidade(dadosCtc['destino_cidade'], dadosCtc['destino_uf'])
+        return render_template('Pages/Planejamento/Editor.html',
+                               Ctc=dadosUnificados,
+                               Origem=coord_origem,
+                               Destino=coord_destino,
+                               AeroOrigem=None,
+                               AeroDestino=None,
+                               OpcoesRotas={},
+                               PlanejamentoSalvo=planejamentoSalvo)
+
+    # Sem planejamento ativo (primeira montagem ou após cancelamento) — monta rotas completo
+    contexto_rotas = _calcular_contexto_rotas_editor(
+        dadosCtc, dadosUnificados, emitir_flash=True,
+        ml_context={'filial': filial, 'serie': serie, 'ctc': ctc, 'usuario': current_user.id}
+    )
 
     return render_template('Pages/Planejamento/Editor.html', 
                            Ctc=dadosUnificados, 
@@ -126,7 +146,7 @@ def montarPlanejamento(filial, serie, ctc):
                            AeroOrigem=contexto_rotas['aero_origem_principal'],
                            AeroDestino=contexto_rotas['aero_destino_principal'],
                            OpcoesRotas=contexto_rotas['opcoes_rotas'],
-                           PlanejamentoSalvo=planejamentoSalvo) 
+                           PlanejamentoSalvo=None) 
 
 
 @PlanejamentoBp.route('/API/OpcoesRotas', methods=['POST'])
@@ -154,7 +174,10 @@ def apiOpcoesRotasPlanejamento():
         if dadosUnificados.get('servico_pendente'):
             return jsonify({'sucesso': False, 'msg': 'Existem clientes com serviço pendente de definição.', 'ctc': dadosUnificados}), 400
 
-        contexto_rotas = _calcular_contexto_rotas_editor(dadosCtc, dadosUnificados, emitir_flash=False)
+        contexto_rotas = _calcular_contexto_rotas_editor(
+            dadosCtc, dadosUnificados, emitir_flash=False,
+            ml_context={'filial': filial, 'serie': serie, 'ctc': ctc, 'usuario': current_user.id}
+        )
         return jsonify({
             'sucesso': True,
             'ctc': dadosUnificados,
@@ -178,6 +201,7 @@ def cancelarPlanejamentoRota():
     sucesso, msg = PlanejamentoService.CancelarPlanejamento(idPlan, current_user.id)
     
     if sucesso:
+        RouteMLEngine.DesvincularPlanejamento(idPlan)
         msg = "Planejamento cancelado com sucesso. Os CTCs retornaram para a fila de pendências."
         
     return jsonify({'sucesso': sucesso, 'msg': msg})
@@ -199,7 +223,8 @@ def salvarPlanejamento():
         
         LogService.Info("Routes.Planejamento", f"Recebendo requisição de salvamento para {filial}-{serie}-{ctc}")
 
-        rotaCompleta = dadosFront.get('rota_completa', []) 
+        rotaCompleta = dadosFront.get('rota_completa', [])
+        motor_escolha = dadosFront.get('motor_escolha', 'GRAFO') 
 
         dadosCtc, ctcsCandidatos, dadosUnificados = _carregar_dados_editor_planejamento(
             filial,
@@ -237,11 +262,19 @@ def salvarPlanejamento():
             status_inicial='Em Planejamento',
             aero_origem=aeroOrigem['iata'] if aeroOrigem else None,
             aero_destino=aeroDestino['iata'] if aeroDestino else None,
-            lista_trechos=rotaCompleta
+            lista_trechos=rotaCompleta,
+            motor_escolha=motor_escolha
         )
         
         if idPlanejamento: 
             LogService.Info("Routes.Planejamento", f"Planejamento salvo com sucesso. ID Retornado: {idPlanejamento}")
+            RouteMLEngine.VincularPlanejamento(
+                filial=filial,
+                serie=serie,
+                ctc=ctc,
+                id_planejamento=idPlanejamento,
+                categoria_escolhida=dadosFront.get('estrategia', ''),
+            )
             return jsonify({
                 'sucesso': True, 
                 'id_planejamento': idPlanejamento, 

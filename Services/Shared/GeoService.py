@@ -54,10 +54,9 @@ def BuscarAeroportoEstrategico(Latitude, Longitude, UfAlvo):
         UfFiltro = UfAlvo.upper().strip()
 
         # 2. Busca aeroportos que estão no Ranking E que estão ativos na RemessaAeroportos
-        # O filtro RankingAeroportos.Uf garante a restrição estadual solicitada.
-        # CORREÇÃO: Ajuste no JOIN de RemessaAeroportos (Aeroporto.IdRemessa == RemessaAeroportos.Id)
         CandidatosEstrategicos = Sessao.query(
             RankingAeroportos.IndiceImportancia,
+            RankingAeroportos.IndiceUso,
             Aeroporto.CodigoIata,
             Aeroporto.NomeAeroporto,
             Aeroporto.Latitude,
@@ -79,13 +78,12 @@ def BuscarAeroportoEstrategico(Latitude, Longitude, UfAlvo):
             for Cand in CandidatosEstrategicos:
                 DistanciaReal = Haversine(Latitude, Longitude, float(Cand.Latitude), float(Cand.Longitude))
                 
-                # FÓRMULA DE DECISÃO:
-                # O Ranking atua como um "redutor de distância percebida".
-                # Se o aeroporto é muito importante (Indice 100), ele "abate" 350km (100 * 3.5) do custo.
-                BonusRanking = Cand.IndiceImportancia * FATOR_RANKING_KM
+                # Prioridade efetiva: Manual se definida (>0), senão usa a calculada por Uso
+                IndiceEfetivo = Cand.IndiceImportancia if Cand.IndiceImportancia > 0 else Cand.IndiceUso
+                BonusRanking = IndiceEfetivo * FATOR_RANKING_KM
                 ScoreCalculado = DistanciaReal - BonusRanking
 
-                LogDecisao.append(f"{Cand.CodigoIata}: Dist={DistanciaReal:.1f}km, Rank={Cand.IndiceImportancia}, Score={ScoreCalculado:.1f}")
+                LogDecisao.append(f"{Cand.CodigoIata}: Dist={DistanciaReal:.1f}km, Manual={Cand.IndiceImportancia}, Uso={Cand.IndiceUso}, Efetivo={IndiceEfetivo}, Score={ScoreCalculado:.1f}")
 
                 if ScoreCalculado < MenorScore:
                     MenorScore = ScoreCalculado
@@ -95,7 +93,9 @@ def BuscarAeroportoEstrategico(Latitude, Longitude, UfAlvo):
                         'lat': float(Cand.Latitude),
                         'lon': float(Cand.Longitude),
                         'distancia_km': round(DistanciaReal, 1),
-                        'ranking': Cand.IndiceImportancia,
+                        'ranking': IndiceEfetivo,
+                        'ranking_manual': Cand.IndiceImportancia,
+                        'ranking_uso': Cand.IndiceUso,
                         'metodo': 'Estrategico (Ranking)'
                     }
             

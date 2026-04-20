@@ -10,6 +10,7 @@ class GerenciadorEditor {
         
         this.estadoAtual = {
             estrategia: 'recomendada',
+            motorEscolha: 'GRAFO',
             rotaSelecionada: null,
             servicosEscolhidos: {}
         };
@@ -255,12 +256,44 @@ class GerenciadorEditor {
         });
     }
 
-    ativarModoEdicao() {
+    async ativarModoEdicao() {
         if(!confirm('Deseja descartar a visualização atual e calcular novas rotas?')) return;
+
+        const botao = document.getElementById('btn-recalcular');
+        const textoOriginal = botao.innerHTML;
+        botao.disabled = true;
+        botao.innerHTML = '<i class="ph-bold ph-spinner ph-spin"></i> Calculando...';
+
+        try {
+            const resposta = await fetch(rotasEditor.opcoesRotas, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    filial: dadosEditor.ctc.filial,
+                    serie: dadosEditor.ctc.serie,
+                    ctc: dadosEditor.ctc.ctc,
+                    servicos_escolhidos: this.estadoAtual.servicosEscolhidos
+                })
+            });
+            const dados = await resposta.json();
+
+            if (!resposta.ok || !dados.sucesso) {
+                throw new Error(dados.msg || 'Falha ao calcular as rotas.');
+            }
+
+            dadosEditor.opcoesRotas = dados.opcoes_rotas || {};
+            if (dados.ctc) dadosEditor.ctc = dados.ctc;
+
+        } catch (erro) {
+            console.error(erro);
+            alert(erro.message || 'Erro ao calcular as rotas.');
+            botao.disabled = false;
+            botao.innerHTML = textoOriginal;
+            return;
+        }
 
         document.getElementById('aviso-modo-visualizacao').classList.add('hidden');
         document.getElementById('container-estrategias').style.display = 'grid'; 
-        
         document.getElementById('btn-confirmar').style.display = 'inline-flex'; 
         document.getElementById('btn-recalcular').classList.add('hidden');
         document.getElementById('btn-cancelar-plan').classList.add('hidden');
@@ -324,6 +357,7 @@ class GerenciadorEditor {
         if(botaoAtivo) botaoAtivo.classList.add('active');
 
         const rotas = dadosEditor.opcoesRotas[tipoEstrategia];
+        this.estadoAtual.motorEscolha = (rotas && rotas.length > 0 && rotas[0].ml_ativo) ? 'ML' : 'GRAFO';
         this.estadoAtual.rotaSelecionada = rotas;
 
         if (rotas && rotas.length > 0) {
@@ -652,6 +686,7 @@ class GerenciadorEditor {
             ctc: dadosEditor.ctc.ctc,
             rota_completa: rotaFormatada,
             estrategia: this.estadoAtual.estrategia,
+            motor_escolha: this.estadoAtual.motorEscolha,
             servicos_escolhidos: this.estadoAtual.servicosEscolhidos
         };
 

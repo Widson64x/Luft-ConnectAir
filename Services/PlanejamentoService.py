@@ -891,7 +891,7 @@ class PlanejamentoService:
     
     @staticmethod
     def RegistrarPlanejamento(dados_ctc_principal, lista_consolidados=None, usuario="Sistema", status_inicial='Em Planejamento', 
-                              aero_origem=None, aero_destino=None, lista_trechos=None):
+                              aero_origem=None, aero_destino=None, lista_trechos=None, motor_escolha='GRAFO'):
         SessaoPG = ObterSessaoSqlServer()
         if not SessaoPG: 
             LogService.Error("PlanejamentoService", "Falha de conexão com banco ao tentar RegistrarPlanejamento.")
@@ -1085,7 +1085,8 @@ class PlanejamentoService:
                 Cabecalho.IdAeroportoOrigem = id_aero_orig_cab
                 Cabecalho.AeroportoDestino = aero_destino
                 Cabecalho.IdAeroportoDestino = id_aero_dest_cab
-                Cabecalho.IdCortePln = id_corte_pln 
+                Cabecalho.IdCortePln = id_corte_pln
+                Cabecalho.MotorEscolha = motor_escolha 
                 
                 def get_val(key): return float(dados_ctc_principal.get(key, 0) or 0)
                 Cabecalho.TotalVolumes = int(get_val('volumes'))
@@ -1106,7 +1107,8 @@ class PlanejamentoService:
                     TotalVolumes=int(get_val('volumes')),
                     TotalPeso=get_val('peso_taxado'), 
                     TotalValor=get_val('valor'),
-                    IdCortePln=id_corte_pln 
+                    IdCortePln=id_corte_pln,
+                    MotorEscolha=motor_escolha
                 )
                 SessaoPG.add(Cabecalho)
                 SessaoPG.flush()

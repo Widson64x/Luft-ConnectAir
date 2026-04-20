@@ -103,6 +103,18 @@ def rankingIndex():
     dadosAeroportos = AeroportoService.ListarAeroportosPorEstado()
     return render_template('Cadastros/Aeroportos/Ranking.html', Dados=dadosAeroportos)
 
+@AeroportoBp.route('/API/RecalcularUso', methods=['POST'])
+@login_required
+@require_ajax
+@RequerPermissao('CADASTROS.AEROPORTOS.EDITAR')
+def recalcularUso():
+    try:
+        sucesso, msg = AeroportoService.RecalcularUsoAeroportos()
+        return jsonify({'sucesso': sucesso, 'msg': msg})
+    except Exception as erro:
+        LogService.Error("Route.Aeroportos", "Erro na API RecalcularUso", erro)
+        return jsonify({'sucesso': False, 'msg': str(erro)}), 500
+
 @AeroportoBp.route('/API/SalvarRanking', methods=['POST'])
 @login_required
 @require_ajax
