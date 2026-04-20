@@ -44,7 +44,7 @@ jobs:
         $VersionNum = $VersionNum.Trim()
         
         # Chama o Python direto da pasta do projeto já implantado
-        cmd /c ".\.venv\Scripts\python.exe Scripts/GestaoVersao.py promover --sistema-id `"$SistemaId`" --numero `"$VersionNum`" --estagio `"$Estagio`""
+        cmd /c ".\.venv\Scripts\python.exe Scripts/GestaoVersao.py --sistema-id `"$SistemaId`" promover --numero `"$VersionNum`" --estagio `"$Estagio`""
         if ($LASTEXITCODE -ne 0) {
           Write-Error "Falha ao promover a versão $VersionNum do sistema $SistemaId. Código: $LASTEXITCODE"
           exit $LASTEXITCODE
