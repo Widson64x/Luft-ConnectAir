@@ -153,7 +153,7 @@ Luft-ConnectAir/
 ├── Conexoes.py                 # Gerenciamento central das instâncias de conexão e Session Makers
 ├── Configuracoes.py            # Carregamento de variáveis de ambiente e setup da aplicação
 ├── requirements.txt            # Lista de dependências e bibliotecas Python
-├── VERSION                     # Arquivo de controle estrito da versão atual do software
+├── VERSION                     # Fonte de verdade da versão atual (NUMERO e ESTAGIO)
 └── WSGI.py                     # Entrypoint de execução para ambiente de Produção
 
 ```
@@ -185,7 +185,9 @@ Luft-ConnectAir/
 
 
 5. **Versionamento:**
-* Qualquer nova release deve ter a numeração ajustada no arquivo `VERSION` e gerida através do script `Scripts/GestaoVersao.py`, que dispara os hooks corretos no `.github/workflows`.
+* O arquivo `VERSION` é a fonte única de verdade da release e deve manter `NUMERO` e `ESTAGIO`.
+* O deploy apenas sincroniza o conteúdo do `VERSION` com o banco, sem estágio fixo no workflow.
+* A promoção manual atualiza o `VERSION` e publica essa mudança na `main`, disparando o deploy automático na sequência.
 
 
 

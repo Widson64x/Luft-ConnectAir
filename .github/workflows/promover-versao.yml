@@ -11,7 +11,7 @@ on:
       novo_estagio:
         description: 'Novo estágio da versão'
         required: true
-        default: 'Alpha'
+        default: 'Beta'
         type: choice
         options:
         - Alpha                # <--- Desenvolvimento inicial
@@ -19,35 +19,61 @@ on:
         - Release Candidate    # <--- Candidata a oficial (NOVO)
         - Stable               # <--- Produção oficial
 
+permissions:
+  contents: write
+
 jobs:
   promover:
     runs-on: self-hosted  # Roda no mesmo servidor do deploy
 
     steps:
-    - name: Executar Promoção
+    - name: Baixar código atualizado
+      uses: actions/checkout@v4
+      with:
+        ref: main
+        fetch-depth: 0
+
+    - name: Atualizar VERSION no repositório
       shell: powershell
       run: |
-        $AppPath = "C:\ProjetosPython\Luft-ConnectAir"
+        $PythonPath = "C:\ProjetosPython\Luft-ConnectAir\.venv\Scripts\python.exe"
         $SistemaId = "${{ inputs.sistema_id }}"
         $Estagio = "${{ inputs.novo_estagio }}"
         
-        Write-Host "Iniciando promoção para $Estagio..."
-        
-        Set-Location $AppPath
-
-        if (-not (Test-Path "VERSION")) {
-          Write-Error "Arquivo VERSION não encontrado em $AppPath."
+        if (-not (Test-Path $PythonPath)) {
+          Write-Error "Python da aplicação não encontrado em $PythonPath."
           exit 1
         }
 
-        $VersionNum = Get-Content "VERSION" -Raw
-        $VersionNum = $VersionNum.Trim()
+        Write-Host "Atualizando VERSION para $Estagio..."
         
-        # Chama o Python direto da pasta do projeto já implantado
-        cmd /c ".\.venv\Scripts\python.exe Scripts/GestaoVersao.py --sistema-id `"$SistemaId`" promover --numero `"$VersionNum`" --estagio `"$Estagio`""
+        & $PythonPath Scripts/GestaoVersao.py --sistema-id "$SistemaId" promover --estagio "$Estagio" --somente-arquivo
         if ($LASTEXITCODE -ne 0) {
-          Write-Error "Falha ao promover a versão $VersionNum do sistema $SistemaId. Código: $LASTEXITCODE"
+          Write-Error "Falha ao atualizar o arquivo VERSION para o sistema $SistemaId. Código: $LASTEXITCODE"
           exit $LASTEXITCODE
         }
-        
-        Write-Host "Promoção concluída para a versão $VersionNum do sistema $SistemaId."
+
+    - name: Commitar VERSION atualizado
+      shell: powershell
+      run: |
+        if (-not (git status --short -- VERSION)) {
+          Write-Host "VERSION já estava no estágio solicitado. Nenhum commit necessário."
+          exit 0
+        }
+
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add VERSION
+        git commit -m "chore(version): promover para ${{ inputs.novo_estagio }}"
+        if ($LASTEXITCODE -ne 0) {
+          Write-Error "Falha ao criar commit da promoção de versão. Código: $LASTEXITCODE"
+          exit $LASTEXITCODE
+        }
+
+        git push origin HEAD:main
+        if ($LASTEXITCODE -ne 0) {
+          Write-Error "Falha ao publicar o VERSION atualizado na main. Código: $LASTEXITCODE"
+          exit $LASTEXITCODE
+        }
+
+        Write-Host "VERSION publicado na main. O deploy automático fará a sincronização no banco."

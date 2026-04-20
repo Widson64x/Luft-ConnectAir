@@ -664,7 +664,7 @@ def InjetarDadosGlobais():
 Os scripts soltos nesta pasta operam fora do ciclo de vida das requisições web (HTTP). Eles são utilizados por administradores do sistema ou via agendadores de tarefas (como o *Task Scheduler* do Windows ou *Cron* no Linux) para rotinas de banco de dados.
 
 * **`AtualizarBanco.py` / `InicializarBanco.py`:** Scripts que criam as tabelas e aplicam migrações (DDL) baseadas nas classes ORM definidas na pasta `Models/`.
-* **`GestaoVersao.py`:** Atualiza o arquivo `VERSION` e gerencia o log de mudanças de *releases*.
+* **`GestaoVersao.py`:** Atualiza o arquivo `VERSION` (`NUMERO` e `ESTAGIO`) e sincroniza a versão vigente com o banco.
 * **`DiagnosticoTabelas.py`:** Varre a integridade das conexões entre o PostgreSQL e o SQL Server, gerando alertas de discrepância de dados geográficos ou cadastrais.
 
 ### Módulo `Utils/` (Helpers Genéricos)

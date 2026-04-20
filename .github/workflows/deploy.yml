@@ -76,33 +76,22 @@ jobs:
             }
 
             # -----------------------------------------------------------
-            # 4.1 REGISTRAR NOVA VERSÃO (NOVO!)
+            # 4.1 SINCRONIZAR VERSION COM O BANCO
             # -----------------------------------------------------------
-            Write-Host "4.1 Registrando Versão no Banco..."
-            
-            # Lê o arquivo VERSION da raiz (Crie este arquivo com o número, ex: 1.0.1)
-            if (Test-Path "VERSION") {
-              $VersionNum = Get-Content "VERSION" -Raw
-              $VersionNum = $VersionNum.Trim() # Remove espaços extras
-              $VersionType = "Beta"
-              $SistemaId = $env:SISTEMA_ID
-            
-              # Limpa aspas e quebras de linha da mensagem de commit para não quebrar o comando CMD
-              $CleanMsg = $env:COMMIT_MSG -replace '"', '' -replace '[\r\n]+', ' | '
-              $Author = $env:COMMIT_AUTHOR
-              $Hash = $env:COMMIT_HASH
-            
-              # Roda o script Python usando a venv
-              cmd /c ".\.venv\Scripts\python.exe Scripts/GestaoVersao.py --sistema-id `"$SistemaId`" nova --numero `"$VersionNum`" --estagio `"$VersionType`" --msg `"$CleanMsg`" --dev `"$Author`" --hash `"$Hash`""
-              if ($LASTEXITCODE -ne 0) {
-                Write-Error "ERRO FATAL: Falha ao registrar/atualizar a versão $VersionNum do sistema $SistemaId. Código: $LASTEXITCODE"
-                Stop-Transcript; exit $LASTEXITCODE
-              }
-        
-              Write-Host "Versão $VersionNum sincronizada no banco para o sistema $SistemaId."
-            } else {
-              Write-Warning "Arquivo VERSION não encontrado. Pulei o registro de versão."
+            Write-Host "4.1 Sincronizando arquivo VERSION com o banco..."
+
+            $SistemaId = $env:SISTEMA_ID
+            $CleanMsg = $env:COMMIT_MSG -replace '"', '' -replace '[\r\n]+', ' | '
+            $Author = $env:COMMIT_AUTHOR
+            $Hash = $env:COMMIT_HASH
+
+            cmd /c ".\.venv\Scripts\python.exe Scripts/GestaoVersao.py --sistema-id `"$SistemaId`" sync --msg `"$CleanMsg`" --dev `"$Author`" --hash `"$Hash`""
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "ERRO FATAL: Falha ao sincronizar o arquivo VERSION no sistema $SistemaId. Código: $LASTEXITCODE"
+              Stop-Transcript; exit $LASTEXITCODE
             }
+
+            Write-Host "Arquivo VERSION sincronizado no banco para o sistema $SistemaId."
 
         } else {
             Write-Error "ERRO FATAL: .venv não encontrada!"
