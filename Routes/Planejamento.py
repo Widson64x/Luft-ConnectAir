@@ -7,8 +7,8 @@ from luftcore.extensions.flask_extension import require_ajax
 from Services.PermissaoService import RequerPermissao
 from Services.PlanejamentoService import PlanejamentoService
 from Services.Shared.GeoService import BuscarCoordenadasCidade, BuscarAeroportoEstrategico, BuscarTopAeroportos
-from Services.MalhaService import MalhaService
 from Services.LogService import LogService
+from Services.Logic.RouteIntelligenceService import RouteIntelligenceService
 from Services.Logic.RouteMLEngine import RouteMLEngine
 
 PlanejamentoBp = Blueprint('Planejamento', __name__)
@@ -58,7 +58,7 @@ def _calcular_contexto_rotas_editor(dados_ctc, dados_unificados, emitir_flash=Fa
                 "Routes.Planejamento",
                 f"Buscando opções de rotas de {iatas_origem} para {iatas_destino} entre {data_inicio_busca} e {data_limite} com peso {peso_total}kg."
             )
-            opcoes_rotas = MalhaService.BuscarOpcoesDeRotas(
+            opcoes_rotas = RouteIntelligenceService.BuscarOpcoesDeRotas(
                 data_inicio_busca,
                 data_limite,
                 iatas_origem,

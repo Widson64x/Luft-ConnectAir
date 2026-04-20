@@ -1272,6 +1272,31 @@ class PlanejamentoService:
                 PlanejamentoTrecho.IdPlanejamento == Cabecalho.IdPlanejamento
             ).order_by(PlanejamentoTrecho.Ordem).all()
 
+            iatasUnicos = {
+                str(iata or '').strip().upper()
+                for row in TrechosDB
+                for iata in (row[0].AeroportoOrigem, row[0].AeroportoDestino)
+                if str(iata or '').strip()
+            }
+
+            coordsAeroportos = {}
+            if iatasUnicos:
+                aeroportosDb = (
+                    SessaoPG.query(Aeroporto.CodigoIata, Aeroporto.Latitude, Aeroporto.Longitude)
+                    .join(RemessaAeroportos, Aeroporto.IdRemessa == RemessaAeroportos.Id)
+                    .filter(RemessaAeroportos.Ativo == True)
+                    .filter(Aeroporto.CodigoIata.in_(iatasUnicos))
+                    .all()
+                )
+                for aeroporto in aeroportosDb:
+                    codigoIata = str(aeroporto.CodigoIata or '').strip().upper()
+                    if not codigoIata:
+                        continue
+                    coordsAeroportos[codigoIata] = {
+                        'lat': float(aeroporto.Latitude) if aeroporto.Latitude is not None else 0.0,
+                        'lon': float(aeroporto.Longitude) if aeroporto.Longitude is not None else 0.0,
+                    }
+
             RotaFormatada = []
             CustoTotalCalculado = 0.0
             PrimeiraPartida = None
@@ -1295,14 +1320,19 @@ class PlanejamentoService:
                 custo_trecho = val_tarifa * PesoTotal
                 CustoTotalCalculado += custo_trecho
 
+                origemIata = str(t.AeroportoOrigem or '').strip().upper()
+                destinoIata = str(t.AeroportoDestino or '').strip().upper()
+                coordsOrigem = coordsAeroportos.get(origemIata, {'lat': 0.0, 'lon': 0.0})
+                coordsDestino = coordsAeroportos.get(destinoIata, {'lat': 0.0, 'lon': 0.0})
+
                 RotaFormatada.append({
                     'cia': t.CiaAerea,
                     'voo': t.NumeroVoo,
                     'data': data_str,
                     'horario_saida': partida_str,
                     'horario_chegada': chegada_str,
-                    'origem': {'iata': t.AeroportoOrigem, 'lat': 0, 'lon': 0}, 
-                    'destino': {'iata': t.AeroportoDestino, 'lat': 0, 'lon': 0},
+                    'origem': {'iata': origemIata, 'lat': coordsOrigem['lat'], 'lon': coordsOrigem['lon']}, 
+                    'destino': {'iata': destinoIata, 'lat': coordsDestino['lat'], 'lon': coordsDestino['lon']},
                     'base_calculo': {
                         'id_frete': t.IdFrete,
                         'servico': nm_servico,

@@ -2,6 +2,7 @@ from Conexoes import ObterSessaoSqlServer
 from Models.SQL_SERVER.CiaConfig import CiaConfig
 from Models.SQL_SERVER.MalhaAerea import VooMalha, RemessaMalha
 from Services.LogService import LogService
+from Services.Logic.RouteConfig import REGRAS_BUSCA_PADRAO
 
 class CiaAereaService:
 
@@ -43,7 +44,7 @@ class CiaAereaService:
                 if not nome_cia or nome_cia in CiasVistas:
                     continue
 
-                score = MapConfigs.get(nome_cia, 50) # Padrão 50 (Neutro)
+                score = MapConfigs.get(nome_cia, REGRAS_BUSCA_PADRAO.score_parceria_padrao)
                 ListaFinal.append({'cia': nome_cia, 'score': score})
                 CiasVistas.add(nome_cia)
             
@@ -95,7 +96,11 @@ class CiaAereaService:
         Sessao = ObterSessaoSqlServer()
         try:
             Configs = Sessao.query(CiaConfig).filter(CiaConfig.Ativo == True).all()
-            return {c.CiaAerea: c.ScoreParceria for c in Configs}
+            return {
+                CiaAereaService._NormalizarNomeCia(c.CiaAerea): c.ScoreParceria
+                for c in Configs
+                if CiaAereaService._NormalizarNomeCia(c.CiaAerea)
+            }
         except:
             return {}
         finally:

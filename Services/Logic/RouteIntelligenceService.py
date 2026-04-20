@@ -1,131 +1,336 @@
 ﻿import numpy as np
-import networkx as nx
-from datetime import datetime, timedelta, time
-from typing import Optional
+from datetime import datetime, timedelta
 
 from Conexoes import ObterSessaoSqlServer
-from Models.SQL_SERVER.Aeroporto import Aeroporto, RemessaAeroportos
-from Utils.Geometria import Haversine
-from Services.LogService import LogService
-from Services.TabelaFreteService import TabelaFreteService
+from Models.SQL_SERVER.Aeroporto import Aeroporto
+from Models.SQL_SERVER.MalhaAerea import RemessaMalha, VooMalha
 from Services.CiaAereaService import CiaAereaService
-from Services.Logic.RouteConfig import ContextoRota, ScoringWeights, resolver_contexto
+from Services.LogService import LogService
+from Services.Logic.RouteConfig import (
+    ContextoRota,
+    REGRAS_BUSCA_PADRAO,
+    RouteSearchRules,
+    ScoringWeights,
+    normalizar_iatas,
+    resolver_contexto,
+)
+from Services.Logic.RouteGraphEngine import RouteGraphEngine
 from Services.Logic.RouteMLEngine import RouteMLEngine
+from Services.TabelaFreteService import TabelaFreteService
 
 
 class RouteIntelligenceService:
     """
-    Motor de roteamento inteligente:
-    Grafos (NetworkX) -> Caminhos Cronologicos -> Score Vetorizado (NumPy + ML) -> Categorias
+    Orquestrador do fluxo de montagem de rotas.
 
-    Para mudar pesos ou regras de servico: edite Services/Logic/RouteConfig.py
-    Para treinar o modelo ML:              chame RouteMLEngine.Treinar()
-    Para registrar escolha do planejador:  chame RouteMLEngine.VincularPlanejamento() (em Routes/Planejamento.py)
+    Esta classe mantém apenas o fluxo base do processo:
+      consulta da malha -> geração de candidatos -> score -> categorização -> formatação
+
+    Cada engine especializada vive separada em Services/Logic:
+      - RouteGraphEngine: monta sequências válidas de voos pela malha
+      - RouteMLEngine: ajusta ranking com aprendizado histórico
+      - RouteAIEngine: reservado para uso futuro
     """
+
+    CATEGORIAS_RESULTADO = (
+        'recomendada',
+        'direta',
+        'rapida',
+        'economica',
+        'conexao_mesma_cia',
+        'interline',
+    )
 
     # -------------------------------------------------------------------------
     # ENTRADA PRINCIPAL
     # -------------------------------------------------------------------------
 
-    @staticmethod
+    @classmethod
+    def BuscarOpcoesDeRotas(
+        cls,
+        data_inicio,
+        data_fim,
+        lista_origens,
+        lista_destinos,
+        peso_total=100.0,
+        tipo_carga=None,
+        servico_contratado=None,
+        ml_context=None,
+    ) -> dict:
+        resultados = cls._novo_resultado_formatado()
+        origens = normalizar_iatas(lista_origens)
+        destinos = normalizar_iatas(lista_destinos)
+
+        if not origens or not destinos:
+            LogService.Warning("RouteIntelligence", "Busca ignorada: origens ou destinos vazios.")
+            return resultados
+
+        sessao = ObterSessaoSqlServer()
+        try:
+            LogService.Warning("RouteIntelligence", "=== BUSCA INTELIGENTE INICIADA ===")
+            LogService.Info("RouteIntelligence", f"IATAs Buscados -> Origens: {origens} | Destinos: {destinos}")
+
+            voos_db = cls._buscar_voos_disponiveis(sessao, data_inicio, data_fim, REGRAS_BUSCA_PADRAO)
+            if not voos_db:
+                LogService.Warning("RouteIntelligence", "FALHA: Nenhum voo foi encontrado no banco de dados para as datas solicitadas!")
+                return resultados
+
+            opcoes_brutas = cls.AnalisarEEncontrarRotas(
+                voos_db=voos_db,
+                data_inicio=data_inicio,
+                lista_origens=origens,
+                lista_destinos=destinos,
+                peso_total=peso_total,
+                tipo_carga=tipo_carga,
+                servico_contratado=servico_contratado,
+                regras=REGRAS_BUSCA_PADRAO,
+            )
+
+            if ml_context and any(valor for valor in opcoes_brutas.values() if valor):
+                RouteMLEngine.RegistrarSessaoAnalise(
+                    opcoes_brutas=opcoes_brutas,
+                    filial=ml_context.get('filial', ''),
+                    serie=ml_context.get('serie', ''),
+                    ctc=ml_context.get('ctc', ''),
+                    tipo_carga=tipo_carga,
+                    servico_contratado=servico_contratado,
+                    usuario=ml_context.get('usuario', ''),
+                )
+
+            return cls._formatar_resultados(sessao, opcoes_brutas)
+
+        except Exception as e:
+            LogService.Error("RouteIntelligence", "ERRO CRÍTICO em BuscarOpcoesDeRotas", e)
+            return resultados
+        finally:
+            sessao.close()
+
+    @classmethod
     def AnalisarEEncontrarRotas(
-        voos_db, data_inicio, lista_origens, lista_destinos,
-        peso_total, tipo_carga, servico_contratado,
+        cls,
+        voos_db,
+        data_inicio,
+        lista_origens,
+        lista_destinos,
+        peso_total,
+        tipo_carga,
+        servico_contratado,
+        regras: RouteSearchRules = REGRAS_BUSCA_PADRAO,
     ) -> dict:
         ctx = ContextoRota(tipo_carga, servico_contratado)
         servicos_alvo, pesos = resolver_contexto(ctx)
 
         LogService.Info("RouteIntelligence",
             f"Contexto: {ctx.tipo_carga}/{ctx.servico_contratado} | "
-            f"peso_tempo={pesos.peso_tempo:.1f}  peso_custo={pesos.peso_custo:.3f}")
+            f"peso_tempo={pesos.peso_tempo:.3f}  peso_custo={pesos.peso_custo:.3f}")
 
         scores_parceria = CiaAereaService.ObterDicionarioScores()
-        G = RouteIntelligenceService._construir_grafo(voos_db, scores_parceria)
-        LogService.Info("RouteIntelligence", f"Grafo: {G.number_of_nodes()} nos, {G.number_of_edges()} arestas")
-
-        coords = RouteIntelligenceService._carregar_coordenadas()
-
-        # Pre-carrega todas as tarifas em um único batch SQL (evita N+1 queries por candidato)
         cache_tarifas = TabelaFreteService.CarregarCacheParaVoos(voos_db)
+        coords = RouteGraphEngine.CarregarCoordenadas()
 
-        candidatos = RouteIntelligenceService._explorar_caminhos(
-            G, lista_origens, lista_destinos, data_inicio, peso_total, servicos_alvo, scores_parceria, coords,
+        rotas = RouteGraphEngine.GerarRotasCronologicas(
+            voos_db=voos_db,
+            data_inicio=data_inicio,
+            lista_origens=normalizar_iatas(lista_origens),
+            lista_destinos=normalizar_iatas(lista_destinos),
+            scores_parceria=scores_parceria,
+            regras=regras,
+        )
+
+        candidatos = cls._montar_candidatos(
+            rotas=rotas,
+            peso_total=peso_total,
+            servicos_alvo=servicos_alvo,
+            scores_parceria=scores_parceria,
+            coords=coords,
+            regras=regras,
             cache_tarifas=cache_tarifas,
         )
 
-        return RouteIntelligenceService._categorizar(candidatos, pesos, ctx, servicos_alvo)
+        return cls._categorizar(candidatos, pesos, ctx, servicos_alvo, regras)
 
     # -------------------------------------------------------------------------
-    # GRAFO
-    # -------------------------------------------------------------------------
-
-    @staticmethod
-    def _construir_grafo(voos_db, scores_parceria: dict) -> nx.DiGraph:
-        G = nx.DiGraph()
-        for voo in voos_db:
-            cia = voo.CiaAerea.strip().upper()
-            if scores_parceria.get(cia, 50) <= 0:
-                continue
-            o = voo.AeroportoOrigem.strip().upper()
-            d = voo.AeroportoDestino.strip().upper()
-            if G.has_edge(o, d):
-                G[o][d]['voos'].append(voo)
-            else:
-                G.add_edge(o, d, voos=[voo])
-        return G
-
-    # -------------------------------------------------------------------------
-    # EXPLORACAO DE CAMINHOS
+    # CONSULTA / MONTAGEM BASE
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def _explorar_caminhos(
-        G, origens, destinos, data_inicio, peso_total, servicos_alvo, scores_parceria, coords: dict,
+    def _buscar_voos_disponiveis(sessao, data_inicio, data_fim, regras: RouteSearchRules) -> list:
+        filtro_data_inicio = data_inicio.date() if isinstance(data_inicio, datetime) else data_inicio
+        filtro_data_fim = data_fim.date() if isinstance(data_fim, datetime) else data_fim
+        data_limite = filtro_data_fim + timedelta(days=regras.dias_adicionais_busca)
+
+        voos_db = (
+            sessao.query(VooMalha)
+            .join(RemessaMalha)
+            .filter(
+                RemessaMalha.Ativo == True,
+                VooMalha.DataPartida >= filtro_data_inicio,
+                VooMalha.DataPartida <= data_limite,
+            )
+            .all()
+        )
+
+        LogService.Info("RouteIntelligence", f"Buscando voos entre {filtro_data_inicio} e {data_limite}")
+        LogService.Info("RouteIntelligence", f"Quantidade de voos totais resgatados da base: {len(voos_db)}")
+        return voos_db
+
+    @classmethod
+    def _montar_candidatos(
+        cls,
+        rotas: list[list],
+        peso_total,
+        servicos_alvo: list,
+        scores_parceria: dict,
+        coords: dict,
+        regras: RouteSearchRules,
         cache_tarifas=None,
     ) -> list:
         candidatos = []
 
-        for origem in origens:
-            for destino in destinos:
-                if not G.has_node(origem):
-                    LogService.Warning("RouteIntelligence", f"Origem {origem} ausente no grafo.")
-                    continue
-                if not G.has_node(destino):
-                    LogService.Warning("RouteIntelligence", f"Destino {destino} ausente no grafo.")
-                    continue
+        for voos in rotas:
+            financeiro = cls.CalcularCustoRota(
+                voos,
+                peso_total,
+                servicos_alvo,
+                cache_tarifas=cache_tarifas,
+            )
 
-                try:
-                    caminhos = list(nx.all_simple_paths(G, source=origem, target=destino, cutoff=3))
-                except Exception as e:
-                    LogService.Error("RouteIntelligence", "Erro no motor de caminhos", e)
-                    continue
+            parceria_media = sum(
+                scores_parceria.get(str(voo.CiaAerea or '').strip().upper(), regras.score_parceria_padrao)
+                for voo in voos
+            ) / len(voos)
 
-                LogService.Info("RouteIntelligence", f"{origem}->{destino}: {len(caminhos)} caminhos teoricos")
-
-                for caminho in caminhos:
-                    voos = RouteIntelligenceService._validar_cronologico(G, caminho, data_inicio)
-                    if not voos:
-                        continue
-
-                    financeiro   = RouteIntelligenceService.CalcularCustoRota(voos, peso_total, servicos_alvo, cache_tarifas=cache_tarifas)
-                    parceria_med = sum(scores_parceria.get(v.CiaAerea.strip().upper(), 50) for v in voos) / len(voos)
-
-                    candidatos.append({
-                        'rota':            voos,
-                        'detalhes_tarifas': financeiro['detalhes'],
-                        'metricas': {
-                            'duracao':         RouteIntelligenceService._duracao(voos),
-                            'custo':           financeiro['custo_total'],
-                            'escalas':         len(voos) - 1,
-                            'trocas_cia':      RouteIntelligenceService._trocas_cia(voos),
-                            'indice_parceria': parceria_med,
-                            'sem_tarifa':      financeiro['sem_tarifa'],
-                            'fator_desvio':    RouteIntelligenceService._calcular_desvio(voos, coords),
-                            'score':           0.0,
-                        },
-                    })
+            candidatos.append({
+                'rota': voos,
+                'detalhes_tarifas': financeiro['detalhes'],
+                'metricas': {
+                    'duracao': cls._duracao(voos),
+                    'custo': financeiro['custo_total'],
+                    'escalas': len(voos) - 1,
+                    'trocas_cia': cls._trocas_cia(voos),
+                    'indice_parceria': parceria_media,
+                    'sem_tarifa': financeiro['sem_tarifa'],
+                    'fator_desvio': RouteGraphEngine.CalcularDesvio(voos, coords),
+                    'score': 0.0,
+                },
+            })
 
         return candidatos
+
+    @classmethod
+    def _formatar_resultados(cls, sessao, opcoes_brutas: dict) -> dict:
+        resultados = cls._novo_resultado_formatado()
+        cache_aeroportos = {}
+        voos_para_cache = []
+
+        for candidato in opcoes_brutas.values():
+            if candidato:
+                voos_para_cache.extend(candidato['rota'])
+
+        cls._completar_cache_aeroportos(sessao, voos_para_cache, cache_aeroportos)
+
+        def formatar(candidato, tag):
+            if not candidato:
+                return []
+            return cls._formatar_lista_rotas(
+                candidato['rota'],
+                cache_aeroportos,
+                tag,
+                candidato['metricas'],
+                candidato['detalhes_tarifas'],
+                bonus_ml=candidato.get('_bonus_ml', 0.0),
+            )
+
+        resultados['recomendada'] = formatar(opcoes_brutas.get('recomendada'), 'Recomendada')
+        resultados['direta'] = formatar(opcoes_brutas.get('direta'), 'Voo Direto')
+        resultados['rapida'] = formatar(opcoes_brutas.get('rapida'), 'Mais Rápida')
+        resultados['economica'] = formatar(opcoes_brutas.get('economica'), 'Mais Econômica')
+        resultados['conexao_mesma_cia'] = formatar(opcoes_brutas.get('conexao_mesma_cia'), 'Conexão (Mesma Cia)')
+        resultados['interline'] = formatar(opcoes_brutas.get('interline'), 'Interline (Múltiplas Cias)')
+
+        return resultados
+
+    @staticmethod
+    def _completar_cache_aeroportos(sessao, lista_voos, cache):
+        iatas = set()
+        for voo in lista_voos:
+            iatas.add(voo.AeroportoOrigem)
+            iatas.add(voo.AeroportoDestino)
+
+        faltantes = [iata for iata in iatas if iata not in cache]
+        if not faltantes:
+            return
+
+        for aeroporto in sessao.query(Aeroporto).filter(Aeroporto.CodigoIata.in_(faltantes)).all():
+            cache[aeroporto.CodigoIata] = {
+                'nome': aeroporto.NomeAeroporto,
+                'lat': float(aeroporto.Latitude or 0),
+                'lon': float(aeroporto.Longitude or 0),
+            }
+
+    @staticmethod
+    def _formatar_lista_rotas(lista_voos, cache, tipo, metricas=None, detalhes_tarifas=None, bonus_ml: float = 0.0):
+        resultado = []
+        info_adicional = {}
+
+        if metricas:
+            total_segundos = int(metricas['duracao'] * 60)
+            dias, resto = divmod(total_segundos, 86400)
+            horas, minutos = divmod(resto, 3600)
+            minutos //= 60
+            duracao_fmt = f"{dias}d {horas:02}:{minutos:02}" if dias > 0 else f"{horas:02}:{minutos:02}"
+            custo_fmt = f"R$ {metricas['custo']:,.2f}"
+            info_adicional = {
+                'total_duracao': duracao_fmt,
+                'total_custo': custo_fmt,
+                'total_custo_fmt': custo_fmt,
+                'total_custo_raw': metricas['custo'],
+                'ml_ativo': abs(bonus_ml) > REGRAS_BUSCA_PADRAO.limiar_bonus_ml_relevante,
+                'ml_bonus': round(bonus_ml, 2),
+            }
+
+        for idx, voo in enumerate(lista_voos):
+            origem = cache.get(voo.AeroportoOrigem, {'nome': voo.AeroportoOrigem})
+            destino = cache.get(voo.AeroportoDestino, {'nome': voo.AeroportoDestino})
+            dados_frete = detalhes_tarifas[idx] if detalhes_tarifas and idx < len(detalhes_tarifas) else {}
+            custo_trecho = dados_frete.get('custo_calculado', 0.0)
+
+            cia_tabela = dados_frete.get('cia_tarifaria')
+            cia_voo = str(voo.CiaAerea or '').strip()
+            cia_final = cia_tabela if cia_tabela else cia_voo
+
+            resultado.append({
+                'tipo_resultado': tipo,
+                'cia': cia_voo,
+                'voo': voo.NumeroVoo,
+                'data': voo.DataPartida.strftime('%d/%m/%Y'),
+                'horario_saida': voo.HorarioSaida.strftime('%H:%M'),
+                'horario_chegada': voo.HorarioChegada.strftime('%H:%M'),
+                'origem': {
+                    'iata': voo.AeroportoOrigem,
+                    'nome': origem.get('nome'),
+                    'lat': origem.get('lat'),
+                    'lon': origem.get('lon'),
+                },
+                'destino': {
+                    'iata': voo.AeroportoDestino,
+                    'nome': destino.get('nome'),
+                    'lat': destino.get('lat'),
+                    'lon': destino.get('lon'),
+                },
+                'base_calculo': {
+                    'id_frete': dados_frete.get('id_frete'),
+                    'tarifa': dados_frete.get('tarifa_base', 0.0),
+                    'servico': dados_frete.get('servico', 'STANDARD'),
+                    'cia_tarifaria': cia_final,
+                    'peso_usado': dados_frete.get('peso_calculado', 0),
+                    'custo_trecho': custo_trecho,
+                    'custo_trecho_fmt': f"R$ {custo_trecho:,.2f}",
+                },
+                **info_adicional,
+            })
+
+        return resultado
 
     # -------------------------------------------------------------------------
     # SCORE VETORIZADO (NumPy)
@@ -133,21 +338,40 @@ class RouteIntelligenceService:
 
     @staticmethod
     def _calcular_scores(
-        candidatos: list, pesos: ScoringWeights, ctx: ContextoRota, servicos_alvo: list,
+        candidatos: list,
+        pesos: ScoringWeights,
+        ctx: ContextoRota,
+        servicos_alvo: list,
+        regras: RouteSearchRules,
     ) -> list:
+        """
+        Pontua cada candidato de rota. Score MENOR = rota MELHOR (ranking ascendente).
+
+        A fórmula combina penalidades e bônus em quatro dimensões:
+          1. Tempo        → duração total da rota
+          2. Conexões     → número de escalas + trocas de CIA
+          3. Custo        → estratificado: sem tarifa > caro > proporcional
+          4. Qualidade    → penalidade por desvio geográfico − bônus de parceria
+          5. Serviço      → bônus/penalidade por alinhamento com o serviço contratado
+
+        Após o score base (determinístico), o ML aplica um ajuste calibrado para a
+        mesma escala do score base. O impacto é logado quando altera o vencedor.
+        """
         if not candidatos:
             return candidatos
 
+        # Extrai arrays NumPy de cada métrica — vetorizado, sem loop Python
         col = lambda key: np.array([c['metricas'][key] for c in candidatos], dtype=float)
 
-        duracoes  = col('duracao')
-        custos    = col('custo')
-        escalas   = col('escalas')
-        trocas    = col('trocas_cia')
-        parcerias = col('indice_parceria')
-        sem_tar   = col('sem_tarifa')
-        desvios   = col('fator_desvio')
+        duracoes  = col('duracao')          # minutos totais de voo da origem ao destino
+        custos    = col('custo')            # R$ total estimado para o peso informado
+        escalas   = col('escalas')          # número de conexões (0 = direto)
+        trocas    = col('trocas_cia')       # quantas trocas de companhia aérea na rota
+        parcerias = col('indice_parceria')  # score médio de parceria das CIAs (0–100)
+        sem_tar   = col('sem_tarifa')       # 1 se algum trecho está sem tarifa cadastrada
+        desvios   = col('fator_desvio')     # razão dist_percorrida / dist_direta (1.0 = ótimo)
 
+        # Verifica se o serviço do primeiro trecho bate com o serviço contratado
         svcs_usados = [
             str(c['detalhes_tarifas'][0].get('servico', '')).upper().strip()
             if c.get('detalhes_tarifas') else ''
@@ -155,26 +379,80 @@ class RouteIntelligenceService:
         ]
         alinhado = np.array([s in servicos_alvo for s in svcs_usados], dtype=float)
 
-        fator_custo = np.where(
-            sem_tar == 1,  pesos.penalidade_sem_tarifa,
+        # ── 1. Penalidade de TEMPO ────────────────────────────────────────────
+        # Cada minuto extra na rota adiciona peso_tempo ao score.
+        # Para perecível expresso, resolver_contexto multiplica este peso por 5.
+        pen_tempo = duracoes * pesos.peso_tempo
+
+        # ── 2. Penalidade de ESCALA ───────────────────────────────────────────
+        # Cada conexão adiciona peso_conexao=20 pontos.
+        # É uma penalidade propositalmente alta para que voos diretos sigam priorizados.
+        pen_escala = escalas * pesos.peso_conexao
+
+        # ── 3. Penalidade de TROCA DE CIA ─────────────────────────────────────
+        # Mudar de companhia em uma escala = processo de liberação diferente,
+        # mais manuseio e risco de perda. Penalidade por troca individual.
+        pen_troca = trocas * pesos.penalidade_troca_cia
+
+        # ── 4. Penalidade de CUSTO ────────────────────────────────────────────
+        # Estratificada em 3 níveis (do mais grave ao menos grave):
+        #   a) Sem tarifa cadastrada → penalidade máxima: custo real desconhecido
+        #   b) Custo acima do limiar → penalidade alta: rota cara demais para aprovar
+        #   c) Custo normal          → penalidade proporcional ao valor (custo × peso)
+        pen_custo = np.where(
+            sem_tar == 1,
+            pesos.penalidade_sem_tarifa,
             np.where(
-                custos > pesos.limiar_custo_alto, pesos.penalidade_custo_alto,
+                custos > pesos.limiar_custo_alto,
+                pesos.penalidade_custo_alto,
                 custos * pesos.peso_custo,
             ),
         )
 
-        scores = (
-            duracoes  * pesos.peso_tempo
-            + escalas * pesos.peso_conexao
-            + trocas  * pesos.penalidade_troca_cia
-            + fator_custo
-            + (desvios - 1.0) * pesos.penalidade_desvio
-            - (parcerias ** pesos.fator_parceria) / 50.0
-            - alinhado * pesos.bonus_servico_alinhado
-            + (1 - alinhado) * pesos.penalidade_perecivel_desalinhado * int(ctx.eh_perecivel_expresso)
+        # ── 5. Penalidade de DESVIO GEOGRÁFICO ───────────────────────────────
+        # Razão: distância total percorrida / distância direta origem→destino.
+        # Valor 1.0 = caminho ótimo (sem desvio). Valores > 1.0 indicam retrocesso.
+        # Ex.: GRU→SSA→GIG tem desvio ~1.7 (SSA fica ao norte, mas GIG ao sul).
+        pen_desvio = (desvios - 1.0) * pesos.penalidade_desvio
+
+        # ── 6. Bônus de PARCERIA ──────────────────────────────────────────────
+        # CIAs com parceria alta recebem bônus com crescimento exponencial (^2.2).
+        # Isso cria separação clara entre parceiros premium e básicos — um parceiro
+        # com score 90 recebe proporcionalmente muito mais bônus que um com score 60.
+        bon_parceria = (parcerias ** pesos.fator_parceria) / pesos.divisor_parceria
+
+        # ── 7. Bônus por SERVIÇO ALINHADO ─────────────────────────────────────
+        # Rota que oferece exatamente o serviço contratado pelo cliente é premiada.
+        # Ex.: cliente pediu "GOL LOG SAÚDE" → rota com "GOL LOG SAÚDE" ganha bônus.
+        bon_servico = alinhado * pesos.bonus_servico_alinhado
+
+        # ── 8. Penalidade perecível sem serviço alinhado ──────────────────────
+        # Cargas perecíveis em modo expresso EXIGEM o serviço correto para
+        # garantir a cadeia de frio. Se o serviço não bate, penalidade extra.
+        pen_perecivel = (
+            (1 - alinhado)
+            * pesos.penalidade_perecivel_desalinhado
+            * int(ctx.eh_perecivel_expresso)
         )
 
-        # Ajuste ML por candidato (modelo pre-carregado em memoria, chamada e rapida)
+        # ── Score base (puro algorítmico, sem ML) ─────────────────────────────
+        # Soma de todas as penalidades menos todos os bônus.
+        # Score MENOR = rota MELHOR.
+        scores = (
+            pen_tempo
+            + pen_escala
+            + pen_troca
+            + pen_custo
+            + pen_desvio
+            - bon_parceria
+            - bon_servico
+            + pen_perecivel
+        )
+
+        # ── Ajuste ML (opcional) ──────────────────────────────────────────────
+        # PredizirBonus() consulta o modelo treinado e retorna ±pontos com base
+        # nos padrões históricos das decisões dos planejadores.
+        # Só é aplicado quando o modelo está confiante (|prob - 0.5| > CONFIANCA_MINIMA).
         scores_base = scores.copy()
         for i, c in enumerate(candidatos):
             features = {
@@ -190,6 +468,7 @@ class RouteIntelligenceService:
             rota_voos = c.get('rota', [])
             aero_orig = rota_voos[0].AeroportoOrigem.strip().upper() if rota_voos else None
             aero_dest = rota_voos[-1].AeroportoDestino.strip().upper() if rota_voos else None
+
             bonus                  = RouteMLEngine.PredizirBonus(features, aero_orig=aero_orig, aero_dest=aero_dest)
             scores[i]             += bonus
             c['metricas']['score'] = float(scores[i])
@@ -197,12 +476,16 @@ class RouteIntelligenceService:
             c['_score_base']       = float(scores_base[i])
             c['_bonus_ml']         = float(bonus)
 
-        ativos = sum(1 for c in candidatos if abs(c.get('_bonus_ml', 0.0)) > 1.0)
+        # ── Diagnóstico do impacto ML ─────────────────────────────────────────
+        # Conta quantos candidatos receberam ajuste significativo.
+        # Compara quem seria o vencedor COM e SEM o ajuste ML.
+        limiar_bonus_ml = regras.limiar_bonus_ml_relevante
+        ativos = sum(1 for c in candidatos if abs(c.get('_bonus_ml', 0.0)) > limiar_bonus_ml)
         if ativos:
             idx_com_ml = min(range(len(candidatos)), key=lambda i: candidatos[i]['metricas']['score'])
             idx_sem_ml = min(range(len(candidatos)), key=lambda i: candidatos[i].get('_score_base', 0.0))
-            ml_decisivo = (idx_com_ml != idx_sem_ml) # O modelo ML mudou o vencedor (melhor score) em comparação ao score base sem ML
-            vencedor_tem_ml = abs(candidatos[idx_com_ml].get('_bonus_ml', 0.0)) > 1.0
+            ml_decisivo     = (idx_com_ml != idx_sem_ml)
+            vencedor_tem_ml = abs(candidatos[idx_com_ml].get('_bonus_ml', 0.0)) > limiar_bonus_ml
 
             if ml_decisivo:
                 LogService.Info("RouteIntelligence",
@@ -211,15 +494,16 @@ class RouteIntelligenceService:
                 LogService.Info("RouteIntelligence",
                     f"ML ATIVO: ajuste aplicado em {ativos}/{len(candidatos)} candidatos — vencedor confirmado pelo ML")
             else:
-                # Bonuses ativos mas o vencedor é um aeroporto desconhecido — manter scores base
+                # ML tem cobertura parcial, mas o vencedor algorítmico está fora dela.
+                # Descarta os ajustes para não distorcer o ranking de forma assimétrica.
                 for c in candidatos:
                     c['_bonus_ml'] = 0.0
                     c['metricas']['score'] = c.get('_score_base', c['metricas']['score'])
                 LogService.Info("RouteIntelligence",
-                    f"ML: ajuste parcial ({ativos}/{len(candidatos)} candidatos) — vencedor sem cobertura ML, GRAFO mantido")
+                    f"ML: ajuste parcial ({ativos}/{len(candidatos)} candidatos) — vencedor sem cobertura ML, score base mantido")
         else:
             LogService.Debug("RouteIntelligence",
-                "ML: sem modelo treinado — scores sem ajuste ML (fallback puro)")
+                "ML: sem modelo treinado ou confiança insuficiente — ranking por score algorítmico puro")
 
         return candidatos
 
@@ -227,18 +511,22 @@ class RouteIntelligenceService:
     # CATEGORIZACAO
     # -------------------------------------------------------------------------
 
-    @staticmethod
+    @classmethod
     def _categorizar(
-        candidatos: list, pesos: ScoringWeights, ctx: ContextoRota, servicos_alvo: list,
+        cls,
+        candidatos: list,
+        pesos: ScoringWeights,
+        ctx: ContextoRota,
+        servicos_alvo: list,
+        regras: RouteSearchRules,
     ) -> dict:
-        resultado = {k: None for k in
-                     ('recomendada', 'direta', 'rapida', 'economica', 'conexao_mesma_cia', 'interline')}
+        resultado = cls._novo_resultado_bruto()
 
         if not candidatos:
             LogService.Warning("RouteIntelligence", "Nenhum candidato aprovado nos filtros cronologicos.")
             return resultado
 
-        candidatos = RouteIntelligenceService._calcular_scores(candidatos, pesos, ctx, servicos_alvo)
+        candidatos = cls._calcular_scores(candidatos, pesos, ctx, servicos_alvo, regras)
         by_score   = sorted(candidatos, key=lambda c: c['metricas']['score'])
 
         tem_tarifa = lambda c: (
@@ -310,120 +598,6 @@ class RouteIntelligenceService:
         return {'custo_total': custo_total, 'detalhes': detalhes, 'sem_tarifa': sem_tarifa}
 
     # -------------------------------------------------------------------------
-    # VALIDACAO CRONOLOGICA
-    # -------------------------------------------------------------------------
-
-    @staticmethod
-    def _validar_cronologico(G, nos: list, data_inicio) -> Optional[list]:
-        """
-        Para cada caminho teórico, tenta TODAS as combinações de voo possíveis
-        começando do primeiro trecho, aceitando conexões de 3h a 36h.
-        Retorna a sequência válida mais cedo (menor data de partida total), ou None.
-        """
-        inicio = data_inicio if isinstance(data_inicio, datetime) else datetime.combine(data_inicio, time.min)
-
-        origem0, destino0 = nos[0], nos[1]
-        if not G.has_edge(origem0, destino0):
-            return None
-
-        primeiros_voos = sorted(
-            [v for v in G[origem0][destino0]['voos']
-             if datetime.combine(v.DataPartida, v.HorarioSaida) >= inicio],
-            key=lambda v: (v.DataPartida, v.HorarioSaida),
-        )
-
-        for primeiro_voo in primeiros_voos:
-            resultado = RouteIntelligenceService._construir_cadeia_cronologica(
-                G, nos, [primeiro_voo], trecho_idx=1,
-            )
-            if resultado is not None:
-                return resultado
-
-        return None
-
-    @staticmethod
-    def _construir_cadeia_cronologica(G, nos: list, voos_ate_agora: list, trecho_idx: int) -> Optional[list]:
-        """Recursivo: dado os voos já escolhidos, tenta encaixar o próximo trecho."""
-        if trecho_idx == len(nos) - 1:
-            return voos_ate_agora  # Caminho completo
-
-        origem  = nos[trecho_idx]
-        destino = nos[trecho_idx + 1]
-        if not G.has_edge(origem, destino):
-            return None
-
-        opcoes = sorted(G[origem][destino]['voos'], key=lambda v: (v.DataPartida, v.HorarioSaida))
-
-        # Preferência: mesma cia do trecho anterior
-        cia_ant = voos_ate_agora[-1].CiaAerea
-        opcoes = [v for v in opcoes if v.CiaAerea == cia_ant] + \
-                 [v for v in opcoes if v.CiaAerea != cia_ant]
-
-        chegada_ant = RouteIntelligenceService._chegada(voos_ate_agora[-1])
-
-        for voo in opcoes:
-            saida = datetime.combine(voo.DataPartida, voo.HorarioSaida)
-            if chegada_ant + timedelta(hours=3) <= saida <= chegada_ant + timedelta(hours=36):
-                resultado = RouteIntelligenceService._construir_cadeia_cronologica(
-                    G, nos, voos_ate_agora + [voo], trecho_idx + 1,
-                )
-                if resultado is not None:
-                    return resultado
-
-        return None
-
-    # -------------------------------------------------------------------------
-    # COORDENADAS DE AEROPORTOS (cache local por chamada)
-    # -------------------------------------------------------------------------
-
-    @staticmethod
-    def _carregar_coordenadas() -> dict:
-        """Retorna {IATA: (lat, lon)} usando a remessa ativa de aeroportos."""
-        sessao = ObterSessaoSqlServer()
-        try:
-            rows = (
-                sessao.query(Aeroporto.CodigoIata, Aeroporto.Latitude, Aeroporto.Longitude)
-                .join(RemessaAeroportos, Aeroporto.IdRemessa == RemessaAeroportos.Id)
-                .filter(RemessaAeroportos.Ativo == True)
-                .filter(Aeroporto.Latitude.isnot(None))
-                .filter(Aeroporto.Longitude.isnot(None))
-                .all()
-            )
-            return {
-                r.CodigoIata.upper(): (float(r.Latitude), float(r.Longitude))
-                for r in rows if r.CodigoIata
-            }
-        except Exception as e:
-            LogService.Warning("RouteIntelligence", f"Falha ao carregar coordenadas: {e}")
-            return {}
-        finally:
-            sessao.close()
-
-    @staticmethod
-    def _calcular_desvio(voos: list, coords: dict) -> float:
-        """
-        Razão entre a soma das distâncias de cada trecho e a distância direta origem→destino.
-        1.0 = rota sem desvio (caminho ótimo).
-        Valores acima indicam retrocesso geográfico (ex.: GIG→SSA→GRU→BEL retorna ao sul antes de subir).
-        """
-        if len(voos) < 2:
-            return 1.0
-        iatas = [voos[0].AeroportoOrigem.upper()] + [v.AeroportoDestino.upper() for v in voos]
-        o, d = iatas[0], iatas[-1]
-        if o not in coords or d not in coords:
-            return 1.0
-        dist_direta = Haversine(coords[o][0], coords[o][1], coords[d][0], coords[d][1])
-        if dist_direta < 1:
-            return 1.0
-        dist_total = 0.0
-        for i in range(len(iatas) - 1):
-            a, b = iatas[i], iatas[i + 1]
-            if a not in coords or b not in coords:
-                return 1.0  # Sem dados → sem penalidade (benefício da dúvida)
-            dist_total += Haversine(coords[a][0], coords[a][1], coords[b][0], coords[b][1])
-        return dist_total / dist_direta
-
-    # -------------------------------------------------------------------------
     # HELPERS DE DATA/HORA
     # -------------------------------------------------------------------------
 
@@ -445,5 +619,13 @@ class RouteIntelligenceService:
     @staticmethod
     def _trocas_cia(voos: list) -> int:
         return sum(1 for i in range(len(voos) - 1) if voos[i].CiaAerea != voos[i + 1].CiaAerea)
+
+    @classmethod
+    def _novo_resultado_bruto(cls) -> dict:
+        return {categoria: None for categoria in cls.CATEGORIAS_RESULTADO}
+
+    @classmethod
+    def _novo_resultado_formatado(cls) -> dict:
+        return {categoria: [] for categoria in cls.CATEGORIAS_RESULTADO}
 
 

@@ -1,6 +1,7 @@
 import os # Biblioteca para manipulação de caminhos e variáveis de ambiente
 import urllib.parse
 import secrets
+from click import Path
 from dotenv import load_dotenv
 
 load_dotenv() # Carrega as variáveis de ambiente do arquivo .env para o ambiente de execução
@@ -9,6 +10,8 @@ class ConfiguracaoBase:
     """
     Configurações Base compartilhadas entre todos os ambientes.
     """
+    DIR_SERVER = os.path.join(r"\\172.16.200.80\c$\Documents\Data_LuftConnectAir")
+
     DIR_BASE = os.path.dirname(os.path.abspath(__file__))
     # Nome da aplicação, usado para exibição e prefixo de rotas (pode ser personalizado via .env)
     APP_NAME = os.getenv("APP_NAME", "Luft-ConnectAir") # Obtém a variável APP_NAME, com a função getenv, que permite definir um valor padrão caso a variável não esteja presente. Se APP_NAME não estiver definido no .env, ele usará "Luft-ConnectAir" como nome da aplicação.
@@ -39,7 +42,7 @@ class ConfiguracaoBase:
     DIR_UPLOADS = os.path.join(DIR_BASE, "Data", "Uploads")
     DIR_TEMP    = os.path.join(DIR_BASE, "Data", "Temp")
     DIR_LOGS    = os.path.join(DIR_BASE, "Logs")
-    DIR_MODELS  = os.path.join(DIR_BASE, "Data", "ML_Models")
+    DIR_MODELS  = os.path.join(DIR_SERVER, "Data", "ML_Models")
 
     HOST = os.getenv("HOST", "127.0.0.1")
     PORT = int(os.getenv("PORT", "5000"))

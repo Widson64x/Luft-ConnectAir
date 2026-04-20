@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, render_template, request
 from flask_login import login_required
 from datetime import datetime
-from Services.MalhaService import MalhaService
+from Services.Logic.RouteIntelligenceService import RouteIntelligenceService
 from Services.PermissaoService import RequerPermissao
 
 EscalasBp = Blueprint('Escalas', __name__)
@@ -33,7 +33,7 @@ def apiOtimizarRotas():
         except ValueError:
             return jsonify({'erro': 'Formato de data ou peso inválido.'}), 400
 
-        opcoesRotas = MalhaService.BuscarOpcoesDeRotas(
+        opcoesRotas = RouteIntelligenceService.BuscarOpcoesDeRotas(
             data_inicio=dtInicio,
             data_fim=dtFim,
             lista_origens=origemBusca,   

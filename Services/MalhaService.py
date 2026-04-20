@@ -182,105 +182,17 @@ class MalhaService:
     # --- MÉTODO PRINCIPAL DE BUSCA ---
     @staticmethod
     def BuscarOpcoesDeRotas(data_inicio, data_fim, lista_origens, lista_destinos, peso_total=100.0, tipo_carga=None, servico_contratado=None, ml_context=None):
-        """Rota inteligente que busca opções de rotas na malha aérea, calcula métricas, e aplica inteligência para categorização.
-
-        Args:
-            data_inicio (_type_): Recebe a data de início para filtro dos voos (pode ser datetime ou date)
-            data_fim (_type_): Recebe a data de fim para filtro dos voos (pode ser datetime ou date)
-            lista_origens (_type_): Recebe uma lista de IATAs de origem ou um único IATA como string
-            lista_destinos (_type_): Recebe uma lista de IATAs de destino ou um único IATA como string
-            peso_total (float, optional): Recebe o peso total da carga para cálculo de custo. Defaults to 100.0.
-            tipo_carga (_type_, optional): Recebe o tipo de carga (ex: PERECIVEL, GERAL). Defaults to None.
-            servico_contratado (_type_, optional): Recebe o serviço contratado pelo cliente (ex: EXPRESSO, PADRÃO). Defaults to None.
-
-        Returns:
-            dict: Retorna um dicionário com as categorias de rotas e suas respectivas opções formatadas para exibição.
-        """
-        Sessao = ObterSessaoSqlServer()
-        ResultadosFormatados = {
-            'recomendada': [], 'direta': [], 'rapida': [], 
-            'economica': [], 'conexao_mesma_cia': [], 'interline': []
-        }
-        
-        if isinstance(lista_origens, str): lista_origens = [lista_origens]
-        if isinstance(lista_destinos, str): lista_destinos = [lista_destinos]
-        lista_origens = [o.strip().upper() for o in lista_origens]
-        lista_destinos = [d.strip().upper() for d in lista_destinos]
-
-        try:
-            LogService.Warning("MalhaService", f"=== BUSCA INTELIGENTE INICIADA ===")
-            FiltroDataInicio = data_inicio.date() if isinstance(data_inicio, datetime) else data_inicio
-            FiltroDataFim = data_fim.date() if isinstance(data_fim, datetime) else data_fim
-            
-            # 1. Busca os Dados Brutos (Provider de Dados)
-            VoosDB = Sessao.query(VooMalha).join(RemessaMalha).filter(
-                    RemessaMalha.Ativo == True,
-                    VooMalha.DataPartida >= FiltroDataInicio, 
-                    VooMalha.DataPartida <= FiltroDataFim + timedelta(days=30) # Lembre-se que mudamos para 30 aqui
-                ).all()
-            
-            # --- NOVOS LOGS AQUI ---
-            LogService.Info("MalhaService", f"Buscando voos entre {FiltroDataInicio} e {FiltroDataFim + timedelta(days=30)}")
-            LogService.Info("MalhaService", f"IATAs Buscados -> Origens: {lista_origens} | Destinos: {lista_destinos}")
-            LogService.Info("MalhaService", f"Quantidade de voos totais resgatados da base: {len(VoosDB)}")
-
-            if not VoosDB: 
-                LogService.Warning("MalhaService", "FALHA: Nenhum voo foi encontrado no banco de dados para as datas solicitadas!")
-                return ResultadosFormatados
-            
-            # 2. DELEGA PARA O CÉREBRO: O Intelligence processa tudo
-            OpcoesBrutas = RouteIntelligenceService.AnalisarEEncontrarRotas(
-                voos_db=VoosDB,
-                data_inicio=data_inicio,
-                lista_origens=lista_origens,
-                lista_destinos=lista_destinos,
-                peso_total=peso_total,
-                tipo_carga=tipo_carga,
-                servico_contratado=servico_contratado
-            )
-
-            # Registro ML: captura features brutas antes da formatação visual
-            if ml_context and any(v for v in OpcoesBrutas.values() if v):
-                RouteMLEngine.RegistrarSessaoAnalise(
-                    opcoes_brutas=OpcoesBrutas,
-                    filial=ml_context.get('filial', ''),
-                    serie=ml_context.get('serie', ''),
-                    ctc=ml_context.get('ctc', ''),
-                    tipo_carga=tipo_carga,
-                    servico_contratado=servico_contratado,
-                    usuario=ml_context.get('usuario', ''),
-                )
-
-            # 3. Formatação Visual (Presentation Layer mantida aqui ou no Controller)
-            DadosAeroportos = {}
-            VoosParaCache = []
-            for cat, val in OpcoesBrutas.items():
-                if val: VoosParaCache.extend(val['rota'])
-            
-            MalhaService._CompletarCacheDestinos(Sessao, VoosParaCache, DadosAeroportos)
-
-            def formatar_candidato(candidato, tag):
-                if not candidato: return []
-                return MalhaService._FormatarListaRotas(
-                    candidato['rota'], DadosAeroportos, tag,
-                    candidato['metricas'], candidato['detalhes_tarifas'],
-                    bonus_ml=candidato.get('_bonus_ml', 0.0),
-                )
-
-            ResultadosFormatados['recomendada'] = formatar_candidato(OpcoesBrutas.get('recomendada'), 'Recomendada')
-            ResultadosFormatados['direta'] = formatar_candidato(OpcoesBrutas.get('direta'), 'Voo Direto')
-            ResultadosFormatados['rapida'] = formatar_candidato(OpcoesBrutas.get('rapida'), 'Mais Rápida')
-            ResultadosFormatados['economica'] = formatar_candidato(OpcoesBrutas.get('economica'), 'Mais Econômica')
-            ResultadosFormatados['conexao_mesma_cia'] = formatar_candidato(OpcoesBrutas.get('conexao_mesma_cia'), 'Conexão (Mesma Cia)')
-            ResultadosFormatados['interline'] = formatar_candidato(OpcoesBrutas.get('interline'), 'Interline (Múltiplas Cias)')
-
-            return ResultadosFormatados
-
-        except Exception as e:
-            LogService.Error("MalhaService", "ERRO CRÍTICO em BuscarOpcoesDeRotas", e)
-            return ResultadosFormatados
-        finally:
-            Sessao.close()  
+        """Compatibilidade legada: delega a montagem de rotas para Services/Logic."""
+        return RouteIntelligenceService.BuscarOpcoesDeRotas(
+            data_inicio=data_inicio,
+            data_fim=data_fim,
+            lista_origens=lista_origens,
+            lista_destinos=lista_destinos,
+            peso_total=peso_total,
+            tipo_carga=tipo_carga,
+            servico_contratado=servico_contratado,
+            ml_context=ml_context,
+        )
 
     @staticmethod
     def _CompletarCacheDestinos(Sessao, ListaVoos, Cache):
