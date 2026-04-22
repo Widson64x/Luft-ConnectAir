@@ -119,7 +119,7 @@ class GerenciadorReversa {
             const displayStatus = document.getElementById(`status-display-${payload.filial}-${payload.ctc}`);
             const htmlOriginal = displayStatus.innerHTML;
 
-            displayStatus.innerHTML = `<div class="text-xs font-bold text-primary"><i class="ph-bold ph-spinner ph-spin"></i> Salvando...</div>`;
+            displayStatus.innerHTML = `<div class="text-xs font-bold text-primary"><i class="ph-bold ph-spinner animate-spin"></i> Salvando...</div>`;
             checkbox.disabled = true;
 
             try {
@@ -177,7 +177,7 @@ class GerenciadorReversa {
         const displayStatus = document.getElementById(`status-display-${payload.filial}-${payload.ctc}`);
         const htmlOriginal = displayStatus.innerHTML;
 
-        displayStatus.innerHTML = `<div class="text-xs font-bold text-primary"><i class="ph-bold ph-spinner ph-spin"></i> Salvando...</div>`;
+        displayStatus.innerHTML = `<div class="text-xs font-bold text-primary"><i class="ph-bold ph-spinner animate-spin"></i> Salvando...</div>`;
         checkbox.disabled = true;
 
         try {
@@ -209,7 +209,7 @@ class GerenciadorReversa {
             }
         } catch (erro) {
             console.error(erro);
-            alert('Erro ao comunicar com o servidor: ' + erro.message);
+            LuftCore.notificar('Erro ao comunicar com o servidor: ' + erro.message, 'danger');
             checkbox.checked = !estaMarcado;
             displayStatus.innerHTML = htmlOriginal;
         } finally {

@@ -87,12 +87,12 @@ class GerenciadorEscalas {
         };
 
         if (!parametros.inicio || !parametros.fim || !parametros.origem || !parametros.destino) {
-            alert("Por favor, preencha todos os campos obrigatórios (Datas, Origem e Destino).");
+            LuftCore.notificar('Por favor, preencha todos os campos obrigatórios (Datas, Origem e Destino).', 'warning');
             return;
         }
 
         this.btnBuscar.disabled = true;
-        this.btnBuscar.innerHTML = `<i class="ph-bold ph-spinner ph-spin"></i> Processando malha...`;
+            this.btnBuscar.innerHTML = `<i class="ph-bold ph-spinner animate-spin"></i> Processando malha...`;
         this.listaOpcoes.innerHTML = '';
         this.areaResultados.style.display = 'none';
         
@@ -106,7 +106,7 @@ class GerenciadorEscalas {
             const retornoJson = await resposta.json();
 
             if (retornoJson.status !== 'sucesso') {
-                alert(retornoJson.mensagem || retornoJson.erro || "Falha ao calcular rotas.");
+                LuftCore.notificar(retornoJson.mensagem || retornoJson.erro || 'Falha ao calcular rotas.', 'danger');
                 return;
             }
 
@@ -129,7 +129,7 @@ class GerenciadorEscalas {
 
         } catch (erro) {
             console.error(erro);
-            alert("Erro de comunicação com o servidor ao calcular rotas.");
+            LuftCore.notificar('Erro de comunicação com o servidor ao calcular rotas.', 'danger');
         } finally {
             this.btnBuscar.disabled = false;
             this.btnBuscar.innerHTML = `<i class="ph-bold ph-lightning"></i> Calcular Melhores Rotas`;

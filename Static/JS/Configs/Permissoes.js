@@ -43,7 +43,7 @@ class GerenciadorPermissoes {
                 chk.disabled = !this.PODE_EDITAR;
                 this.configurarVisualUsuario(idPerm, null, null, null); 
             });
-        } catch (e) { alert('Erro ao carregar grupo.'); console.error(e); }
+        } catch (e) { LuftCore.notificar('Erro ao carregar grupo.', 'danger'); console.error(e); }
     }
 
     async carregarUsuario(el, id, nome) {
@@ -80,13 +80,13 @@ class GerenciadorPermissoes {
                 chk.disabled = !this.PODE_EDITAR;
                 this.configurarVisualUsuario(idPerm, tipoStatus, isChecked, heranca.has(idPerm));
             });
-        } catch (e) { alert('Erro ao carregar usuário.'); console.error(e); }
+        } catch (e) { LuftCore.notificar('Erro ao carregar usuário.', 'danger'); console.error(e); }
     }
 
     async processarClick(chk) {
         if (!this.PODE_EDITAR) {
             chk.checked = !chk.checked;
-            alert('Você não tem permissão para editar.');
+            LuftCore.notificar('Você não tem permissão para editar.', 'warning');
             return;
         }
 
@@ -143,8 +143,8 @@ class GerenciadorPermissoes {
                 body: JSON.stringify({ Tipo: tipo, IdAlvo: alvo, IdPermissao: perm, Acao: acao })
             });
             const d = await resp.json();
-            if(!d.sucesso) alert('Erro: ' + d.erro);
-        } catch(e) { console.error(e); alert('Erro de conexão'); }
+            if(!d.sucesso) LuftCore.notificar('Erro: ' + d.erro, 'danger');
+        } catch(e) { console.error(e); LuftCore.notificar('Erro de conexão', 'danger'); }
     }
 
     ativarItemLista(el) {

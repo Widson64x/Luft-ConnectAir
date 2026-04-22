@@ -136,7 +136,7 @@ class GerenciadorEditor {
     async confirmarServicosDestino() {
         const { escolhas, faltantes } = this.coletarServicosPendentes();
         if (faltantes.length > 0) {
-            alert('Selecione o serviço para todos os clientes pendentes antes de calcular as rotas.');
+            LuftCore.notificar('Selecione o serviço para todos os clientes pendentes antes de calcular as rotas.', 'warning');
             return;
         }
 
@@ -146,7 +146,7 @@ class GerenciadorEditor {
         const textoOriginal = botao ? botao.innerHTML : '';
         if (botao) {
             botao.disabled = true;
-            botao.innerHTML = '<i class="ph-bold ph-spinner ph-spin"></i> Calculando...';
+            botao.innerHTML = '<i class="ph-bold ph-spinner animate-spin"></i> Calculando...';
         }
 
         this.renderizarMensagemServicoPendente();
@@ -177,7 +177,7 @@ class GerenciadorEditor {
             this.selecionarEstrategia('recomendada');
         } catch (erro) {
             console.error(erro);
-            alert(erro.message || 'Erro ao calcular as rotas.');
+            LuftCore.notificar(erro.message || 'Erro ao calcular as rotas.', 'danger');
             if (rotaAnterior && rotaAnterior.length > 0) {
                 this.renderizarRotaNoMapa(rotaAnterior);
                 this.renderizarLinhaDoTempo(rotaAnterior);
@@ -301,7 +301,7 @@ class GerenciadorEditor {
         const botao = document.getElementById('btn-recalcular');
         const textoOriginal = botao.innerHTML;
         botao.disabled = true;
-        botao.innerHTML = '<i class="ph-bold ph-spinner ph-spin"></i> Calculando...';
+        botao.innerHTML = '<i class="ph-bold ph-spinner animate-spin"></i> Calculando...';
 
         try {
             const resposta = await fetch(rotasEditor.opcoesRotas, {
@@ -325,7 +325,7 @@ class GerenciadorEditor {
 
         } catch (erro) {
             console.error(erro);
-            alert(erro.message || 'Erro ao calcular as rotas.');
+            LuftCore.notificar(erro.message || 'Erro ao calcular as rotas.', 'danger');
             botao.disabled = false;
             botao.innerHTML = textoOriginal;
             return;
@@ -346,7 +346,7 @@ class GerenciadorEditor {
         const id = dadosEditor.planejamentoSalvo.id_planejamento;
         const botao = document.getElementById('btn-cancelar-plan');
         const textoOriginal = botao.innerHTML;
-        botao.innerHTML = '<i class="ph-bold ph-spinner ph-spin"></i>...';
+        botao.innerHTML = '<i class="ph-bold ph-spinner animate-spin"></i>...';
         botao.disabled = true;
 
         try {
@@ -360,7 +360,7 @@ class GerenciadorEditor {
             if(dados.sucesso) {
                 window.location.href = rotasEditor.dashboard;
             } else {
-                alert('Erro: ' + dados.msg);
+                LuftCore.notificar('Erro: ' + dados.msg, 'danger');
                 botao.innerHTML = textoOriginal;
                 botao.disabled = false;
             }
@@ -779,13 +779,13 @@ class GerenciadorEditor {
                     window.location.href = rotasEditor.dashboard;
                 }, 1000);
             } else {
-                alert('Erro: ' + (dados.msg || 'Erro desconhecido'));
+                LuftCore.notificar('Erro: ' + (dados.msg || 'Erro desconhecido'), 'danger');
                 botao.innerHTML = textoOriginal;
                 botao.disabled = false;
             }
         } catch (erro) {
             console.error(erro);
-            alert('Erro de comunicação.');
+            LuftCore.notificar('Erro de comunicação.', 'danger');
             botao.innerHTML = textoOriginal;
             botao.disabled = false;
         }

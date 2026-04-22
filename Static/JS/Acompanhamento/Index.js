@@ -87,7 +87,7 @@ class GerenciadorAcompanhamento {
 
         const corpoTabela = document.querySelector('#tabela-awbs tbody');
 
-        corpoTabela.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:60px; color:var(--luft-text-muted);"><i class="ph-spinner ph-spin text-primary" style="font-size:28px;"></i><br><span style="margin-top:10px; display:block">Buscando cargas...</span></td></tr>`;
+        corpoTabela.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:60px; color:var(--luft-text-muted);"><i class="ph-bold ph-spinner animate-spin text-primary" style="font-size:28px;"></i><br><span style="margin-top:10px; display:block">Buscando cargas...</span></td></tr>`;
         
         this.resetarMapaVisual(); 
 
@@ -356,12 +356,12 @@ class GerenciadorAcompanhamento {
                 else cabecalho.classList.add('mh-default');
 
             } else {
-                alert(dadosRetorno.msg || "Detalhes não encontrados.");
+                LuftCore.notificar(dadosRetorno.msg || 'Detalhes não encontrados.', 'info');
                 this.fecharModalVoo();
             }
         } catch (erro) {
             console.error(erro);
-            alert("Erro ao buscar detalhes do voo.");
+            LuftCore.notificar('Erro ao buscar detalhes do voo.', 'danger');
             this.fecharModalVoo();
         }
     }

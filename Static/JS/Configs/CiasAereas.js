@@ -83,10 +83,10 @@ class GerenciadorCiasAereas {
                 body: JSON.stringify({ cia: cia, score: valor })
             });
             const dados = await resposta.json();
-            if (!dados.sucesso) alert('Erro ao salvar preferência.');
+            if (!dados.sucesso) LuftCore.notificar('Erro ao salvar preferência.', 'danger');
         } catch (erro) {
             console.error(erro);
-            alert("Erro de conexão ao salvar.");
+            LuftCore.notificar('Erro de conexão ao salvar.', 'danger');
         }
     }
 
@@ -117,7 +117,7 @@ class GerenciadorCiasAereas {
         const score = this.inputNovoScore.value;
 
         if (!nome) { 
-            alert('Digite o nome da Cia.'); 
+            LuftCore.notificar('Digite o nome da Cia.', 'warning');
             return; 
         }
 
@@ -132,11 +132,11 @@ class GerenciadorCiasAereas {
             if (dados.sucesso) {
                 location.reload(); 
             } else {
-                alert('Erro ao criar companhia.');
+                LuftCore.notificar('Erro ao criar companhia.', 'danger');
             }
         } catch (erro) {
             console.error(erro);
-            alert("Erro de conexão ao salvar.");
+            LuftCore.notificar('Erro de conexão ao salvar.', 'danger');
         }
     }
 }

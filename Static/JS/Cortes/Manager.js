@@ -33,7 +33,7 @@ class GerenciadorCortes {
     async carregarDados() {
         if (!this.tbodyTabela) return;
 
-        this.tbodyTabela.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 60px; color: var(--luft-text-muted);"><i class="ph-bold ph-spinner ph-spin text-primary" style="font-size: 2.5rem;"></i><br><span class="mt-2 d-inline-block">Carregando Dados...</span></td></tr>';
+        this.tbodyTabela.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 60px; color: var(--luft-text-muted);"><i class="ph-bold ph-spinner animate-spin text-primary" style="font-size: 2.5rem;"></i><br><span class="mt-2 d-inline-block">Carregando Dados...</span></td></tr>';
         
         const checkboxTodos = document.getElementById('cb-table-all');
         if (checkboxTodos) checkboxTodos.checked = false;
@@ -274,12 +274,12 @@ class GerenciadorCortes {
             document.querySelectorAll('.cb-tree-filial:checked').forEach(checkbox => payloadRequest.filiais.push(checkbox.value));
             
             if (payloadRequest.filiais.length === 0) {
-                return alert("Por favor, selecione pelo menos uma filial na árvore de seleção.");
+                return LuftCore.notificar('Por favor, selecione pelo menos uma filial na árvore de seleção.', 'warning');
             }
         }
 
         botaoSubmeter.disabled = true;
-        botaoSubmeter.innerHTML = '<i class="ph-bold ph-spinner ph-spin"></i> Salvando...';
+        botaoSubmeter.innerHTML = '<i class="ph-bold ph-spinner animate-spin"></i> Salvando...';
 
         const urlDestino = this.tabAtual === 'planejamento' ? rotasCortes.salvarPlanejamento : rotasCortes.salvarEmissao;
         
@@ -295,11 +295,11 @@ class GerenciadorCortes {
                 this.carregarDados();
             } else {
                 const retornoErro = await respostaServidor.json();
-                alert("Erro ao salvar: " + (retornoErro.msg || "Falha desconhecida"));
+                LuftCore.notificar('Erro ao salvar: ' + (retornoErro.msg || 'Falha desconhecida'), 'danger');
             }
         } catch (erroDeRede) { 
             console.error(erroDeRede);
-            alert("Erro de conexão ao servidor ao tentar salvar."); 
+            LuftCore.notificar('Erro de conexão ao servidor ao tentar salvar.', 'danger');
         } finally {
             botaoSubmeter.disabled = false;
             botaoSubmeter.innerHTML = textoOriginalBotao;
@@ -326,11 +326,11 @@ class GerenciadorCortes {
                 this.carregarDados();
             } else {
                 const retornoErro = await respostaServidor.json();
-                alert("Erro ao excluir as regras: " + (retornoErro.msg || "Falha desconhecida"));
+                LuftCore.notificar('Erro ao excluir as regras: ' + (retornoErro.msg || 'Falha desconhecida'), 'danger');
             }
         } catch (erroDeRede) { 
             console.error(erroDeRede);
-            alert("Erro de conexão ao servidor ao tentar excluir."); 
+            LuftCore.notificar('Erro de conexão ao servidor ao tentar excluir.', 'danger');
         }
     }
 }

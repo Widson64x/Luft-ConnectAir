@@ -72,14 +72,14 @@ class GerenciadorTabelasFrete {
         
         // Verifica a extensão
         if (!nomeArquivo.toLowerCase().endsWith('.xlsx')) {
-            alert('Por favor, envie apenas arquivos do formato Excel (.xlsx).');
+            LuftCore.notificar('Por favor, envie apenas arquivos do formato Excel (.xlsx).', 'warning');
             this.inputArquivo.value = ''; 
             return;
         }
 
         // Altera visualmente a área para o estado de "Carregando"
         this.areaUpload.innerHTML = `
-            <i class="ph-bold ph-spinner ph-spin text-primary" style="font-size: 3rem; margin-bottom: 16px;"></i>
+            <i class="ph-bold ph-spinner animate-spin text-primary" style="font-size: 3rem; margin-bottom: 16px;"></i>
             <div class="font-bold text-main" style="word-break: break-all;">Processando ${nomeArquivo}...</div>
             <div class="text-xs text-muted mt-1">Aguarde, importando a tabela de fretes.</div>
         `;
@@ -98,7 +98,7 @@ class GerenciadorTabelasFrete {
                 
                 if (confirm('ATENÇÃO: Deseja realmente excluir esta tabela de fretes e todas as suas tarifas?\nDeseja continuar?')) {
                     // Feedback visual no botão
-                    botao.innerHTML = '<i class="ph-bold ph-spinner ph-spin text-lg"></i>';
+                    botao.innerHTML = '<i class="ph-bold ph-spinner animate-spin text-lg"></i>';
                     botao.style.pointerEvents = 'none';
                     botao.classList.remove('text-danger');
                     botao.classList.add('text-muted');
@@ -114,7 +114,7 @@ class GerenciadorTabelasFrete {
             this.formSubstituicao.addEventListener('submit', () => {
                 const botaoConfirmar = document.getElementById('btn-confirmar-substituicao');
                 if (botaoConfirmar) {
-                    botaoConfirmar.innerHTML = '<i class="ph-bold ph-spinner ph-spin"></i> Atualizando Tabela...';
+                    botaoConfirmar.innerHTML = '<i class="ph-bold ph-spinner animate-spin"></i> Atualizando Tabela...';
                     botaoConfirmar.disabled = true;
                 }
             });

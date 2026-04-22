@@ -454,12 +454,12 @@
             if(json.sucesso) {
                 PreencherModal(json.dados);
             } else {
-                alert(json.msg || "Erro ao buscar dados.");
+                LuftCore.notificar(json.msg || 'Erro ao buscar dados.', 'danger');
                 FecharModalAwb();
             }
         } catch (e) {
             console.error("Erro modal:", e);
-            alert("Falha na comunicação.");
+            LuftCore.notificar('Falha na comunicação.', 'danger');
             FecharModalAwb();
         } finally {
             loader.style.display = 'none';

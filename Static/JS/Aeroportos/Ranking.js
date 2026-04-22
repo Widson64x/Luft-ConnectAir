@@ -284,7 +284,7 @@ class GerenciadorRanking {
     async recalcularUso() {
         const botao = document.getElementById('btn-recalcular-uso');
         const textoOriginal = botao.innerHTML;
-        botao.innerHTML = `<i class="ph-bold ph-spinner ph-spin text-lg"></i> Calculando...`;
+        botao.innerHTML = `<i class="ph-bold ph-spinner animate-spin text-lg"></i> Calculando...`;
         botao.disabled = true;
 
         try {
@@ -297,12 +297,12 @@ class GerenciadorRanking {
                 botao.innerHTML = `<i class="ph-bold ph-check text-lg"></i> ${json.msg}`;
                 setTimeout(() => window.location.reload(), 1800);
             } else {
-                alert(`Erro: ${json.msg}`);
+                LuftCore.notificar(`Erro: ${json.msg}`, 'danger');
                 botao.innerHTML = textoOriginal;
                 botao.disabled = false;
             }
         } catch (e) {
-            alert('Erro de comunicação.');
+            LuftCore.notificar('Erro de comunicação.', 'danger');
             botao.innerHTML = textoOriginal;
             botao.disabled = false;
         }
@@ -315,7 +315,7 @@ class GerenciadorRanking {
         
         texto.innerText = 'Processando...';
         botao.disabled = true;
-        botao.innerHTML = `<i class="ph-bold ph-spinner ph-spin text-lg"></i> <span class="btn-text">Salvando...</span>`;
+        botao.innerHTML = `<i class="ph-bold ph-spinner animate-spin text-lg"></i> <span class="btn-text">Salvando...</span>`;
 
         const promessas = Object.keys(dadosRanking).map(uf => {
             return fetch(rotasRanking.salvarRanking, {
@@ -336,13 +336,13 @@ class GerenciadorRanking {
                     botao.disabled = false;
                 }, 2000);
             } else {
-                alert(`Erro ao salvar ${falhas.length} estados.`);
+                LuftCore.notificar(`Erro ao salvar ${falhas.length} estados.`, 'danger');
                 botao.innerHTML = `<i class="ph-bold ph-floppy-disk text-lg"></i> <span class="btn-text">${textoOriginal}</span>`;
                 botao.disabled = false;
             }
         } catch (erro) {
             console.error(erro);
-            alert('Erro de comunicação.');
+            LuftCore.notificar('Erro de comunicação.', 'danger');
             botao.innerHTML = `<i class="ph-bold ph-floppy-disk text-lg"></i> <span class="btn-text">${textoOriginal}</span>`;
             botao.disabled = false;
         }
