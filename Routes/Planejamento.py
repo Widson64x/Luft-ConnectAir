@@ -97,6 +97,19 @@ def dashboard():
 @RequerPermissao('PLANEJAMENTO.ROTAS.VISUALIZAR')
 def apiCtcsHoje():
     LogService.Debug("Routes.Planejamento", "API Listar CTCs requisitada.")
+
+    sincronizacao = PlanejamentoService.SincronizarStatusPlanejamentosComAwb()
+    if sincronizacao.get('modo') == 'erro':
+        LogService.Warning(
+            "Routes.Planejamento",
+            f"Falha ao sincronizar planejamentos com AWB antes da listagem: {sincronizacao.get('erro', 'erro não informado')}"
+        )
+    elif sincronizacao.get('planejamentos_atualizados'):
+        LogService.Info(
+            "Routes.Planejamento",
+            f"Sincronização AWB concluída antes da listagem. Planejamentos atualizados: {sincronizacao['planejamentos_atualizados']}"
+        )
+
     dadosCtc = PlanejamentoService.BuscarCtcsPlanejamento()
     return jsonify(dadosCtc)
 
