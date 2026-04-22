@@ -2,9 +2,8 @@ from datetime import datetime, date, time, timedelta
 from decimal import Decimal
 import random
 import unicodedata
-import pandas as pd
 import io
-from sqlalchemy.orm import joinedload
+from openpyxl import Workbook
 from sqlalchemy import desc, func, text
 from Conexoes import ObterSessaoSqlServer
 from Models.SQL_SERVER.Ctc import CtcEsp, CtcEspCpl
@@ -23,6 +22,54 @@ class PlanejamentoService:
     """
     Service Layer Refatorada: Separação em Blocos (Diário, Reversa, Backlog).
     """
+
+    _CacheCollationColunas = {}
+
+    @staticmethod
+    def _ObterCollationColuna(sessao, nome_banco, nome_schema, nome_tabela, nome_coluna):
+        partes = [nome_banco, nome_schema, nome_tabela, nome_coluna]
+        if not all(partes):
+            return None
+
+        partes_sanitizadas = []
+        for parte in partes:
+            valor = str(parte).strip()
+            if not re.fullmatch(r'[A-Za-z0-9_]+', valor):
+                return None
+            partes_sanitizadas.append(valor)
+
+        banco, schema, tabela, coluna = partes_sanitizadas
+        chave_cache = (banco.lower(), schema.lower(), tabela.lower(), coluna.lower())
+
+        if chave_cache in PlanejamentoService._CacheCollationColunas:
+            return PlanejamentoService._CacheCollationColunas[chave_cache]
+
+        resultado = sessao.execute(
+            text(f"""
+                SELECT c.collation_name
+                FROM [{banco}].sys.columns c
+                INNER JOIN [{banco}].sys.objects o
+                    ON c.object_id = o.object_id
+                INNER JOIN [{banco}].sys.schemas s
+                    ON o.schema_id = s.schema_id
+                WHERE s.name = :nome_schema
+                  AND o.name = :nome_tabela
+                  AND c.name = :nome_coluna
+            """),
+            {
+                'nome_schema': schema,
+                'nome_tabela': tabela,
+                'nome_coluna': coluna,
+            }
+        ).scalar()
+
+        if resultado:
+            resultado = str(resultado).strip()
+            if not re.fullmatch(r'[A-Za-z0-9_]+', resultado):
+                resultado = None
+
+        PlanejamentoService._CacheCollationColunas[chave_cache] = resultado
+        return resultado
 
     # --- SQL BASE ATUALIZADO (Correção da lógica TM) ---
     _QueryBase = """
@@ -350,6 +397,112 @@ class PlanejamentoService:
             finally: 
                 SessaoPln.close()
         return mapa
+
+    @staticmethod
+    def SincronizarStatusPlanejamentosComAwb(aplicar_atualizacao=True):
+        SessaoPln = ObterSessaoSqlServer()
+        try:
+            if not SessaoPln:
+                return {'planejamentos_atualizados': 0, 'modo': 'indisponivel'}
+
+            collation_awbnota_ctc = PlanejamentoService._ObterCollationColuna(SessaoPln, 'intec', 'dbo', 'tb_airAWBnota', 'filialctc')
+            collation_awbnota_serie = PlanejamentoService._ObterCollationColuna(SessaoPln, 'intec', 'dbo', 'tb_airAWBnota', 'serie')
+            collation_awb_codawb = PlanejamentoService._ObterCollationColuna(SessaoPln, 'intec', 'dbo', 'tb_airAWB', 'codawb')
+            collation_status_codawb = PlanejamentoService._ObterCollationColuna(SessaoPln, 'intec', 'dbo', 'TB_AWB_STATUS', 'CODAWB')
+
+            expr_ctc_planejamento = "RIGHT(REPLICATE('0', 10) + LTRIM(RTRIM(ISNULL(pi.Ctc, ''))), 10)"
+            expr_serie_planejamento = "LTRIM(RTRIM(ISNULL(pi.Serie, '')))"
+            expr_codawb_awbnota = 'an.codawb'
+            expr_codawb_awb = 'a.codawb'
+
+            if collation_awbnota_ctc:
+                expr_ctc_planejamento = f"{expr_ctc_planejamento} COLLATE {collation_awbnota_ctc}"
+            if collation_awbnota_serie:
+                expr_serie_planejamento = f"{expr_serie_planejamento} COLLATE {collation_awbnota_serie}"
+            if collation_awb_codawb:
+                expr_codawb_awbnota = f"an.codawb COLLATE {collation_awb_codawb}"
+            if collation_status_codawb:
+                expr_codawb_awb = f"a.codawb COLLATE {collation_status_codawb}"
+
+            query_sincronizacao = text(f"""
+                WITH PlanejamentosComAwb AS (
+                    SELECT
+                        pc.IdPlanejamento,
+                        LEFT(COALESCE(NULLIF(LTRIM(RTRIM(ult.STATUS_AWB)), ''), 'AWB Gerada'), 20) AS NovoStatus,
+                        COALESCE(ult.DATAHORA_STATUS, a.Data_Importacao, a.data, pc.DataCriacao) AS DataReferencia,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY pc.IdPlanejamento
+                            ORDER BY COALESCE(ult.DATAHORA_STATUS, a.Data_Importacao, a.data, pc.DataCriacao) DESC,
+                                     a.codawb DESC
+                        ) AS OrdemStatus
+                    FROM intec.dbo.Tb_PLN_PlanejamentoCabecalho pc WITH (NOLOCK)
+                    INNER JOIN intec.dbo.Tb_PLN_PlanejamentoItem pi WITH (NOLOCK)
+                        ON pc.IdPlanejamento = pi.IdPlanejamento
+                    INNER JOIN intec.dbo.tb_airAWBnota an WITH (NOLOCK)
+                        ON RIGHT(REPLICATE('0', 10) + LTRIM(RTRIM(ISNULL(an.filialctc, ''))), 10)
+                         = {expr_ctc_planejamento}
+                       AND (
+                            NULLIF(LTRIM(RTRIM(ISNULL(an.serie, ''))), '') IS NULL
+                            OR LTRIM(RTRIM(an.serie)) = {expr_serie_planejamento}
+                       )
+                    INNER JOIN intec.dbo.tb_airAWB a WITH (NOLOCK)
+                        ON a.codawb = {expr_codawb_awbnota}
+                       AND ISNULL(a.cancelado, '') <> 'S'
+                    OUTER APPLY (
+                        SELECT TOP 1
+                            s.STATUS_AWB,
+                            s.DATAHORA_STATUS
+                        FROM intec.dbo.TB_AWB_STATUS s WITH (NOLOCK)
+                        WHERE s.CODAWB = {expr_codawb_awb}
+                        ORDER BY s.DATAHORA_STATUS DESC, s.DATA_INSERT DESC
+                    ) ult
+                    WHERE pc.Status = 'Em Planejamento'
+                )
+                SELECT IdPlanejamento, NovoStatus
+                FROM PlanejamentosComAwb
+                WHERE OrdemStatus = 1
+            """)
+
+            atualizacoes = []
+            for row in SessaoPln.execute(query_sincronizacao).mappings().all():
+                novo_status = str(row['NovoStatus'] or '').strip() or 'AWB Gerada'
+                atualizacoes.append({
+                    'id_planejamento': int(row['IdPlanejamento']),
+                    'novo_status': novo_status,
+                })
+
+            if not atualizacoes:
+                return {'planejamentos_atualizados': 0, 'modo': 'dry-run' if not aplicar_atualizacao else 'aplicado'}
+
+            if aplicar_atualizacao:
+                SessaoPln.execute(
+                    text("""
+                        UPDATE intec.dbo.Tb_PLN_PlanejamentoCabecalho
+                        SET Status = :novo_status
+                        WHERE IdPlanejamento = :id_planejamento
+                          AND Status = 'Em Planejamento'
+                    """),
+                    atualizacoes
+                )
+                SessaoPln.commit()
+
+            return {
+                'planejamentos_atualizados': len(atualizacoes),
+                'ids_planejamento': [item['id_planejamento'] for item in atualizacoes],
+                'modo': 'dry-run' if not aplicar_atualizacao else 'aplicado'
+            }
+        except Exception as e:
+            if SessaoPln:
+                SessaoPln.rollback()
+            LogService.Error("PlanejamentoService", "Erro ao sincronizar planejamentos com AWB", e)
+            return {
+                'planejamentos_atualizados': 0,
+                'modo': 'erro',
+                'erro': str(e)
+            }
+        finally:
+            if SessaoPln:
+                SessaoPln.close()
 
     @staticmethod
     def _SerializarResultados(ResultadoSQL, NomeBloco, MapaCache, CacheTarifas=None):
@@ -1394,165 +1547,204 @@ class PlanejamentoService:
     def GerarExcelPlanejamentos():
         SessaoPG = ObterSessaoSqlServer()
         try:
-            Resultados = SessaoPG.query(
-                PlanejamentoItem,
-                CtcEsp.rotafilialdest,
-                CtcEsp.motivodoc,
-                CtcEsp.remet_nome,
-                CtcEsp.dest_nome,
-                CtcEsp.respons_nome,
-                CtcEspCpl.ctc_corresp,
-                CtcEspCpl.TipoCarga,
-                Filial.nomefilial
-            ).join(
-                PlanejamentoCabecalho, PlanejamentoItem.IdPlanejamento == PlanejamentoCabecalho.IdPlanejamento
-            ).outerjoin(
-                CtcEsp,
-                (PlanejamentoItem.Filial.collate('DATABASE_DEFAULT') == CtcEsp.filial.collate('DATABASE_DEFAULT')) &
-                (PlanejamentoItem.Serie.collate('DATABASE_DEFAULT') == CtcEsp.seriectc.collate('DATABASE_DEFAULT')) &
-                (PlanejamentoItem.Ctc.collate('DATABASE_DEFAULT') == CtcEsp.filialctc.collate('DATABASE_DEFAULT'))
-            ).outerjoin(
-                CtcEspCpl, CtcEsp.filialctc == CtcEspCpl.filialctc
-            ).outerjoin(
-                Filial, PlanejamentoItem.Filial.collate('DATABASE_DEFAULT') == Filial.filial.collate('DATABASE_DEFAULT')
-            ).options(
-                joinedload(PlanejamentoItem.Cabecalho).joinedload(PlanejamentoCabecalho.Trechos),
-                joinedload(PlanejamentoItem.CidadeOrigemObj),
-                joinedload(PlanejamentoItem.CidadeDestinoObj)
-            ).filter(
-                PlanejamentoCabecalho.Status != 'Cancelado'
-            ).all()
+            collation_ctc_filial = PlanejamentoService._ObterCollationColuna(SessaoPG, 'intec', 'dbo', 'tb_ctc_esp', 'filial')
+            collation_ctc_serie = PlanejamentoService._ObterCollationColuna(SessaoPG, 'intec', 'dbo', 'tb_ctc_esp', 'seriectc')
+            collation_ctc_numero = PlanejamentoService._ObterCollationColuna(SessaoPG, 'intec', 'dbo', 'tb_ctc_esp', 'filialctc')
+            collation_filial = PlanejamentoService._ObterCollationColuna(SessaoPG, 'intec', 'dbo', 'tb_filial', 'filial')
+            collation_farma = PlanejamentoService._ObterCollationColuna(SessaoPG, 'farma', 'dbo', 'tb_ctc_esp', 'filialctc')
 
-            DadosPlanilha = []
+            join_pi_ctc_filial = 'pi.Filial = ctc.filial'
+            join_pi_ctc_serie = 'pi.Serie = ctc.seriectc'
+            join_pi_ctc_numero = 'pi.Ctc = ctc.filialctc'
+            join_pi_filial = 'pi.Filial = fil.filial'
+            join_farma = "cpl.ctc_corresp = farma.filialctc"
+
+            if collation_ctc_filial:
+                join_pi_ctc_filial = f"pi.Filial COLLATE {collation_ctc_filial} = ctc.filial"
+            if collation_ctc_serie:
+                join_pi_ctc_serie = f"pi.Serie COLLATE {collation_ctc_serie} = ctc.seriectc"
+            if collation_ctc_numero:
+                join_pi_ctc_numero = f"pi.Ctc COLLATE {collation_ctc_numero} = ctc.filialctc"
+            if collation_filial:
+                join_pi_filial = f"pi.Filial COLLATE {collation_filial} = fil.filial"
+            if collation_farma:
+                join_farma = f"cpl.ctc_corresp COLLATE {collation_farma} = farma.filialctc"
+
+            query_exportacao = text(f"""
+                WITH PrimeiroTrecho AS (
+                    SELECT
+                        pt.IdPlanejamento,
+                        pt.CiaAerea,
+                        pt.TipoServico,
+                        pt.DataPartida,
+                        ROW_NUMBER() OVER (PARTITION BY pt.IdPlanejamento ORDER BY pt.Ordem) AS LinhaTrecho
+                    FROM intec.dbo.Tb_PLN_PlanejamentoTrecho pt WITH (NOLOCK)
+                ),
+                TrechosFormatados AS (
+                    SELECT
+                        base.IdPlanejamento,
+                        STUFF((
+                            SELECT ' - ' + CASE
+                                WHEN pt2.Ordem = 1 THEN CONCAT(
+                                    'EM ', ISNULL(pt2.AeroportoOrigem, ''), ' VOO ',
+                                    ISNULL(pt2.CiaAerea, ''), ' ', ISNULL(pt2.NumeroVoo, ''), ' ',
+                                    ISNULL(CONVERT(varchar(5), pt2.DataPartida, 108), '--:--'),
+                                    ' / ',
+                                    ISNULL(CONVERT(varchar(5), pt2.DataChegada, 108), '--:--'),
+                                    ' EM ', ISNULL(pt2.AeroportoDestino, '')
+                                )
+                                ELSE CONCAT(
+                                    'VOO ', ISNULL(pt2.CiaAerea, ''), ' ', ISNULL(pt2.NumeroVoo, ''), ' ',
+                                    ISNULL(CONVERT(varchar(5), pt2.DataPartida, 108), '--:--'),
+                                    ' / ',
+                                    ISNULL(CONVERT(varchar(5), pt2.DataChegada, 108), '--:--'),
+                                    ' EM ', ISNULL(pt2.AeroportoDestino, '')
+                                )
+                            END
+                            FROM intec.dbo.Tb_PLN_PlanejamentoTrecho pt2 WITH (NOLOCK)
+                            WHERE pt2.IdPlanejamento = base.IdPlanejamento
+                            ORDER BY pt2.Ordem
+                            FOR XML PATH(''), TYPE
+                        ).value('.', 'nvarchar(max)'), 1, 3, '') AS VooFormatado
+                    FROM (
+                        SELECT DISTINCT IdPlanejamento
+                        FROM intec.dbo.Tb_PLN_PlanejamentoTrecho WITH (NOLOCK)
+                    ) base
+                )
+                SELECT
+                    pi.IdItem,
+                    pi.Filial,
+                    pi.Serie,
+                    pi.Ctc,
+                    pi.NotaFiscal,
+                    pi.DataEmissao,
+                    pi.Remetente,
+                    pi.Destinatario,
+                    pi.DestinoCidade,
+                    pi.Corte,
+                    pi.Volumes,
+                    pi.PesoTaxado,
+                    pi.ValMercadoria,
+                    pc.IdPlanejamento,
+                    pc.Status,
+                    ctc.rotafilialdest AS RotaLastMile,
+                    ctc.motivodoc AS MotivoDoc,
+                    ctc.remet_nome AS RemetNome,
+                    ctc.dest_nome AS DestNome,
+                    ctc.respons_nome AS ClienteNome,
+                    cpl.TipoCarga AS TipoCarga,
+                    fil.nomefilial AS NomeFilial,
+                    cidOrig.Uf AS UfOrigem,
+                    cidDest.Uf AS UfDestino,
+                    tp.CiaAerea AS CiaTrecho,
+                    tp.TipoServico AS ServicoTrecho,
+                    tp.DataPartida AS DataPartidaTrecho,
+                    tf.VooFormatado,
+                    farma.respons_nome AS ClienteFarma
+                FROM intec.dbo.Tb_PLN_PlanejamentoItem pi WITH (NOLOCK)
+                INNER JOIN intec.dbo.Tb_PLN_PlanejamentoCabecalho pc WITH (NOLOCK)
+                    ON pi.IdPlanejamento = pc.IdPlanejamento
+                LEFT JOIN intec.dbo.tb_ctc_esp ctc WITH (NOLOCK)
+                    ON {join_pi_ctc_filial}
+                   AND {join_pi_ctc_serie}
+                   AND {join_pi_ctc_numero}
+                LEFT JOIN intec.dbo.tb_ctc_esp_cpl cpl WITH (NOLOCK)
+                    ON ctc.filialctc = cpl.filialctc
+                LEFT JOIN farma.dbo.tb_ctc_esp farma WITH (NOLOCK)
+                    ON {join_farma}
+                   AND ISNULL(cpl.ctc_corresp, '') <> ''
+                LEFT JOIN intec.dbo.tb_filial fil WITH (NOLOCK)
+                    ON {join_pi_filial}
+                LEFT JOIN intec.dbo.Tb_PLN_Cidade cidOrig WITH (NOLOCK)
+                    ON pi.IdCidadeOrigem = cidOrig.Id
+                LEFT JOIN intec.dbo.Tb_PLN_Cidade cidDest WITH (NOLOCK)
+                    ON pi.IdCidadeDestino = cidDest.Id
+                LEFT JOIN PrimeiroTrecho tp
+                    ON tp.IdPlanejamento = pc.IdPlanejamento
+                   AND tp.LinhaTrecho = 1
+                LEFT JOIN TrechosFormatados tf
+                    ON tf.IdPlanejamento = pc.IdPlanejamento
+                WHERE pc.Status <> 'Cancelado' and pc.Status <> 'AWB Gerada'
+                ORDER BY pc.IdPlanejamento, pi.IdItem
+            """).execution_options(stream_results=True)
+
             Hoje = date.today()
-            
-            # Cache para evitar consultar o mesmo CTC da Farma repetidas vezes no banco
-            CacheFarma = {}
+            ColunasPlanilha = [
+                'UF ORIGEM', 'UNIDADE RESPONSÁVEL LAST MILE', 'TIPO', 'TIPO DE CARGA', 'CIA', 'SERVIÇO',
+                'CORTE', 'NOTA FISCAL', 'CLIENTE', 'RAZÃO SOCIAL DESTINATÁRIO', 'CIDADE DESTINO', 'UF DESTINO',
+                'VOLUMES', 'PESO', 'VALOR NF', 'PLANEJAMENTO', 'STATUS', 'FILIAL', 'SÉRIE', 'CTC', 'VOO',
+                'PREVISÃO DT. PARTIDA'
+            ]
+            ArquivoMemoria = io.BytesIO()
 
-            for Row in Resultados:
-                Item = Row.PlanejamentoItem
-                RotaLastMile = Row.rotafilialdest if Row.rotafilialdest else ''
-                MotivoDoc = Row.motivodoc if Row.motivodoc else ''
-                NomeFilialStr = str(Row.nomefilial).strip() if Row.nomefilial else Item.Filial
-                TipoCargaStr = str(Row.TipoCarga).strip() if Row.TipoCarga else ''
-                
-                RemetNome = Row.remet_nome if Row.remet_nome else Item.Remetente
-                DestNome = Row.dest_nome if Row.dest_nome else Item.Destinatario
-                ClienteNome = Row.respons_nome if Row.respons_nome else Item.Remetente
-                CtcCorresp = Row.ctc_corresp
+            WorkbookExcel = Workbook(write_only=True)
+            AbaPlanejamentos = WorkbookExcel.create_sheet(title='Planejamentos')
+            AbaPlanejamentos.append(ColunasPlanilha)
 
-                # --- LÓGICA DE SUBCONTRATAÇÃO FARMA ---
-                if CtcCorresp and str(CtcCorresp).strip():
-                    ctc_farma = str(CtcCorresp).strip()
-                    if ctc_farma not in CacheFarma:
-                        try:
-                            query_farma = text("SELECT respons_nome FROM farma.dbo.tb_ctc_esp (NOLOCK) WHERE filialctc = :ctc")
-                            farma_data = SessaoPG.execute(query_farma, {'ctc': ctc_farma}).fetchone()
-                            if farma_data and farma_data.respons_nome:
-                                CacheFarma[ctc_farma] = farma_data.respons_nome
-                            else:
-                                CacheFarma[ctc_farma] = None
-                        except Exception as e_farma:
-                            LogService.Warning("PlanejamentoService", f"Erro buscar subcontratação Farma no Excel: {e_farma}")
-                            CacheFarma[ctc_farma] = None
-                    
-                    nome_farma = CacheFarma.get(ctc_farma)
-                    if nome_farma:
-                        ClienteNome = nome_farma
+            ResultadoStream = SessaoPG.execute(query_exportacao)
 
-                # --- LÓGICA DE REVERSA (DEV) ---
-                ClienteFinal = ClienteNome
+            for Row in ResultadoStream.mappings():
+                MotivoDoc = Row['MotivoDoc'] or ''
+                NomeFilialStr = str(Row['NomeFilial']).strip() if Row['NomeFilial'] else Row['Filial']
+                TipoCargaStr = str(Row['TipoCarga']).strip() if Row['TipoCarga'] else ''
+                RotaLastMile = Row['RotaLastMile'] or ''
+
+                RemetNome = Row['RemetNome'] or Row['Remetente']
+                DestNome = Row['DestNome'] or Row['Destinatario']
+                ClienteFinal = Row['ClienteFarma'] or Row['ClienteNome'] or Row['Remetente']
                 DestinatarioFinal = RemetNome if MotivoDoc == 'DEV' else DestNome
 
-                if not ClienteFinal: ClienteFinal = Item.Remetente
-                if not DestinatarioFinal: DestinatarioFinal = Item.Destinatario
+                if not ClienteFinal:
+                    ClienteFinal = Row['Remetente']
+                if not DestinatarioFinal:
+                    DestinatarioFinal = Row['Destinatario']
 
-                # --- MONTAGEM DOS TRECHOS DE VOO ---
-                Cabecalho = Item.Cabecalho
-                TrechoPrincipal = None
-                VooFormatado = ""
-                
-                if Cabecalho.Trechos:
-                    TrechosOrdenados = sorted(Cabecalho.Trechos, key=lambda t: t.Ordem)
-                    if TrechosOrdenados:
-                        TrechoPrincipal = TrechosOrdenados[0]
-                        
-                        TrechosStrings = []
-                        for idx, trecho in enumerate(TrechosOrdenados):
-                            origem = trecho.AeroportoOrigem or ''
-                            destino = trecho.AeroportoDestino or ''
-                            cia = trecho.CiaAerea or ''
-                            voo = trecho.NumeroVoo or ''
-                            saida = trecho.DataPartida.strftime('%H:%M') if getattr(trecho, 'DataPartida', None) else '--:--'
-                            chegada = trecho.DataChegada.strftime('%H:%M') if getattr(trecho, 'DataChegada', None) else '--:--'
-                            
-                            if idx == 0:
-                                str_t = f"EM {origem} VOO {cia} {voo} {saida} / {chegada} EM {destino}"
-                            else:
-                                str_t = f"VOO {cia} {voo} {saida} / {chegada} EM {destino}"
-                                
-                            TrechosStrings.append(str_t)
-                            
-                        VooFormatado = " - ".join(TrechosStrings)
+                TipoClassificacao = 'DIÁRIO'
+                DataEmissao = Row['DataEmissao']
+                DataEmissaoComparacao = DataEmissao.date() if hasattr(DataEmissao, 'date') else DataEmissao
 
-                UfOrigem = Item.CidadeOrigemObj.Uf if Item.CidadeOrigemObj and hasattr(Item.CidadeOrigemObj, 'Uf') else ''
-                UfDestino = Item.CidadeDestinoObj.Uf if Item.CidadeDestinoObj and hasattr(Item.CidadeDestinoObj, 'Uf') else ''
-                
-                TipoClassificacao = "DIÁRIO"
                 if MotivoDoc == 'DEV':
-                    TipoClassificacao = "REVERSA"
-                elif Item.DataEmissao and Item.DataEmissao.date() < Hoje:
-                    TipoClassificacao = "BACKLOG"
+                    TipoClassificacao = 'REVERSA'
+                elif DataEmissaoComparacao and DataEmissaoComparacao < Hoje:
+                    TipoClassificacao = 'BACKLOG'
 
-                # --- LÓGICA DO CORTE SEM HORÁRIO ---
-                CorteFmt = ''
-                if Item.Corte is not None:
-                    CorteFmt = f"{Item.Corte}° Corte"
+                CorteFmt = f"{Row['Corte']}° Corte" if Row['Corte'] is not None else ''
+                DataPartidaFmt = Row['DataPartidaTrecho'].strftime('%d/%m/%Y %H:%M') if Row['DataPartidaTrecho'] else ''
 
-                DataPartidaFmt = TrechoPrincipal.DataPartida.strftime('%d/%m/%Y %H:%M') if TrechoPrincipal and TrechoPrincipal.DataPartida else ''
-
-                # --- LÓGICA DE MULTIPLAS NOTAS FISCAIS EM LINHAS SEPARADAS ---
-                NotasRawStr = str(Item.NotaFiscal).strip() if Item.NotaFiscal else str(Item.Ctc)
-                # Divide por qualquer separador comum: vírgula, barra, ponto-e-vírgula ou espaço
+                NotasRawStr = str(Row['NotaFiscal']).strip() if Row['NotaFiscal'] else str(Row['Ctc'])
                 NotasLista = [n.strip() for n in re.split(r'[,;/|\s]+', NotasRawStr) if n.strip()]
-                
-                # Se após limpar não sobrar nada, ele garante que pelo menos use o CTC
+
                 if not NotasLista:
-                    NotasLista = [str(Item.Ctc)]
+                    NotasLista = [str(Row['Ctc'])]
 
-                # Cria uma linha duplicada idêntica pra cada nota fiscal separada no array
                 for nf_individual in NotasLista:
-                    Linha = {
-                        'UF ORIGEM': UfOrigem,
-                        'UNIDADE RESPONSÁVEL LAST MILE': RotaLastMile, 
-                        'TIPO': TipoClassificacao, 
-                        'TIPO DE CARGA': TipoCargaStr,
-                        'CIA': TrechoPrincipal.CiaAerea if TrechoPrincipal else '',
-                        'SERVIÇO': TrechoPrincipal.TipoServico if TrechoPrincipal else '',
-                        'CORTE': CorteFmt,
-                        'NOTA FISCAL': nf_individual, # Campo individualizado da NF
-                        'CLIENTE': str(ClienteFinal).strip().upper() if ClienteFinal else '',
-                        'RAZÃO SOCIAL DESTINATÁRIO': str(DestinatarioFinal).strip().upper() if DestinatarioFinal else '',
-                        'CIDADE DESTINO': Item.DestinoCidade,
-                        'UF DESTINO': UfDestino,
-                        'VOLUMES': Item.Volumes,
-                        'PESO': float(Item.PesoTaxado) if Item.PesoTaxado else 0.0,
-                        'VALOR NF': float(Item.ValMercadoria) if Item.ValMercadoria else 0.0,
-                        'PLANEJAMENTO': Cabecalho.IdPlanejamento,
-                        'STATUS': Cabecalho.Status,
-                        'FILIAL': NomeFilialStr, 
-                        'SÉRIE': Item.Serie,
-                        'CTC': Item.Ctc,
-                        'VOO': VooFormatado, 
-                        'PREVISÃO DT. PARTIDA': DataPartidaFmt
-                    }
-                    DadosPlanilha.append(Linha)
+                    AbaPlanejamentos.append([
+                        Row['UfOrigem'] or '',
+                        RotaLastMile,
+                        TipoClassificacao,
+                        TipoCargaStr,
+                        Row['CiaTrecho'] or '',
+                        Row['ServicoTrecho'] or '',
+                        CorteFmt,
+                        nf_individual,
+                        str(ClienteFinal).strip().upper() if ClienteFinal else '',
+                        str(DestinatarioFinal).strip().upper() if DestinatarioFinal else '',
+                        Row['DestinoCidade'] or '',
+                        Row['UfDestino'] or '',
+                        Row['Volumes'] or 0,
+                        float(Row['PesoTaxado'] or 0.0),
+                        float(Row['ValMercadoria'] or 0.0),
+                        Row['IdPlanejamento'],
+                        Row['Status'] or '',
+                        NomeFilialStr,
+                        Row['Serie'] or '',
+                        Row['Ctc'] or '',
+                        Row['VooFormatado'] or '',
+                        DataPartidaFmt
+                    ])
 
-            DfPlanilha = pd.DataFrame(DadosPlanilha)
-            ArquivoMemoria = io.BytesIO()
-            
-            with pd.ExcelWriter(ArquivoMemoria, engine='openpyxl') as EscritorExcel:
-                DfPlanilha.to_excel(EscritorExcel, index=False, sheet_name='Planejamentos')
+            WorkbookExcel.save(ArquivoMemoria)
+            WorkbookExcel.close()
             
             ArquivoMemoria.seek(0)
             return ArquivoMemoria
